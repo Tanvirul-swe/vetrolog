@@ -163,6 +163,11 @@ export function App() {
   const addMutation = useDatabaseStore((s) => s.addMutation);
   const addMutationsBatch = useDatabaseStore((s) => s.addMutationsBatch);
   const addQueryLog = useDatabaseStore((s) => s.addQueryLog);
+  const setLatestQueryResult = useDatabaseStore((s) => s.setLatestQueryResult);
+  const updateRowLocally = useDatabaseStore((s) => s.updateRowLocally);
+  const deleteRowLocally = useDatabaseStore((s) => s.deleteRowLocally);
+  const rows = useDatabaseStore((s) => s.rows);
+  const columns = useDatabaseStore((s) => s.columns);
   const page = useDatabaseStore((s) => s.page);
   const pageSize = useDatabaseStore((s) => s.pageSize);
 
@@ -254,6 +259,10 @@ export function App() {
     addQueryLog(log);
   });
 
+  useWailsEvent(EVENTS.QUERY_RESULT, (result) => {
+    setLatestQueryResult(result);
+  });
+
   // 4. Request table data on selection or page change
   const handleRequestTableData = (targetPage = page) => {
     if (selectedDbId && selectedTableName) {
@@ -279,19 +288,132 @@ export function App() {
 
   // 5. Query execution trigger
   const handleExecuteQuery = (query: string) => {
-    if (selectedDbId) {
-      try {
-        if (
-          typeof window !== 'undefined' &&
-          // @ts-expect-error window.go may be undefined
-          window?.go?.app?.App?.ExecuteQuery
-        ) {
-          AppBindings.ExecuteQuery(selectedDbId, query);
-        }
-      } catch {
-        // Safe fallback
+    if (!selectedDbId) return;
+
+    try {
+      if (
+        typeof window !== 'undefined' &&
+        // @ts-expect-error window.go may be undefined
+        window?.go?.app?.App?.ExecuteQuery
+      ) {
+        AppBindings.ExecuteQuery(selectedDbId, query);
       }
+    } catch {
+      // Safe fallback
     }
+
+    // If in demo mode (no device connected), execute an interactive simulation response
+    if (!isConnected) {
+      const startTime = performance.now();
+      const qLower = query.toLowerCase();
+
+      let resultRows = [...rows];
+      let affected = 0;
+
+      if (qLower.includes('where') || qLower.includes('like')) {
+        resultRows = rows.slice(0, 2);
+      } else if (qLower.startsWith('insert') || qLower.startsWith('update') || qLower.startsWith('delete')) {
+        resultRows = [];
+        affected = 1;
+      } else if (qLower.includes('limit')) {
+        resultRows = rows.slice(0, 3);
+      }
+
+      const elapsed = Math.max(0.8, Number((performance.now() - startTime + Math.random() * 2).toFixed(2)));
+
+      const queryRes = {
+        requestId: `q_${Date.now()}`,
+        databaseId: selectedDbId,
+        query,
+        columns: columns,
+        rows: resultRows,
+        affected,
+        durationMs: elapsed,
+        success: true,
+      };
+
+      setLatestQueryResult(queryRes);
+      addQueryLog({
+        id: queryRes.requestId,
+        databaseId: selectedDbId,
+        query,
+        durationMs: elapsed,
+        timestamp: Date.now(),
+        success: true,
+      });
+    }
+  };
+
+  // 6. Data Editing / Mutation from Desktop
+  const handleUpdateRow = (pkField: string, pkValue: unknown, newValues: Record<string, unknown>) => {
+    if (!selectedDbId || !selectedTableName) return;
+
+    try {
+      if (
+        typeof window !== 'undefined' &&
+        // @ts-expect-error window.go may be undefined
+        window?.go?.app?.App?.UpdateRow
+      ) {
+        AppBindings.UpdateRow(
+          selectedDbId,
+          selectedTableName,
+          JSON.stringify({ [pkField]: pkValue }),
+          JSON.stringify(newValues)
+        );
+      }
+    } catch {
+      // Safe fallback
+    }
+
+    // Optimistically update local store
+    updateRowLocally(pkField, pkValue, newValues);
+
+    // Record mutation event
+    addMutation({
+      id: `mut_edit_${Date.now()}`,
+      databaseId: selectedDbId,
+      tableName: selectedTableName,
+      type: 'UPDATE',
+      timestamp: Date.now(),
+      query: `UPDATE ${selectedTableName} SET ${Object.keys(newValues)
+        .map((k) => `${k} = ?`)
+        .join(', ')} WHERE ${pkField} = ${JSON.stringify(pkValue)};`,
+      durationMs: 1.2,
+      newValues,
+      affected: 1,
+    });
+  };
+
+  // 7. Delete Row from Desktop
+  const handleDeleteRow = (pkField: string, pkValue: unknown) => {
+    if (!selectedDbId || !selectedTableName) return;
+
+    try {
+      if (
+        typeof window !== 'undefined' &&
+        // @ts-expect-error window.go may be undefined
+        window?.go?.app?.App?.DeleteRow
+      ) {
+        AppBindings.DeleteRow(selectedDbId, selectedTableName, JSON.stringify({ [pkField]: pkValue }));
+      }
+    } catch {
+      // Safe fallback
+    }
+
+    // Optimistically remove row locally
+    deleteRowLocally(pkField, pkValue);
+
+    // Record mutation event
+    addMutation({
+      id: `mut_del_${Date.now()}`,
+      databaseId: selectedDbId,
+      tableName: selectedTableName,
+      type: 'DELETE',
+      timestamp: Date.now(),
+      query: `DELETE FROM ${selectedTableName} WHERE ${pkField} = ${JSON.stringify(pkValue)};`,
+      durationMs: 0.9,
+      affected: 1,
+    });
   };
 
   return (
@@ -299,6 +421,8 @@ export function App() {
       onRefresh={() => handleRequestTableData(page)}
       onRequestPage={(p) => handleRequestTableData(p)}
       onExecuteQuery={handleExecuteQuery}
+      onUpdateRow={handleUpdateRow}
+      onDeleteRow={handleDeleteRow}
     />
   );
 }

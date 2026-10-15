@@ -8,11 +8,13 @@ import { useDatabaseStore } from '@/stores/useDatabaseStore';
 interface DataGridProps {
   onRefresh?: () => void;
   onRequestPage?: (page: number) => void;
+  onUpdateRow?: (pkField: string, pkValue: unknown, newValues: Record<string, unknown>) => void;
+  onDeleteRow?: (pkField: string, pkValue: unknown) => void;
 }
 
 type SortDirection = 'asc' | 'desc' | null;
 
-export function DataGrid({ onRefresh, onRequestPage }: DataGridProps) {
+export function DataGrid({ onRefresh, onRequestPage, onUpdateRow, onDeleteRow }: DataGridProps) {
   const selectedTable = useDatabaseStore((s) => s.selectedTableName);
   const columns = useDatabaseStore((s) => s.columns);
   const rows = useDatabaseStore((s) => s.rows);
@@ -191,7 +193,12 @@ export function DataGrid({ onRefresh, onRequestPage }: DataGridProps) {
         </div>
 
         {/* Slide-out Row Inspector Drawer */}
-        <RowDetailSheet row={selectedRow} onClose={() => setSelectedRow(null)} />
+        <RowDetailSheet
+          row={selectedRow}
+          onClose={() => setSelectedRow(null)}
+          onUpdateRow={onUpdateRow}
+          onDeleteRow={onDeleteRow}
+        />
       </div>
     </div>
   );

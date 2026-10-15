@@ -6,5 +6,6 @@ export const EVENTS = {
   LIVE_MUTATION: 'vetrolog:live_mutation',
   BATCH_MUTATIONS: 'vetrolog:batch_mutations',
   QUERY_LOG: 'vetrolog:query_log',
+  QUERY_RESULT: 'vetrolog:query_result',
   CONNECTION_STATE: 'vetrolog:connection_state',
 } as const;

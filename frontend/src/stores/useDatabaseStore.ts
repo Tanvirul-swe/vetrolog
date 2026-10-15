@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { ColumnInfo, DatabaseInfo, MutationEvent, QueryLog, TableDataPayload } from '../types/database';
+import { ColumnInfo, DatabaseInfo, MutationEvent, QueryLog, QueryResult, TableDataPayload } from '../types/database';
 
 interface DatabaseStoreState {
   databases: DatabaseInfo[];
@@ -17,6 +17,7 @@ interface DatabaseStoreState {
   filterTerm: string;
   mutations: MutationEvent[];
   queryLogs: QueryLog[];
+  latestQueryResult: QueryResult | null;
 
   // Actions
   setDatabases: (databases: DatabaseInfo[]) => void;
@@ -29,6 +30,9 @@ interface DatabaseStoreState {
   addMutation: (mutation: MutationEvent) => void;
   addMutationsBatch: (batch: MutationEvent[]) => void;
   addQueryLog: (log: QueryLog) => void;
+  setLatestQueryResult: (result: QueryResult | null) => void;
+  updateRowLocally: (pkField: string, pkValue: unknown, newValues: Record<string, unknown>) => void;
+  deleteRowLocally: (pkField: string, pkValue: unknown) => void;
   clearLogs: () => void;
 }
 
@@ -48,6 +52,7 @@ export const useDatabaseStore = create<DatabaseStoreState>((set) => ({
   filterTerm: '',
   mutations: [],
   queryLogs: [],
+  latestQueryResult: null,
 
   setDatabases: (databases) =>
     set((state) => {
@@ -116,5 +121,34 @@ export const useDatabaseStore = create<DatabaseStoreState>((set) => ({
       queryLogs: [log, ...state.queryLogs.slice(0, 499)],
     })),
 
-  clearLogs: () => set({ mutations: [], queryLogs: [] }),
+  setLatestQueryResult: (result) => set({ latestQueryResult: result }),
+
+  updateRowLocally: (pkField, pkValue, newValues) =>
+    set((state) => {
+      const updatedRows = state.rows.map((r) => {
+        if (r[pkField] === pkValue) {
+          return { ...r, ...newValues };
+        }
+        return r;
+      });
+
+      const updatedSelected =
+        state.selectedRow && state.selectedRow[pkField] === pkValue
+          ? { ...state.selectedRow, ...newValues }
+          : state.selectedRow;
+
+      return { rows: updatedRows, selectedRow: updatedSelected };
+    }),
+
+  deleteRowLocally: (pkField, pkValue) =>
+    set((state) => {
+      const updatedRows = state.rows.filter((r) => r[pkField] !== pkValue);
+      return {
+        rows: updatedRows,
+        totalRows: Math.max(0, state.totalRows - 1),
+        selectedRow: state.selectedRow && state.selectedRow[pkField] === pkValue ? null : state.selectedRow,
+      };
+    }),
+
+  clearLogs: () => set({ mutations: [], queryLogs: [], latestQueryResult: null }),
 }));

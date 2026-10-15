@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -32,6 +33,48 @@ func (a *App) ExecuteQuery(databaseID string, query string) bool {
 		"query":      query,
 	}
 	return a.server.Hub().SendToActive("execute_query", reqID, payload)
+}
+
+// UpdateRow requests the mobile client to update a row in the specified database table
+func (a *App) UpdateRow(databaseID string, tableName string, primaryKeyJSON string, newValuesJSON string) bool {
+	reqID := fmt.Sprintf("update_%d", time.Now().UnixNano())
+
+	var pk map[string]interface{}
+	var values map[string]interface{}
+
+	if err := json.Unmarshal([]byte(primaryKeyJSON), &pk); err != nil {
+		return false
+	}
+	if err := json.Unmarshal([]byte(newValuesJSON), &values); err != nil {
+		return false
+	}
+
+	payload := models.RowUpdatePayload{
+		DatabaseID: databaseID,
+		TableName:  tableName,
+		PrimaryKey: pk,
+		NewValues:  values,
+	}
+
+	return a.server.Hub().SendToActive("update_row", reqID, payload)
+}
+
+// DeleteRow requests the mobile client to remove a row in the specified database table
+func (a *App) DeleteRow(databaseID string, tableName string, primaryKeyJSON string) bool {
+	reqID := fmt.Sprintf("delete_%d", time.Now().UnixNano())
+
+	var pk map[string]interface{}
+	if err := json.Unmarshal([]byte(primaryKeyJSON), &pk); err != nil {
+		return false
+	}
+
+	payload := models.RowDeletePayload{
+		DatabaseID: databaseID,
+		TableName:  tableName,
+		PrimaryKey: pk,
+	}
+
+	return a.server.Hub().SendToActive("delete_row", reqID, payload)
 }
 
 // DisconnectActiveDevice gracefully disconnects the connected mobile client

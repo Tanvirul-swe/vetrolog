@@ -81,6 +81,24 @@ func (r *Router) Route(client *Client, raw []byte) {
 			r.broadcaster.Emit(models.EventQueryLog, qLog)
 		}
 
+	case "query_result":
+		var result models.QueryResult
+		if err := json.Unmarshal(env.Payload, &result); err == nil {
+			r.broadcaster.Emit(models.EventQueryResult, result)
+
+			// Also log query execution record
+			qLog := models.QueryLog{
+				ID:         result.RequestID,
+				DatabaseID: result.DatabaseID,
+				Query:      result.Query,
+				DurationMs: result.DurationMs,
+				Timestamp:  time.Now().UnixMilli(),
+				Success:    result.Success,
+				Error:      result.Error,
+			}
+			r.broadcaster.Emit(models.EventQueryLog, qLog)
+		}
+
 	default:
 		log.Printf("Unknown inbound message type: %s", env.Type)
 	}

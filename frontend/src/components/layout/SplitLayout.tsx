@@ -13,9 +13,17 @@ interface SplitLayoutProps {
   onRefresh?: () => void;
   onRequestPage?: (page: number) => void;
   onExecuteQuery?: (query: string) => void;
+  onUpdateRow?: (pkField: string, pkValue: unknown, newValues: Record<string, unknown>) => void;
+  onDeleteRow?: (pkField: string, pkValue: unknown) => void;
 }
 
-export function SplitLayout({ onRefresh, onRequestPage, onExecuteQuery }: SplitLayoutProps) {
+export function SplitLayout({
+  onRefresh,
+  onRequestPage,
+  onExecuteQuery,
+  onUpdateRow,
+  onDeleteRow,
+}: SplitLayoutProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const isConsoleOpen = useSettingsStore((s) => s.isConsoleOpen);
   const activeTab = useSettingsStore((s) => s.activeConsoleTab);
@@ -40,7 +48,12 @@ export function SplitLayout({ onRefresh, onRequestPage, onExecuteQuery }: SplitL
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Top Half: Real-time DataGrid */}
           <div className="flex-1 flex flex-col overflow-hidden">
-            <DataGrid onRefresh={onRefresh} onRequestPage={onRequestPage} />
+            <DataGrid
+              onRefresh={onRefresh}
+              onRequestPage={onRequestPage}
+              onUpdateRow={onUpdateRow}
+              onDeleteRow={onDeleteRow}
+            />
           </div>
 
           {/* Bottom Half: Console / Mutation Stream */}

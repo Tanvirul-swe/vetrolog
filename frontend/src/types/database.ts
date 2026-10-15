@@ -59,3 +59,16 @@ export interface QueryLog {
   success: boolean;
   error?: string;
 }
+
+export interface QueryResult {
+  requestId: string;
+  databaseId: string;
+  query: string;
+  columns: ColumnInfo[];
+  rows: Record<string, unknown>[];
+  affected: number;
+  durationMs: number;
+  success: boolean;
+  error?: string;
+}
+

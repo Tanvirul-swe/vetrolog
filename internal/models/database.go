@@ -4,9 +4,9 @@ package models
 type DatabaseType string
 
 const (
-	DatabaseTypeSQLite       DatabaseType = "sqlite"
-	DatabaseTypeHive         DatabaseType = "hive"
-	DatabaseTypeSharedPrefs  DatabaseType = "shared_preferences"
+	DatabaseTypeSQLite      DatabaseType = "sqlite"
+	DatabaseTypeHive        DatabaseType = "hive"
+	DatabaseTypeSharedPrefs DatabaseType = "shared_preferences"
 )
 
 // ColumnInfo describes a single table or box attribute
@@ -46,4 +46,32 @@ type TableDataPayload struct {
 	PageSize   int                      `json:"pageSize"`
 	Columns    []ColumnInfo             `json:"columns"`
 	Rows       []map[string]interface{} `json:"rows"`
+}
+
+// QueryResult represents the outcome of an executed ad-hoc query
+type QueryResult struct {
+	RequestID  string                   `json:"requestId"`
+	DatabaseID string                   `json:"databaseId"`
+	Query      string                   `json:"query"`
+	Columns    []ColumnInfo             `json:"columns"`
+	Rows       []map[string]interface{} `json:"rows"`
+	Affected   int64                    `json:"affected"`
+	DurationMs float64                  `json:"durationMs"`
+	Success    bool                     `json:"success"`
+	Error      string                   `json:"error,omitempty"`
+}
+
+// RowUpdatePayload is sent from desktop to mobile to mutate a row
+type RowUpdatePayload struct {
+	DatabaseID string                 `json:"databaseId"`
+	TableName  string                 `json:"tableName"`
+	PrimaryKey map[string]interface{} `json:"primaryKey"`
+	NewValues  map[string]interface{} `json:"newValues"`
+}
+
+// RowDeletePayload is sent from desktop to mobile to remove a row
+type RowDeletePayload struct {
+	DatabaseID string                 `json:"databaseId"`
+	TableName  string                 `json:"tableName"`
+	PrimaryKey map[string]interface{} `json:"primaryKey"`
 }

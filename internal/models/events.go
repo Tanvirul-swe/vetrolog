@@ -25,5 +25,6 @@ const (
 	EventLiveMutation       = "vetrolog:live_mutation"
 	EventBatchMutations     = "vetrolog:batch_mutations"
 	EventQueryLog           = "vetrolog:query_log"
+	EventQueryResult        = "vetrolog:query_result"
 	EventConnectionState    = "vetrolog:connection_state"
 )

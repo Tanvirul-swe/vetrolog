@@ -12,16 +12,24 @@ export function useWailsEvent<K extends keyof VetroLogEventMap>(
 ) {
   useEffect(() => {
     try {
-      if (typeof runtime.EventsOn === 'function') {
+      if (
+        typeof window !== 'undefined' &&
+        // @ts-expect-error window.runtime is injected by Wails webview
+        typeof window?.runtime?.EventsOnMultiple === 'function'
+      ) {
         const cancel = runtime.EventsOn(eventName, (data: VetroLogEventMap[K]) => {
           callback(data);
         });
 
         return () => {
-          if (typeof cancel === 'function') {
-            cancel();
-          } else if (typeof runtime.EventsOff === 'function') {
-            runtime.EventsOff(eventName);
+          try {
+            if (typeof cancel === 'function') {
+              cancel();
+            } else if (typeof runtime.EventsOff === 'function') {
+              runtime.EventsOff(eventName);
+            }
+          } catch {
+            // Safe cleanup
           }
         };
       }

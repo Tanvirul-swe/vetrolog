@@ -169,7 +169,11 @@ export function App() {
   // 1. Fetch initial connection state from Go backend
   useEffect(() => {
     try {
-      if (typeof AppBindings.GetConnectionState === 'function') {
+      if (
+        typeof window !== 'undefined' &&
+        // @ts-expect-error window.go may be undefined during dev/browser
+        window?.go?.app?.App?.GetConnectionState
+      ) {
         AppBindings.GetConnectionState().then((state) => {
           if (state) setConnectionState(state);
         });
@@ -254,7 +258,11 @@ export function App() {
   const handleRequestTableData = (targetPage = page) => {
     if (selectedDbId && selectedTableName) {
       try {
-        if (typeof AppBindings.RequestTableData === 'function') {
+        if (
+          typeof window !== 'undefined' &&
+          // @ts-expect-error window.go may be undefined
+          window?.go?.app?.App?.RequestTableData
+        ) {
           AppBindings.RequestTableData(selectedDbId, selectedTableName, targetPage, pageSize);
         }
       } catch {
@@ -273,7 +281,11 @@ export function App() {
   const handleExecuteQuery = (query: string) => {
     if (selectedDbId) {
       try {
-        if (typeof AppBindings.ExecuteQuery === 'function') {
+        if (
+          typeof window !== 'undefined' &&
+          // @ts-expect-error window.go may be undefined
+          window?.go?.app?.App?.ExecuteQuery
+        ) {
           AppBindings.ExecuteQuery(selectedDbId, query);
         }
       } catch {

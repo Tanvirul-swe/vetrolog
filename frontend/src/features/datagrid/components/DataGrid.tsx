@@ -74,20 +74,6 @@ export function DataGrid({ onRefresh, onRequestPage }: DataGridProps) {
     return result;
   }, [rows, filterTerm, sortColumn, sortDir]);
 
-  if (!selectedTable) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center select-none bg-background">
-        <div className="size-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary mb-3">
-          <Database className="size-6" />
-        </div>
-        <h3 className="font-semibold text-foreground text-sm">No Table Selected</h3>
-        <p className="text-xs text-muted-foreground mt-1 max-w-sm">
-          Select a table or box from the left sidebar to inspect rows in real-time.
-        </p>
-      </div>
-    );
-  }
-
   // Derive column list from payload or rows
   const tableColumns = useMemo(() => {
     if (columns.length > 0) return columns;
@@ -101,6 +87,20 @@ export function DataGrid({ onRefresh, onRequestPage }: DataGridProps) {
     }
     return [];
   }, [columns, rows]);
+
+  if (!selectedTable) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center select-none bg-background">
+        <div className="size-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary mb-3">
+          <Database className="size-6" />
+        </div>
+        <h3 className="font-semibold text-foreground text-sm">No Table Selected</h3>
+        <p className="text-xs text-muted-foreground mt-1 max-w-sm">
+          Select a table or box from the left sidebar to inspect rows in real-time.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-background relative">

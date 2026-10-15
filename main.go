@@ -27,7 +27,7 @@ func main() {
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		BackgroundColour: &options.RGBA{R: 11, G: 15, B: 25, A: 1}, // Deep obsidian
+		BackgroundColour: &options.RGBA{R: 11, G: 15, B: 25, A: 255}, // Solid deep obsidian
 		OnStartup:        appInstance.Startup,
 		OnDomReady:       appInstance.DomReady,
 		OnBeforeClose:    appInstance.BeforeClose,
@@ -38,8 +38,8 @@ func main() {
 		Mac: &mac.Options{
 			TitleBar:             mac.TitleBarHiddenInset(),
 			Appearance:           mac.NSAppearanceNameDarkAqua,
-			WebviewIsTransparent: true,
-			WindowIsTranslucent:  true,
+			WebviewIsTransparent: false,
+			WindowIsTranslucent:  false,
 		},
 		Windows: &windows.Options{
 			WebviewIsTransparent: false,

@@ -36,6 +36,50 @@ interface DatabaseStoreState {
   clearLogs: () => void;
 }
 
+function applyMutationToRows(
+  rows: Record<string, unknown>[],
+  totalRows: number,
+  mutation: MutationEvent
+): { rows: Record<string, unknown>[]; totalRows: number } {
+  if (mutation.type === 'INSERT' && mutation.newValues) {
+    return {
+      rows: [mutation.newValues, ...rows],
+      totalRows: totalRows + 1,
+    };
+  }
+
+  if (mutation.type === 'UPDATE' && mutation.newValues) {
+    const pkKey = Object.keys(mutation.newValues).find(
+      (k) => k.toLowerCase() === 'id' || k.toLowerCase().endsWith('_id') || k.toLowerCase() === 'key'
+    );
+    if (pkKey) {
+      const pkVal = mutation.newValues[pkKey];
+      return {
+        rows: rows.map((r) => (r[pkKey] === pkVal ? { ...r, ...mutation.newValues } : r)),
+        totalRows,
+      };
+    }
+  }
+
+  if (mutation.type === 'DELETE') {
+    const target = mutation.oldValues || mutation.newValues;
+    if (target) {
+      const pkKey = Object.keys(target).find(
+        (k) => k.toLowerCase() === 'id' || k.toLowerCase().endsWith('_id') || k.toLowerCase() === 'key'
+      );
+      if (pkKey) {
+        const pkVal = target[pkKey];
+        return {
+          rows: rows.filter((r) => r[pkKey] !== pkVal),
+          totalRows: Math.max(0, totalRows - 1),
+        };
+      }
+    }
+  }
+
+  return { rows, totalRows };
+}
+
 export const useDatabaseStore = create<DatabaseStoreState>((set) => ({
   databases: [],
   selectedDatabaseId: null,
@@ -56,14 +100,13 @@ export const useDatabaseStore = create<DatabaseStoreState>((set) => ({
 
   setDatabases: (databases) =>
     set((state) => {
+      const dbExists = databases.some((d) => d.id === state.selectedDatabaseId);
       let activeDb = state.selectedDatabaseId;
       let activeTable = state.selectedTableName;
 
-      if (!activeDb && databases.length > 0) {
+      if ((!activeDb || !dbExists) && databases.length > 0) {
         activeDb = databases[0].id;
-        if (databases[0].tables.length > 0) {
-          activeTable = databases[0].tables[0].name;
-        }
+        activeTable = databases[0].tables.length > 0 ? databases[0].tables[0].name : null;
       }
       return { databases, selectedDatabaseId: activeDb, selectedTableName: activeTable };
     }),
@@ -94,27 +137,67 @@ export const useDatabaseStore = create<DatabaseStoreState>((set) => ({
   setSelectedRow: (row) => set({ selectedRow: row }),
 
   setTableData: (payload) =>
-    set({
-      columns: payload.columns,
-      rows: payload.rows,
-      totalRows: payload.totalRows,
-      page: payload.page,
-      pageSize: payload.pageSize,
-      isLoadingTable: false,
+    set((state) => {
+      // If tableColumns were empty, infer from payload.columns
+      return {
+        selectedDatabaseId: payload.databaseId || state.selectedDatabaseId,
+        selectedTableName: payload.tableName || state.selectedTableName,
+        columns: payload.columns && payload.columns.length > 0 ? payload.columns : state.columns,
+        rows: payload.rows || [],
+        totalRows: payload.totalRows !== undefined ? payload.totalRows : payload.rows?.length || 0,
+        page: payload.page || 1,
+        pageSize: payload.pageSize || 50,
+        isLoadingTable: false,
+      };
     }),
 
   setFilterTerm: (term) => set({ filterTerm: term }),
   setPage: (page) => set({ page }),
 
   addMutation: (mutation) =>
-    set((state) => ({
-      mutations: [mutation, ...state.mutations.slice(0, 499)], // keep last 500
-    })),
+    set((state) => {
+      const isCurrentTable =
+        state.selectedDatabaseId === mutation.databaseId &&
+        state.selectedTableName === mutation.tableName;
+
+      let nextRows = state.rows;
+      let nextTotal = state.totalRows;
+
+      if (isCurrentTable) {
+        const res = applyMutationToRows(state.rows, state.totalRows, mutation);
+        nextRows = res.rows;
+        nextTotal = res.totalRows;
+      }
+
+      return {
+        mutations: [mutation, ...state.mutations.slice(0, 499)], // keep last 500
+        rows: nextRows,
+        totalRows: nextTotal,
+      };
+    }),
 
   addMutationsBatch: (batch) =>
-    set((state) => ({
-      mutations: [...batch.reverse(), ...state.mutations].slice(0, 500),
-    })),
+    set((state) => {
+      let nextRows = state.rows;
+      let nextTotal = state.totalRows;
+
+      batch.forEach((mutation) => {
+        if (
+          state.selectedDatabaseId === mutation.databaseId &&
+          state.selectedTableName === mutation.tableName
+        ) {
+          const res = applyMutationToRows(nextRows, nextTotal, mutation);
+          nextRows = res.rows;
+          nextTotal = res.totalRows;
+        }
+      });
+
+      return {
+        mutations: [...batch.slice().reverse(), ...state.mutations].slice(0, 500),
+        rows: nextRows,
+        totalRows: nextTotal,
+      };
+    }),
 
   addQueryLog: (log) =>
     set((state) => ({

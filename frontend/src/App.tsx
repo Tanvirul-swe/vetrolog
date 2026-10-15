@@ -241,6 +241,19 @@ export function App() {
 
   useWailsEvent(EVENTS.DATABASE_LIST, (list) => {
     setDatabases(list);
+    if (list && list.length > 0 && list[0].tables && list[0].tables.length > 0) {
+      try {
+        if (
+          typeof window !== 'undefined' &&
+          // @ts-expect-error window.go may be undefined
+          window?.go?.app?.App?.RequestTableData
+        ) {
+          AppBindings.RequestTableData(list[0].id, list[0].tables[0].name, 1, pageSize);
+        }
+      } catch {
+        // Safe fallback
+      }
+    }
   });
 
   useWailsEvent(EVENTS.TABLE_DATA, (payload) => {

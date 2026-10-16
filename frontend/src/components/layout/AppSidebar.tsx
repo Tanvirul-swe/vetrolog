@@ -1,4 +1,4 @@
-import { FolderTree } from 'lucide-react';
+import { FolderTree, Database } from 'lucide-react';
 import { DatabaseTree } from '@/features/databases/components/DatabaseTree';
 import { useDatabaseStore } from '@/stores/useDatabaseStore';
 

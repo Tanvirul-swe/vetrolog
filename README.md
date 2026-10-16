@@ -27,6 +27,20 @@
 
 ---
 
+## 📚 Documentation Suite
+
+Explore our comprehensive documentation:
+
+| Document | Description |
+| :--- | :--- |
+| **[📖 User Manual & ADB Setup](docs/USER_GUIDE.md)** | Step-by-step tutorial on enabling USB debugging, exploring tables, live updates, and SQL runner. |
+| **[🧠 Architecture & Internals](docs/ARCHITECTURE.md)** | Deep dive in plain English explaining zero-code inspection, `run-as`, WAL/SHM sync, and `apiBridge`. |
+| **[💻 Multi-Platform Installation](docs/INSTALLATION.md)** | Setup guides for macOS (including Gatekeeper bypass), Windows, Linux, and Web mode. |
+| **[🤝 Contributing Guidelines](CONTRIBUTING.md)** | Codebase directory map, local dev setup, quality checks, and PR standards. |
+| **[🚀 Deployment & CI/CD](docs/DEPLOYMENT.md)** | Release tagging workflow, GitHub Actions matrix packaging, and in-app updater mechanics. |
+
+---
+
 ## 📥 Download & Installation
 
 Get the latest installer for your operating system from **[GitHub Releases](https://github.com/Tanvirul-swe/vetrolog/releases/latest)**:

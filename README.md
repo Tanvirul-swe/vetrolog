@@ -99,17 +99,6 @@ wails build -platform linux/amd64
 
 ---
 
-## 📱 Mobile SDKs (Optional WebSocket Streaming)
-
-If you wish to stream in-memory mutations over local network WebSockets, lightweight client helpers are provided in `clients/`:
-
-- [Flutter Client](clients/flutter/)
-- [Android Kotlin Client](clients/android-kotlin/)
-- [iOS Swift Client](clients/ios-swift/)
-- [React Native Client](clients/react-native/)
-
----
-
 ## 📄 License
 
 VetroLog is open source under the [MIT License](LICENSE).

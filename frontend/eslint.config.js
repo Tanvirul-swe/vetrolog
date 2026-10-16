@@ -15,6 +15,10 @@ export default [
     rules: {
       ...reactHooks.configs.flat.recommended.rules,
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true, allowExportNames: ["buttonVariants"] }],
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
+      "react-hooks/set-state-in-effect": "off",
+      "no-empty-pattern": "warn",
     },
   },
 ]

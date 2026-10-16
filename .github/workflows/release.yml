@@ -108,27 +108,27 @@ jobs:
           chmod +x deb/usr/bin/vetrolog
           cp ../appicon.png deb/usr/share/icons/hicolor/512x512/apps/vetrolog.png
           
-          cat << 'EOF' > deb/DEBIAN/control
-Package: vetrolog
-Version: 1.0.0
-Section: devel
-Priority: optional
-Architecture: amd64
-Maintainer: Md. Tanvirul Islam <tanvirul.islam.swe@gmail.com>
-Description: Modern real-time mobile database inspector for Android & iOS
-Depends: libgtk-3-0, libwebkit2gtk-4.0-37 | libwebkit2gtk-4.1-0
-EOF
+          printf "%s\n" \
+            "Package: vetrolog" \
+            "Version: 1.0.0" \
+            "Section: devel" \
+            "Priority: optional" \
+            "Architecture: amd64" \
+            "Maintainer: Md. Tanvirul Islam <tanvirul.islam.swe@gmail.com>" \
+            "Description: Modern real-time mobile database inspector for Android and iOS" \
+            "Depends: libgtk-3-0, libwebkit2gtk-4.0-37 | libwebkit2gtk-4.1-0" \
+            > deb/DEBIAN/control
 
-          cat << 'EOF' > deb/usr/share/applications/vetrolog.desktop
-[Desktop Entry]
-Name=VetroLog
-Comment=Mobile Database Inspector
-Exec=/usr/bin/vetrolog
-Icon=vetrolog
-Terminal=false
-Type=Application
-Categories=Development;Debugger;
-EOF
+          printf "%s\n" \
+            "[Desktop Entry]" \
+            "Name=VetroLog" \
+            "Comment=Mobile Database Inspector" \
+            "Exec=/usr/bin/vetrolog" \
+            "Icon=vetrolog" \
+            "Terminal=false" \
+            "Type=Application" \
+            "Categories=Development;Debugger;" \
+            > deb/usr/share/applications/vetrolog.desktop
 
           dpkg-deb --build deb VetroLog-Linux-amd64.deb
 

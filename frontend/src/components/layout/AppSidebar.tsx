@@ -1,4 +1,4 @@
-import { Database, FolderTree } from 'lucide-react';
+import { FolderTree } from 'lucide-react';
 import { DatabaseTree } from '@/features/databases/components/DatabaseTree';
 import { useDatabaseStore } from '@/stores/useDatabaseStore';
 
@@ -6,7 +6,7 @@ interface AppSidebarProps {
   onRefresh?: () => void;
 }
 
-export function AppSidebar({}: AppSidebarProps) {
+export function AppSidebar(_props: AppSidebarProps) {
   const databases = useDatabaseStore((s) => s.databases);
   const selectedDbId = useDatabaseStore((s) => s.selectedDatabaseId);
   const selectedTableName = useDatabaseStore((s) => s.selectedTableName);

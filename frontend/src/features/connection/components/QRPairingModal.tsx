@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { QRCodeSVG } from 'qrcode.react';
-import { X, Copy, Check, QrCode, Terminal, Wifi, Smartphone, Radio } from 'lucide-react';
+import { X, Copy, Check, QrCode, Terminal, Wifi, Radio } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useConnectionStore } from '@/stores/useConnectionStore';
 import * as AppBindings from '../../../../wailsjs/go/app/App';
 import logoIcon from '@/assets/images/vetrolog-icon.png';

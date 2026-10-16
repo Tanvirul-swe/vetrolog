@@ -6,15 +6,12 @@ import { useConnectionStore } from './stores/useConnectionStore';
 import { useDatabaseStore } from './stores/useDatabaseStore';
 import { useAdbStore } from './stores/useAdbStore';
 import * as AppBindings from '../wailsjs/go/app/App';
-import { DatabaseInfo } from './types/database';
 
 export function App() {
-  const isConnected = useConnectionStore((s) => s.isConnected);
   const setConnectionState = useConnectionStore((s) => s.setConnectionState);
   const setDeviceConnected = useConnectionStore((s) => s.setDeviceConnected);
   const setDeviceDisconnected = useConnectionStore((s) => s.setDeviceDisconnected);
 
-  const databases = useDatabaseStore((s) => s.databases);
   const setDatabases = useDatabaseStore((s) => s.setDatabases);
   const selectedDbId = useDatabaseStore((s) => s.selectedDatabaseId);
   const selectedTableName = useDatabaseStore((s) => s.selectedTableName);
@@ -25,8 +22,6 @@ export function App() {
   const setLatestQueryResult = useDatabaseStore((s) => s.setLatestQueryResult);
   const updateRowLocally = useDatabaseStore((s) => s.updateRowLocally);
   const deleteRowLocally = useDatabaseStore((s) => s.deleteRowLocally);
-  const rows = useDatabaseStore((s) => s.rows);
-  const columns = useDatabaseStore((s) => s.columns);
   const page = useDatabaseStore((s) => s.page);
   const pageSize = useDatabaseStore((s) => s.pageSize);
 

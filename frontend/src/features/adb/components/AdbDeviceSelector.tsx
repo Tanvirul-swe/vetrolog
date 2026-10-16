@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Smartphone, RefreshCw, Cpu, Layers } from 'lucide-react';
+import { Smartphone, RefreshCw, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAdbStore } from '@/stores/useAdbStore';
 

@@ -6,6 +6,7 @@ import (
 
 	"vetrolog/internal/broadcaster"
 	"vetrolog/internal/config"
+	"vetrolog/internal/discovery"
 	"vetrolog/internal/server"
 )
 
@@ -17,6 +18,7 @@ type App struct {
 	broadcaster *broadcaster.Broadcaster
 	batcher     *broadcaster.MutationBatcher
 	server      *server.Server
+	mdns        *discovery.MDNSService
 }
 
 // NewApp creates a new App struct with initialized subsystems

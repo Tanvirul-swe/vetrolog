@@ -103,7 +103,9 @@ export function DatabaseTree({
                       table={t}
                       isSelected={isSelectedDb && selectedTableName === t.name}
                       onSelect={() => {
-                        onSelectDatabase(db.id);
+                        if (selectedDatabaseId !== db.id) {
+                          onSelectDatabase(db.id);
+                        }
                         onSelectTable(t.name);
                       }}
                     />

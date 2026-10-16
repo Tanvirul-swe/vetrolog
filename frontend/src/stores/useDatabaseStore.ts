@@ -34,6 +34,8 @@ interface DatabaseStoreState {
   updateRowLocally: (pkField: string, pkValue: unknown, newValues: Record<string, unknown>) => void;
   deleteRowLocally: (pkField: string, pkValue: unknown) => void;
   clearLogs: () => void;
+  resetState: () => void;
+  updateTableCounts: (databaseId: string, counts: Record<string, number>) => void;
 }
 
 function applyMutationToRows(
@@ -113,6 +115,9 @@ export const useDatabaseStore = create<DatabaseStoreState>((set) => ({
 
   selectDatabase: (id) =>
     set((state) => {
+      if (state.selectedDatabaseId === id) {
+        return state;
+      }
       const db = state.databases.find((d) => d.id === id);
       const firstTable = db && db.tables.length > 0 ? db.tables[0].name : null;
       return {
@@ -156,6 +161,10 @@ export const useDatabaseStore = create<DatabaseStoreState>((set) => ({
 
   addMutation: (mutation) =>
     set((state) => {
+      if (state.mutations.some((m) => m.id === mutation.id)) {
+        return state;
+      }
+
       const isCurrentTable =
         state.selectedDatabaseId === mutation.databaseId &&
         state.selectedTableName === mutation.tableName;
@@ -234,4 +243,44 @@ export const useDatabaseStore = create<DatabaseStoreState>((set) => ({
     }),
 
   clearLogs: () => set({ mutations: [], queryLogs: [], latestQueryResult: null }),
+
+  resetState: () =>
+    set({
+      databases: [],
+      selectedDatabaseId: null,
+      selectedTableName: null,
+      selectedRow: null,
+      columns: [],
+      rows: [],
+      totalRows: 0,
+      page: 1,
+      isLoadingTable: false,
+      filterTerm: '',
+      mutations: [],
+      queryLogs: [],
+      latestQueryResult: null,
+    }),
+
+  updateTableCounts: (databaseId, counts) =>
+    set((state) => {
+      const nextDatabases = state.databases.map((db) => {
+        if (db.id !== databaseId && !db.id.includes(databaseId) && !databaseId.includes(db.id)) {
+          return db;
+        }
+        const nextTables = db.tables.map((t) => {
+          if (counts[t.name] !== undefined) {
+            return { ...t, rowCount: counts[t.name] };
+          }
+          return t;
+        });
+        return { ...db, tables: nextTables };
+      });
+
+      let nextTotal = state.totalRows;
+      if (state.selectedTableName && counts[state.selectedTableName] !== undefined) {
+        nextTotal = counts[state.selectedTableName];
+      }
+
+      return { databases: nextDatabases, totalRows: nextTotal };
+    }),
 }));

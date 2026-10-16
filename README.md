@@ -1,46 +1,53 @@
-# Wails + Vite + React + Tailwind CSS + shadcn/ui + TypeScript
+<div align="center">
+  <img src="frontend/src/assets/images/vetrolog-full.png" alt="VetroLog Banner" width="700" />
+  
+  <p><strong>High-Performance Desktop Database Inspector for Mobile Apps (Flutter, Android, iOS, React Native)</strong></p>
+  
+  <p>
+    <img src="https://img.shields.io/badge/Go-1.26-00ADD8?logo=go" alt="Go" />
+    <img src="https://img.shields.io/badge/Wails-v2-DF1A29?logo=wails" alt="Wails" />
+    <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react" alt="React" />
+    <img src="https://img.shields.io/badge/TypeScript-6.0-3178C6?logo=typescript" alt="TypeScript" />
+    <img src="https://img.shields.io/badge/SQLite-Pure--Go-003B57?logo=sqlite" alt="SQLite" />
+  </p>
+</div>
 
-A Wails v2 desktop app template with a Go backend and a React frontend. It tracks stable releases; Wails v3 is still beta.
+---
 
-## Requirements
+## 🌟 Overview
 
-- Go 1.25 or newer
-- Node.js 20.19+ or 22.12+ (Node 21 and 23 are unsupported by Vite)
-- The [Wails v2 platform dependencies](https://wails.io/docs/gettingstarted/installation)
-- The current stable Wails v2 CLI: `go install github.com/wailsapp/wails/v2/cmd/wails@latest`
+**VetroLog** is a modern, cross-platform desktop application designed to inspect, query, and edit mobile local databases (SQLite, Hive, SharedPreferences) in real time.
 
-## Create an app
+- **Zero-Code ADB Native Bridge**: Inspect SQLite databases (`.db`) and SharedPreferences directly from physical Android devices and emulators over ADB without writing a single line of client code in your Flutter or Android project.
+- **WebSocket Live Stream Mode**: Real-time mutation streaming for Flutter, Kotlin, Swift, and React Native apps.
+- **Pure-Go SQLite Engine**: Query, filter, and edit records with automatic write-back sync to the phone sandbox.
+- **Dark Glassmorphic UI**: High-contrast, sortable, paginated DataGrid with SQL Query Editor and Mutation Console.
 
-```sh
-wails init -n myapp -t https://github.com/Mahcks/wails-vite-react-tailwind-shadcnui-ts
-cd myapp
+---
+
+## 🚀 Quick Start
+
+### 1. Run Development Server
+
+```bash
+# Start Wails desktop app in dev mode
 wails dev
 ```
 
-Wails installs frontend dependencies when needed. To install them yourself, run `npm ci` in `frontend/`.
+### 2. Inspect Over ADB (Zero Code Required)
 
-## Work on the frontend
+1. Connect your Android device via USB (with **USB Debugging** enabled).
+2. Run your Flutter app in debug mode (`flutter run`).
+3. In VetroLog's top header, select your device and app package from the **ADB dropdown**.
+4. All SQLite databases (`databases/`, `app_flutter/`) and SharedPreferences load automatically!
 
-```sh
-cd frontend
-npm ci
-npm run lint
-npm run build
-npx shadcn@latest add dialog
-```
+---
 
-The template includes Button, Card, Input, and Label. Add more components with the shadcn CLI from `frontend/`.
+## 📱 Mobile Client SDKs (Optional WebSocket Streaming)
 
-## Build
+If you wish to stream live in-memory mutations over WebSockets, lightweight client helpers are provided in `clients/`:
 
-```sh
-wails build
-```
-
-The executable is written to `build/bin/`. The scripts in `scripts/` provide platform-specific build commands; macOS builds need a macOS host and Linux builds need the Linux native dependencies.
-
-## Keeping the template current
-
-The frontend versions in `frontend/package.json` are the versions tested together here. Dependabot proposes npm and GitHub Actions updates weekly, and CI checks the frontend. TypeScript stays on 6.x until typescript-eslint supports 7.x; review major upgrades before merging. Generated projects use the installed Wails v2 CLI version in their `go.mod`.
-
-See the [Wails documentation](https://wails.io/docs/introduction) for development and packaging details.
+- [Flutter Client](clients/flutter/)
+- [Android Kotlin Client](clients/android-kotlin/)
+- [iOS Swift Client](clients/ios-swift/)
+- [React Native Client](clients/react-native/)

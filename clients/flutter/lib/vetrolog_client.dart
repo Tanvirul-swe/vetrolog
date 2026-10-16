@@ -44,6 +44,55 @@ class VetroLog {
     client._connect();
   }
 
+  /// Connect using scanned QR code data (deep link vetrolog://, raw JSON, or ws:// URL)
+  static void connectFromQr(String scannedData) {
+    final client = VetroLog.instance;
+    try {
+      final trimmed = scannedData.trim();
+      if (trimmed.startsWith('vetrolog://')) {
+        final uri = Uri.parse(trimmed);
+        final urlParam = uri.queryParameters['url'];
+        if (urlParam != null) {
+          client.connectToUrl(urlParam);
+          return;
+        }
+        final hostParam = uri.queryParameters['host'];
+        final portParam = int.tryParse(uri.queryParameters['port'] ?? '9222') ?? 9222;
+        if (hostParam != null) {
+          init(host: hostParam, port: portParam);
+          return;
+        }
+      } else if (trimmed.startsWith('{')) {
+        final map = jsonDecode(trimmed) as Map<String, dynamic>;
+        if (map['wsUrl'] != null) {
+          client.connectToUrl(map['wsUrl'] as String);
+          return;
+        }
+        if (map['host'] != null) {
+          init(host: map['host'] as String, port: map['port'] as int? ?? 9222);
+          return;
+        }
+      } else if (trimmed.startsWith('ws://') || trimmed.startsWith('wss://')) {
+        client.connectToUrl(trimmed);
+        return;
+      }
+    } catch (e) {
+      debugPrint('[VetroLog] Failed to parse QR code data: $e');
+    }
+  }
+
+  /// Connect directly to a WebSocket URL
+  void connectToUrl(String url) {
+    try {
+      final uri = Uri.parse(url);
+      _host = uri.host;
+      _port = uri.port != 0 ? uri.port : 9222;
+      _connect();
+    } catch (e) {
+      debugPrint('[VetroLog] Invalid URL $url: $e');
+    }
+  }
+
   void _connect() {
     _reconnectTimer?.cancel();
     final uri = Uri.parse('ws://$_host:$_port/ws');

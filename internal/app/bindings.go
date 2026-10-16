@@ -5,12 +5,19 @@ import (
 	"fmt"
 	"time"
 
+	"vetrolog/internal/adb"
+	"vetrolog/internal/discovery"
 	"vetrolog/internal/models"
 )
 
 // GetConnectionState returns current desktop server and mobile connection status
 func (a *App) GetConnectionState() models.ConnectionState {
 	return a.server.GetState()
+}
+
+// GetLocalIPAddresses returns available LAN IPv4 addresses for pairing QR code
+func (a *App) GetLocalIPAddresses() []string {
+	return discovery.GetLocalIPv4Addresses()
 }
 
 // RequestTableData requests the mobile client to send a table data page
@@ -86,4 +93,68 @@ func (a *App) DisconnectActiveDevice() bool {
 		return true
 	}
 	return false
+}
+
+// AdbListDevices returns all connected physical/emulator ADB devices
+func (a *App) AdbListDevices() []adb.Device {
+	devs, err := adb.GetService().ListDevices()
+	if err != nil {
+		return []adb.Device{}
+	}
+	return devs
+}
+
+// AdbListApps returns all debuggable apps installed on the specified device
+func (a *App) AdbListApps(deviceID string) []adb.App {
+	apps, err := adb.GetService().ListDebuggableApps(deviceID)
+	if err != nil {
+		return []adb.App{}
+	}
+	return apps
+}
+
+// AdbIsAppRunning checks if the app process is currently active on the device (ultra-fast check ~50ms)
+func (a *App) AdbIsAppRunning(deviceID string, packageName string) bool {
+	return adb.GetService().IsAppRunning(deviceID, packageName)
+}
+
+// AdbDiscoverDatabases finds all SQLite and SharedPreferences databases for the specified app
+func (a *App) AdbDiscoverDatabases(deviceID string, packageName string) []adb.DiscoveredDB {
+	dbs, err := adb.GetService().DiscoverDatabases(deviceID, packageName)
+	if err != nil {
+		return []adb.DiscoveredDB{}
+	}
+	return dbs
+}
+
+// AdbGetTableData fetches table rows directly from device SQLite or SharedPreferences
+func (a *App) AdbGetTableData(deviceID, packageName, remotePath, tableName string, page, pageSize int) (*adb.TableDataResult, error) {
+	return adb.GetService().GetTableData(deviceID, packageName, remotePath, tableName, page, pageSize)
+}
+
+// AdbExecuteQuery runs a SQL query on the device database and syncs back mutations
+func (a *App) AdbExecuteQuery(deviceID, packageName, remotePath, sqlQuery string) (*adb.QueryExecResult, error) {
+	return adb.GetService().ExecuteQuery(deviceID, packageName, remotePath, sqlQuery)
+}
+
+// AdbUpdateRow updates a row in the device SQLite database
+func (a *App) AdbUpdateRow(deviceID, packageName, remotePath, tableName, primaryKeyJSON, newValuesJSON string) bool {
+	var pk map[string]interface{}
+	var values map[string]interface{}
+	if err := json.Unmarshal([]byte(primaryKeyJSON), &pk); err != nil {
+		return false
+	}
+	if err := json.Unmarshal([]byte(newValuesJSON), &values); err != nil {
+		return false
+	}
+	return adb.GetService().UpdateRow(deviceID, packageName, remotePath, tableName, pk, values) == nil
+}
+
+// AdbDeleteRow removes a row from the device SQLite database
+func (a *App) AdbDeleteRow(deviceID, packageName, remotePath, tableName, primaryKeyJSON string) bool {
+	var pk map[string]interface{}
+	if err := json.Unmarshal([]byte(primaryKeyJSON), &pk); err != nil {
+		return false
+	}
+	return adb.GetService().DeleteRow(deviceID, packageName, remotePath, tableName, pk) == nil
 }

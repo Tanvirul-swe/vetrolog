@@ -1,4 +1,22 @@
-build/bin
-node_modules
-frontend/dist
+# Binaries & build artifacts
+build/bin/
+vetrolog
+vetrolog.exe
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Node dependencies & outputs
+node_modules/
+frontend/node_modules/
+frontend/dist/
 frontend/package.json.md5
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Temporary test/debug databases & logs
+*.log
+

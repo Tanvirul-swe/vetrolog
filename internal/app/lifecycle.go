@@ -3,6 +3,8 @@ package app
 import (
 	"context"
 	"log"
+
+	"vetrolog/internal/discovery"
 )
 
 // Startup is called when Wails initializes the application
@@ -16,6 +18,9 @@ func (a *App) Startup(ctx context.Context) {
 	if err := a.server.Start(); err != nil {
 		log.Printf("[VetroLog] Error starting server: %v", err)
 	}
+
+	// Start mDNS ZeroConf discovery advertisement for local Wi-Fi mobile clients
+	a.mdns = discovery.NewMDNSService(a.config.WSPort)
 }
 
 // DomReady is called after the frontend DOM has been loaded
@@ -32,7 +37,10 @@ func (a *App) BeforeClose(ctx context.Context) (prevent bool) {
 
 // Shutdown is called during application teardown
 func (a *App) Shutdown(ctx context.Context) {
-	log.Printf("[VetroLog] Shutting down server...")
+	log.Printf("[VetroLog] Shutting down server and mDNS...")
+	if a.mdns != nil {
+		a.mdns.Stop()
+	}
 	a.batcher.Stop()
 	a.server.Stop()
 }

@@ -6,7 +6,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/grandcat/zeroconf v1.0.0
 	github.com/wailsapp/wails/v2 v2.16.0
-	modernc.org/sqlite v1.60.1
+	modernc.org/sqlite v1.36.0
 )
 
 require (

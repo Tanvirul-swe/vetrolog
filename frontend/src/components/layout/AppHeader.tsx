@@ -8,6 +8,7 @@ import { useDatabaseStore } from '@/stores/useDatabaseStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { QRPairingModal } from '@/features/connection/components/QRPairingModal';
 import { AdbDeviceSelector } from '@/features/adb/components/AdbDeviceSelector';
+import { UpdateBadge } from '@/features/updater/UpdateBadge';
 import logoIcon from '@/assets/images/vetrolog-icon.png';
 
 interface AppHeaderProps {
@@ -42,9 +43,7 @@ export function AppHeader({ searchInputRef, onRefresh }: AppHeaderProps) {
           <div>
             <div className="flex items-center gap-2">
               <span className="font-semibold text-sm tracking-tight text-foreground">VetroLog</span>
-              <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-primary/30 text-primary font-mono">
-                v1.0
-              </Badge>
+              <UpdateBadge />
             </div>
             <p className="text-[11px] text-muted-foreground leading-none">Mobile DB Inspector</p>
           </div>

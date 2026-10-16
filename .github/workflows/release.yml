@@ -37,7 +37,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version-file: 'go.mod'
           cache: true
 
       - name: Set up Node.js
@@ -52,7 +52,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libwebkit2gtk-4.1-dev
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libwebkit2gtk-4.1-dev || sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev
 
       # Install Wails CLI
       - name: Install Wails CLI
@@ -95,12 +95,42 @@ jobs:
           Compress-Archive -Path vetrolog.exe -DestinationPath VetroLog-Windows-x64-Portable.zip
 
       # Build Linux
-      - name: Build Linux Binary
+      - name: Build Linux Binary & Debian Package
         if: runner.os == 'Linux'
         run: |
           wails build -platform ${{ matrix.platform.wails_platform }} -clean
           cd build/bin
           tar -czvf VetroLog-Linux-x64.tar.gz vetrolog
+          
+          # Create .deb package
+          mkdir -p deb/DEBIAN deb/usr/bin deb/usr/share/applications deb/usr/share/icons/hicolor/512x512/apps
+          cp vetrolog deb/usr/bin/vetrolog
+          chmod +x deb/usr/bin/vetrolog
+          cp ../appicon.png deb/usr/share/icons/hicolor/512x512/apps/vetrolog.png
+          
+          cat << 'EOF' > deb/DEBIAN/control
+Package: vetrolog
+Version: 1.0.0
+Section: devel
+Priority: optional
+Architecture: amd64
+Maintainer: Md. Tanvirul Islam <tanvirul.islam.swe@gmail.com>
+Description: Modern real-time mobile database inspector for Android & iOS
+Depends: libgtk-3-0, libwebkit2gtk-4.0-37 | libwebkit2gtk-4.1-0
+EOF
+
+          cat << 'EOF' > deb/usr/share/applications/vetrolog.desktop
+[Desktop Entry]
+Name=VetroLog
+Comment=Mobile Database Inspector
+Exec=/usr/bin/vetrolog
+Icon=vetrolog
+Terminal=false
+Type=Application
+Categories=Development;Debugger;
+EOF
+
+          dpkg-deb --build deb VetroLog-Linux-amd64.deb
 
       # Upload Artifacts for Release
       - name: Upload Build Artifacts
@@ -111,6 +141,7 @@ jobs:
             build/bin/*.zip
             build/bin/*.dmg
             build/bin/*.tar.gz
+            build/bin/*.deb
             build/bin/*-installer.exe
 
   release:

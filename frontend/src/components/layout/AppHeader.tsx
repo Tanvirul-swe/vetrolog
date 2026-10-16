@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Search, Terminal, Trash2, Smartphone, RefreshCw, QrCode } from 'lucide-react';
+import { Search, Terminal, Trash2, Smartphone, RefreshCw, QrCode, Table } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 import { Input } from '@/components/ui/input';
 import { useConnectionStore } from '@/stores/useConnectionStore';
 import { useDatabaseStore } from '@/stores/useDatabaseStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
+import { usePlaygroundStore } from '@/stores/usePlaygroundStore';
 import { QRPairingModal } from '@/features/connection/components/QRPairingModal';
 import { AdbDeviceSelector } from '@/features/adb/components/AdbDeviceSelector';
 import { UpdateBadge } from '@/features/updater/UpdateBadge';
@@ -34,6 +35,9 @@ export function AppHeader({ searchInputRef, onRefresh }: AppHeaderProps) {
   const isConsoleOpen = useSettingsStore((s) => s.isConsoleOpen);
   const toggleConsole = useSettingsStore((s) => s.toggleConsole);
 
+  const activeWorkspaceView = usePlaygroundStore((s) => s.activeWorkspaceView);
+  const setActiveWorkspaceView = usePlaygroundStore((s) => s.setActiveWorkspaceView);
+
   return (
     <>
       <header className="wails-drag h-13 border-b border-border/80 bg-card/60 backdrop-blur-md px-4 flex items-center justify-between select-none shrink-0 z-30">
@@ -51,22 +55,53 @@ export function AppHeader({ searchInputRef, onRefresh }: AppHeaderProps) {
           </div>
         </div>
 
-      {/* Center Search Input */}
-      <div className="wails-no-drag max-w-md w-full mx-4">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 size-3.5 text-muted-foreground" />
-          <Input
-            ref={searchInputRef}
-            value={filterTerm}
-            onChange={(e) => setFilterTerm(e.target.value)}
-            placeholder="Search rows, keys, or queries... (⌘K)"
-            className="pl-8 pr-12 h-8 text-xs bg-muted/40 border-border/60 focus:bg-background"
-          />
-          <kbd className="absolute right-2 top-2 pointer-events-none text-[10px] font-mono text-muted-foreground bg-muted px-1 rounded border border-border">
-            ⌘K
-          </kbd>
+        {/* Center Workspace Switcher & Search Bar */}
+        <div className="wails-no-drag flex items-center gap-3 max-w-xl w-full mx-4">
+          {/* Segmented Workspace Pill */}
+          <div className="flex items-center rounded-lg border border-border/70 bg-muted/40 p-0.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => setActiveWorkspaceView('grid')}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs transition-colors ${
+                activeWorkspaceView === 'grid'
+                  ? 'bg-background text-foreground shadow-xs font-semibold'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Table className="size-3.5 text-sky-400" />
+              <span>Inspector</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveWorkspaceView('playground')}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs transition-colors ${
+                activeWorkspaceView === 'playground'
+                  ? 'bg-background text-foreground shadow-xs font-semibold'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Terminal className="size-3.5 text-primary" />
+              <span>SQL Playground</span>
+              <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse ml-0.5" />
+            </button>
+          </div>
+
+          {/* Quick Search Input */}
+          <div className="relative flex-1">
+            <Search className="absolute left-2.5 top-2.5 size-3.5 text-muted-foreground" />
+            <Input
+              ref={searchInputRef}
+              value={filterTerm}
+              onChange={(e) => setFilterTerm(e.target.value)}
+              placeholder="Search rows or keys... (⌘K)"
+              className="pl-8 pr-12 h-8 text-xs bg-muted/40 border-border/60 focus:bg-background"
+            />
+            <kbd className="absolute right-2 top-2 pointer-events-none text-[10px] font-mono text-muted-foreground bg-muted px-1 rounded border border-border">
+              ⌘K
+            </kbd>
+          </div>
         </div>
-      </div>
+
 
       {/* Right Controls & Device Pill */}
       <div className="wails-no-drag flex items-center gap-2">

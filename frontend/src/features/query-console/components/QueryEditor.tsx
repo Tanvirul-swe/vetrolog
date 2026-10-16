@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Play, Terminal, CheckCircle2, XCircle, Table as TableIcon, History, AlertCircle } from 'lucide-react';
+import { Play, Terminal, CheckCircle2, XCircle, Table as TableIcon, History, AlertCircle, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { formatTimestamp, formatDuration } from '@/lib/formatters';
 import { useDatabaseStore } from '@/stores/useDatabaseStore';
+import { usePlaygroundStore } from '@/stores/usePlaygroundStore';
 import { CellRenderer } from '@/features/datagrid/components/CellRenderer';
 
 interface QueryEditorProps {
@@ -77,6 +78,23 @@ export function QueryEditor({ onExecuteQuery }: QueryEditorProps) {
             className="h-7 w-7"
           >
             <History className="size-3.5" />
+          </Button>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              if (query.trim()) {
+                usePlaygroundStore.getState().setQuery(query.trim());
+              }
+              usePlaygroundStore.getState().setActiveWorkspaceView('playground');
+            }}
+            title="Open Intelligent SQL Playground with Plan & Profiler"
+            className="h-7 text-[11px] gap-1 px-2 border-primary/40 text-primary hover:bg-primary/10 ml-1"
+          >
+            <Sparkles className="size-3" />
+            <span>Playground</span>
           </Button>
         </div>
       </form>

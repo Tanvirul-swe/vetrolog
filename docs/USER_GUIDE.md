@@ -102,28 +102,57 @@ Located in the DataGrid toolbar:
 
 ---
 
-## 5. Running Custom SQL Queries
+## 5. Intelligent SQL Playground
 
-Click the **Query Editor** tab in the main view or press the SQL runner shortcut:
+VetroLog includes a state-of-the-art **Intelligent SQL Playground** built specifically for mobile developers. To access it, click the **SQL Playground** toggle in the top navigation bar or click the **Playground** button in the bottom drawer.
 
-```sql
--- Example 1: Filter active users with high balance
-SELECT id, name, email, balance 
-FROM users 
-WHERE balance > 100.00 
-ORDER BY balance DESC;
-
--- Example 2: Complex joins
-SELECT o.order_id, u.name, o.total_amount, o.created_at
-FROM orders o
-JOIN users u ON o.user_id = u.id
-LIMIT 50;
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ [Inspector] [SQL Playground ●]   Ask AI / NL: "Show top 10 users"   [⚙️ AI] │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ 1 │ SELECT u.id, u.name, COUNT(o.id) as orders_count                         │
+│ 2 │ FROM "users" u JOIN "orders" o ON u.id = o.user_id                       │
+│ 3 │ GROUP BY u.id ORDER BY orders_count DESC LIMIT 20;                       │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ [▶ Execute ⌘↵]  [🛡️ Dry Run ⌘⇧↵]  [🔍 Explain Plan]  │  [Export 📤] [Code Gen 💻] │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ [Results (20)]  [Visual Query Plan]  [Profiler & FPS]  [Index Advisor]       │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-1. Enter your SQL query in the syntax-highlighted editor.
-2. Click **Run Query** (or press `Ctrl+Enter` / `⌘+Enter`).
-3. **Execution Benchmarks**: The bottom toolbar displays the exact query execution time in milliseconds (e.g., `⚡ 2.4ms`) and total rows returned.
-4. The results are displayed in a clean, sortable tabular grid.
+### The 8 Playground Features:
+
+1. **Natural Language to SQL Engine**:
+   - Type plain-English prompts in the top bar (e.g. *"Show users created this week who haven't logged in"* or *"Count orders grouped by status"*).
+   - Works **100% offline** with zero setup using the built-in heuristic pattern matcher.
+   - Or click **⚙️ Settings** to connect your preferred AI provider (**Google Gemini**, **OpenAI**, or self-hosted **Local Ollama**).
+2. **Schema-Aware Autocomplete & Join Predictor**:
+   - Multi-line editor with monospace typography, line numbers, and keyboard shortcuts (`⌘Enter` to run, `⌘⇧Enter` to dry-run).
+   - Contextual completion popup suggests tables and column names with data types.
+   - **Join Predictor**: Type `JOIN orders ON ` and VetroLog automatically detects foreign key relationships (`orders.user_id = users.id`) and completes the join clause with a single press of `Tab` or `Enter`!
+3. **Safe Dry-Run & Transaction Sandbox**:
+   - Click **🛡️ Dry Run** to simulate mutating queries (`UPDATE`, `DELETE`, `ALTER`, `INSERT`) inside an isolated, rollback transaction (`BEGIN TRANSACTION ... ROLLBACK`).
+   - Previews the exact number of affected rows and sample diffs without writing any changes to your mobile device disk.
+   - Flags missing `WHERE` clauses with high-visibility safety warnings.
+4. **Live Visual Query Planner (`EXPLAIN QUERY PLAN`)**:
+   - Analyzes execution paths to map full table scans (🔴 `SCAN`), indexed lookups (🟢 `SEARCH`), and temporary B-Tree sorts (🟡 `TEMP B-TREE`).
+   - Pinpoints mobile performance bottlenecks with 1-click index recommendations.
+5. **Bidirectional Inline Data Editor**:
+   - Double-click any cell in the query results table to edit its value directly.
+   - Pressing `Enter` automatically generates and executes the underlying `UPDATE` statement and syncs the changes to the Android app sandbox in real time.
+6. **Query Performance Profiler**:
+   - Tracks execution times down to microsecond (`μs`) precision.
+   - Evaluates mobile UI thread safety:
+     - 🟢 **Ultra Fast (< 2ms)**: Safe for 60/120 FPS UI threads.
+     - 🟡 **Noticeable (3ms - 15ms)**: Recommend background isolate/thread.
+     - 🔴 **Lag Warning (> 15ms)**: Will drop frames on mobile devices; index required.
+   - Visual sparkline latency trend across recent execution runs.
+7. **Smart Index & Schema Optimization Advisor**:
+   - Identifies slow linear scans and generates exact composite index DDL statements (e.g., `CREATE INDEX IF NOT EXISTS "idx_orders_status" ON "orders" ("status");`).
+   - **1-Click Apply Index**: Creates the index directly in SQLite and syncs to your phone over ADB, then re-analyzes the query plan to show the new green indexed node!
+8. **Instant Data Exporter & Code Generator**:
+   - **Export**: Download or copy results in **JSON**, **CSV**, **SQL Inserts**, or **Markdown**.
+   - **Code Generator**: Converts working SQL queries into copy-paste ready code for **Flutter / Dart** (`sqflite` / `Drift`), **Android / Kotlin** (`Room @Query`), **iOS / Swift** (`GRDB`), and **Go**.
 
 ---
 

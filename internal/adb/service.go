@@ -725,3 +725,423 @@ func parseSharedPrefsRows(xmlPath string, page, pageSize int) ([]map[string]inte
 
 	return allRows[start:end], total, nil
 }
+
+// ExplainQuery executes SQLite's EXPLAIN QUERY PLAN and builds an interactive operation tree.
+func (s *Service) ExplainQuery(deviceID, packageName, remotePath, sqlQuery string) (*QueryPlanResult, error) {
+	fileName := filepath.Base(remotePath)
+	localPath := s.getLocalCachePath(deviceID, packageName, fileName)
+
+	// Ensure latest copy
+	_ = s.client.ExecOutCat(deviceID, packageName, remotePath, localPath)
+	s.syncAuxiliarySqliteFiles(deviceID, packageName, remotePath, localPath)
+
+	db, err := sql.Open("sqlite", localPath)
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+
+	start := time.Now()
+	explainSQL := fmt.Sprintf("EXPLAIN QUERY PLAN %s", strings.TrimRight(strings.TrimSpace(sqlQuery), ";"))
+	rows, err := db.Query(explainSQL)
+	elapsed := float64(time.Since(start).Microseconds()) / 1000.0
+	if err != nil {
+		return &QueryPlanResult{
+			Success:    false,
+			Error:      err.Error(),
+			DurationMs: elapsed,
+		}, nil
+	}
+	defer rows.Close()
+
+	var rawNodes []PlanNode
+	nodeMap := make(map[int]*PlanNode)
+	hasFullScan := false
+	hasTempBTree := false
+
+	for rows.Next() {
+		var id, parent, notused int
+		var detail string
+		if err := rows.Scan(&id, &parent, &notused, &detail); err != nil {
+			continue
+		}
+
+		op := "OTHER"
+		cost := "info"
+		tbl := ""
+		idx := ""
+
+		upper := strings.ToUpper(detail)
+		if strings.HasPrefix(upper, "SCAN") {
+			op = "SCAN"
+			cost = "high"
+			hasFullScan = true
+			tbl = extractTableNameFromDetail(detail)
+		} else if strings.HasPrefix(upper, "SEARCH") {
+			op = "SEARCH"
+			cost = "optimal"
+			tbl = extractTableNameFromDetail(detail)
+			idx = extractIndexNameFromDetail(detail)
+		} else if strings.Contains(upper, "TEMP B-TREE") {
+			op = "TEMP_BTREE"
+			cost = "warning"
+			hasTempBTree = true
+		} else if strings.HasPrefix(upper, "COMPOUND") {
+			op = "COMPOUND"
+			cost = "info"
+		}
+
+		node := PlanNode{
+			ID:        id,
+			ParentID:  parent,
+			Detail:    detail,
+			Operation: op,
+			Table:     tbl,
+			IndexName: idx,
+			CostAlert: cost,
+			Children:  []PlanNode{},
+		}
+		rawNodes = append(rawNodes, node)
+		nodeMap[id] = &node
+	}
+
+	// Build tree hierarchy
+	var rootNodes []PlanNode
+	for _, n := range rawNodes {
+		if n.ParentID == 0 || nodeMap[n.ParentID] == nil {
+			rootNodes = append(rootNodes, n)
+		} else {
+			p := nodeMap[n.ParentID]
+			p.Children = append(p.Children, n)
+		}
+	}
+
+	summary := "Query executed using existing indexes."
+	if hasFullScan {
+		summary = "Full table scan detected! Query traverses all rows linearly without an index."
+	} else if hasTempBTree {
+		summary = "Temporary B-Tree created for sorting or grouping. An index may improve performance."
+	}
+
+	return &QueryPlanResult{
+		RawNodes:     rawNodes,
+		RootNodes:    rootNodes,
+		HasFullScan:  hasFullScan,
+		HasTempBTree: hasTempBTree,
+		Summary:      summary,
+		DurationMs:   elapsed,
+		Success:      true,
+	}, nil
+}
+
+// SimulateQuery runs mutating queries in an isolated rollback transaction sandbox.
+func (s *Service) SimulateQuery(deviceID, packageName, remotePath, sqlQuery string) (*SimulationResult, error) {
+	fileName := filepath.Base(remotePath)
+	localPath := s.getLocalCachePath(deviceID, packageName, fileName)
+
+	// Ensure latest copy
+	_ = s.client.ExecOutCat(deviceID, packageName, remotePath, localPath)
+	s.syncAuxiliarySqliteFiles(deviceID, packageName, remotePath, localPath)
+
+	db, err := sql.Open("sqlite", localPath)
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+
+	start := time.Now()
+	trimmed := strings.TrimSpace(sqlQuery)
+	upper := strings.ToUpper(trimmed)
+
+	isMutation := strings.HasPrefix(upper, "UPDATE") ||
+		strings.HasPrefix(upper, "DELETE") ||
+		strings.HasPrefix(upper, "INSERT") ||
+		strings.HasPrefix(upper, "DROP") ||
+		strings.HasPrefix(upper, "ALTER")
+
+	if !isMutation {
+		// Read-only query simulation
+		rows, err := db.Query(sqlQuery)
+		elapsed := float64(time.Since(start).Microseconds()) / 1000.0
+		if err != nil {
+			return &SimulationResult{
+				Query:      sqlQuery,
+				IsMutation: false,
+				DurationMs: elapsed,
+				Success:    false,
+				Error:      err.Error(),
+			}, nil
+		}
+		defer rows.Close()
+
+		var count int64
+		for rows.Next() {
+			count++
+		}
+		return &SimulationResult{
+			Query:        sqlQuery,
+			IsMutation:   false,
+			AffectedRows: count,
+			DurationMs:   elapsed,
+			Success:      true,
+		}, nil
+	}
+
+	// For UPDATE or DELETE, attempt to capture preview of affected rows before executing
+	var previewRows []map[string]interface{}
+	if strings.HasPrefix(upper, "UPDATE") || strings.HasPrefix(upper, "DELETE") {
+		tableName := extractTableNameFromMutation(trimmed)
+		whereClause := extractWhereClause(trimmed)
+		if tableName != "" {
+			previewSQL := fmt.Sprintf("SELECT * FROM \"%s\"", tableName)
+			if whereClause != "" {
+				previewSQL += " " + whereClause
+			}
+			previewSQL += " LIMIT 20"
+
+			pRows, err := db.Query(previewSQL)
+			if err == nil {
+				defer pRows.Close()
+				colNames, _ := pRows.Columns()
+				for pRows.Next() {
+					colPointers := make([]interface{}, len(colNames))
+					colValues := make([]interface{}, len(colNames))
+					for i := range colValues {
+						colPointers[i] = &colValues[i]
+					}
+					if err := pRows.Scan(colPointers...); err == nil {
+						rowMap := make(map[string]interface{})
+						for i, colName := range colNames {
+							val := colValues[i]
+							if b, ok := val.([]byte); ok {
+								rowMap[colName] = string(b)
+							} else {
+								rowMap[colName] = val
+							}
+						}
+						previewRows = append(previewRows, rowMap)
+					}
+				}
+			}
+		}
+	}
+
+	// Begin explicit transaction
+	tx, err := db.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("failed to open sandbox transaction: %v", err)
+	}
+	defer tx.Rollback() // Always rollback so no changes persist
+
+	res, err := tx.Exec(sqlQuery)
+	elapsed := float64(time.Since(start).Microseconds()) / 1000.0
+	if err != nil {
+		return &SimulationResult{
+			Query:        sqlQuery,
+			IsMutation:   true,
+			AffectedRows: 0,
+			DurationMs:   elapsed,
+			Success:      false,
+			Error:        err.Error(),
+		}, nil
+	}
+
+	affected, _ := res.RowsAffected()
+
+	// Rollback explicitly
+	_ = tx.Rollback()
+
+	return &SimulationResult{
+		Query:        sqlQuery,
+		IsMutation:   true,
+		AffectedRows: affected,
+		PreviewRows:  previewRows,
+		DurationMs:   elapsed,
+		Success:      true,
+	}, nil
+}
+
+// GetDatabaseSchemaExtended fetches full metadata including columns, foreign keys, and indexes for all tables.
+func (s *Service) GetDatabaseSchemaExtended(deviceID, packageName, remotePath string) (*ExtendedSchemaResult, error) {
+	fileName := filepath.Base(remotePath)
+	localPath := s.getLocalCachePath(deviceID, packageName, fileName)
+
+	// Ensure latest copy
+	_ = s.client.ExecOutCat(deviceID, packageName, remotePath, localPath)
+	s.syncAuxiliarySqliteFiles(deviceID, packageName, remotePath, localPath)
+
+	db, err := sql.Open("sqlite", localPath)
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+
+	tableRows, err := db.Query("SELECT name, type FROM sqlite_master WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%' ORDER BY name")
+	if err != nil {
+		return nil, err
+	}
+	defer tableRows.Close()
+
+	var extendedTables []ExtendedTableSchema
+	for tableRows.Next() {
+		var name, tType string
+		if err := tableRows.Scan(&name, &tType); err != nil {
+			continue
+		}
+
+		var rowCount int64
+		_ = db.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM \"%s\"", name)).Scan(&rowCount)
+
+		cols, _ := s.getTableColumns(db, name)
+		fks, _ := s.getTableForeignKeys(db, name)
+		idxs, _ := s.getTableIndexes(db, name)
+
+		extendedTables = append(extendedTables, ExtendedTableSchema{
+			Name:        name,
+			Type:        tType,
+			RowCount:    rowCount,
+			Columns:     cols,
+			ForeignKeys: fks,
+			Indexes:     idxs,
+		})
+	}
+
+	return &ExtendedSchemaResult{
+		DatabaseID: fmt.Sprintf("%s_%s", packageName, fileName),
+		Tables:     extendedTables,
+	}, nil
+}
+
+// CreateIndex executes a CREATE INDEX DDL statement and syncs back to the mobile device.
+func (s *Service) CreateIndex(deviceID, packageName, remotePath, indexSql string) error {
+	fileName := filepath.Base(remotePath)
+	localPath := s.getLocalCachePath(deviceID, packageName, fileName)
+
+	db, err := sql.Open("sqlite", localPath)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	_, err = db.Exec(indexSql)
+	if err != nil {
+		return err
+	}
+
+	return s.client.PushToSandbox(deviceID, packageName, localPath, remotePath)
+}
+
+func (s *Service) getTableForeignKeys(db *sql.DB, tableName string) ([]ForeignKeyMeta, error) {
+	rows, err := db.Query(fmt.Sprintf("PRAGMA foreign_key_list(\"%s\")", tableName))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var fks []ForeignKeyMeta
+	for rows.Next() {
+		var id, seq int
+		var toTable, fromCol, toCol, onUpdate, onDelete, match string
+		if err := rows.Scan(&id, &seq, &toTable, &fromCol, &toCol, &onUpdate, &onDelete, &match); err == nil {
+			fks = append(fks, ForeignKeyMeta{
+				ID:       id,
+				Seq:      seq,
+				ToTable:  toTable,
+				FromCol:  fromCol,
+				ToCol:    toCol,
+				OnUpdate: onUpdate,
+				OnDelete: onDelete,
+			})
+		}
+	}
+	return fks, nil
+}
+
+func (s *Service) getTableIndexes(db *sql.DB, tableName string) ([]IndexMeta, error) {
+	rows, err := db.Query(fmt.Sprintf("PRAGMA index_list(\"%s\")", tableName))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var indexes []IndexMeta
+	for rows.Next() {
+		var seq int
+		var name, origin string
+		var unique, partial int
+		if err := rows.Scan(&seq, &name, &unique, &origin, &partial); err == nil {
+			// Query columns in this index
+			cols := []string{}
+			infoRows, err := db.Query(fmt.Sprintf("PRAGMA index_info(\"%s\")", name))
+			if err == nil {
+				for infoRows.Next() {
+					var seqno, cid int
+					var cName string
+					if err := infoRows.Scan(&seqno, &cid, &cName); err == nil {
+						cols = append(cols, cName)
+					}
+				}
+				infoRows.Close()
+			}
+
+			indexes = append(indexes, IndexMeta{
+				Seq:     seq,
+				Name:    name,
+				Unique:  unique > 0,
+				Origin:  origin,
+				Partial: partial > 0,
+				Columns: cols,
+			})
+		}
+	}
+	return indexes, nil
+}
+
+func extractTableNameFromDetail(detail string) string {
+	parts := strings.Fields(detail)
+	for i, p := range parts {
+		if strings.EqualFold(p, "TABLE") && i+1 < len(parts) {
+			tbl := parts[i+1]
+			tbl = strings.Trim(tbl, "\"';,")
+			return tbl
+		}
+	}
+	return ""
+}
+
+func extractIndexNameFromDetail(detail string) string {
+	parts := strings.Fields(detail)
+	for i, p := range parts {
+		if strings.EqualFold(p, "INDEX") && i+1 < len(parts) {
+			idx := parts[i+1]
+			idx = strings.Trim(idx, "\"';,()")
+			return idx
+		}
+	}
+	return ""
+}
+
+func extractTableNameFromMutation(sql string) string {
+	parts := strings.Fields(sql)
+	if len(parts) < 2 {
+		return ""
+	}
+	upper := strings.ToUpper(parts[0])
+	if upper == "UPDATE" {
+		return strings.Trim(parts[1], "\"`';")
+	}
+	if upper == "DELETE" && len(parts) >= 3 && strings.ToUpper(parts[1]) == "FROM" {
+		return strings.Trim(parts[2], "\"`';")
+	}
+	return ""
+}
+
+func extractWhereClause(sql string) string {
+	upper := strings.ToUpper(sql)
+	idx := strings.Index(upper, "WHERE")
+	if idx != -1 {
+		return strings.TrimSpace(sql[idx:])
+	}
+	return ""
+}
+

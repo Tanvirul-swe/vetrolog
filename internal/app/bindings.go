@@ -158,3 +158,24 @@ func (a *App) AdbDeleteRow(deviceID, packageName, remotePath, tableName, primary
 	}
 	return adb.GetService().DeleteRow(deviceID, packageName, remotePath, tableName, pk) == nil
 }
+
+// AdbExplainQuery analyzes a query using SQLite's EXPLAIN QUERY PLAN and builds an operation tree
+func (a *App) AdbExplainQuery(deviceID, packageName, remotePath, sqlQuery string) (*adb.QueryPlanResult, error) {
+	return adb.GetService().ExplainQuery(deviceID, packageName, remotePath, sqlQuery)
+}
+
+// AdbSimulateQuery runs mutating queries in a safe rollback transaction sandbox
+func (a *App) AdbSimulateQuery(deviceID, packageName, remotePath, sqlQuery string) (*adb.SimulationResult, error) {
+	return adb.GetService().SimulateQuery(deviceID, packageName, remotePath, sqlQuery)
+}
+
+// AdbGetDatabaseSchemaExtended returns extended metadata including foreign keys and indexes
+func (a *App) AdbGetDatabaseSchemaExtended(deviceID, packageName, remotePath string) (*adb.ExtendedSchemaResult, error) {
+	return adb.GetService().GetDatabaseSchemaExtended(deviceID, packageName, remotePath)
+}
+
+// AdbCreateIndex executes a CREATE INDEX DDL statement and syncs back to device
+func (a *App) AdbCreateIndex(deviceID, packageName, remotePath, indexSql string) error {
+	return adb.GetService().CreateIndex(deviceID, packageName, remotePath, indexSql)
+}
+

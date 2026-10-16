@@ -5,8 +5,10 @@ import { AppStatusBar } from './AppStatusBar';
 import { DataGrid } from '@/features/datagrid/components/DataGrid';
 import { LogStream } from '@/features/query-console/components/LogStream';
 import { QueryEditor } from '@/features/query-console/components/QueryEditor';
+import { SqlPlayground } from '@/features/playground/SqlPlayground';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useSettingsStore } from '@/stores/useSettingsStore';
+import { usePlaygroundStore } from '@/stores/usePlaygroundStore';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 
 interface SplitLayoutProps {
@@ -28,6 +30,7 @@ export function SplitLayout({
   const isConsoleOpen = useSettingsStore((s) => s.isConsoleOpen);
   const activeTab = useSettingsStore((s) => s.activeConsoleTab);
   const setActiveTab = useSettingsStore((s) => s.setActiveConsoleTab);
+  const activeWorkspaceView = usePlaygroundStore((s) => s.activeWorkspaceView);
 
   useKeyboardShortcuts(
     () => searchInputRef.current?.focus(),
@@ -46,15 +49,20 @@ export function SplitLayout({
 
         {/* Center Canvas */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Top Half: Real-time DataGrid */}
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <DataGrid
-              onRefresh={onRefresh}
-              onRequestPage={onRequestPage}
-              onUpdateRow={onUpdateRow}
-              onDeleteRow={onDeleteRow}
-            />
-          </div>
+          {activeWorkspaceView === 'playground' ? (
+            <SqlPlayground />
+          ) : (
+            <>
+              {/* Top Half: Real-time DataGrid */}
+              <div className="flex-1 flex flex-col overflow-hidden">
+                <DataGrid
+                  onRefresh={onRefresh}
+                  onRequestPage={onRequestPage}
+                  onUpdateRow={onUpdateRow}
+                  onDeleteRow={onDeleteRow}
+                />
+              </div>
+
 
           {/* Bottom Half: Console / Mutation Stream */}
           {isConsoleOpen && (
@@ -85,8 +93,10 @@ export function SplitLayout({
               </Tabs>
             </div>
           )}
-        </div>
-      </div>
+        </>
+      )}
+    </div>
+  </div>
 
       {/* Bottom Status Bar */}
       <AppStatusBar />

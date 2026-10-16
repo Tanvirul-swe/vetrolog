@@ -72,3 +72,82 @@ export interface QueryResult {
   error?: string;
 }
 
+export type OperationType = 'SCAN' | 'SEARCH' | 'TEMP_BTREE' | 'COMPOUND' | 'OTHER';
+export type CostAlert = 'high' | 'warning' | 'optimal' | 'info';
+
+export interface PlanNode {
+  id: number;
+  parentId: number;
+  detail: string;
+  operation: OperationType;
+  table?: string;
+  indexName?: string;
+  costAlert: CostAlert;
+  children?: PlanNode[];
+}
+
+export interface QueryPlanResult {
+  rawNodes: PlanNode[];
+  rootNodes: PlanNode[];
+  hasFullScan: boolean;
+  hasTempBTree: boolean;
+  summary: string;
+  durationMs: number;
+  success: boolean;
+  error?: string;
+}
+
+export interface SimulationResult {
+  query: string;
+  isMutation: boolean;
+  affectedRows: number;
+  previewRows?: Record<string, unknown>[];
+  durationMs: number;
+  success: boolean;
+  error?: string;
+}
+
+export interface ForeignKeyInfo {
+  id: number;
+  seq: number;
+  toTable: string;
+  fromCol: string;
+  toCol: string;
+  onUpdate: string;
+  onDelete: string;
+}
+
+export interface IndexInfo {
+  seq: number;
+  name: string;
+  unique: boolean;
+  origin: string;
+  partial: boolean;
+  columns: string[];
+}
+
+export interface ExtendedTableSchema {
+  name: string;
+  type: string;
+  rowCount: number;
+  columns: ColumnInfo[];
+  foreignKeys: ForeignKeyInfo[];
+  indexes: IndexInfo[];
+}
+
+export interface ExtendedSchemaResult {
+  databaseId: string;
+  tables: ExtendedTableSchema[];
+}
+
+export type AIProvider = 'offline' | 'gemini' | 'openai' | 'ollama';
+
+export interface AIConfig {
+  provider: AIProvider;
+  geminiApiKey?: string;
+  openaiApiKey?: string;
+  ollamaBaseUrl?: string;
+  modelName?: string;
+}
+
+

@@ -188,4 +188,87 @@ export const apiBridge = {
     const data = await res.json();
     return Boolean(data.success);
   },
+
+  explainQuery: async (
+    deviceId: string,
+    packageName: string,
+    remotePath: string,
+    query: string
+  ): Promise<any> => {
+    if (isWailsApp()) {
+      return await AppBindings.AdbExplainQuery(deviceId, packageName, remotePath, query);
+    }
+    const res = await fetch('/api/adb/explain', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deviceId, packageName, remotePath, query }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Explain query failed' }));
+      throw new Error(err.error || 'Explain query failed');
+    }
+    return await res.json();
+  },
+
+  simulateQuery: async (
+    deviceId: string,
+    packageName: string,
+    remotePath: string,
+    query: string
+  ): Promise<any> => {
+    if (isWailsApp()) {
+      return await AppBindings.AdbSimulateQuery(deviceId, packageName, remotePath, query);
+    }
+    const res = await fetch('/api/adb/simulate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deviceId, packageName, remotePath, query }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Simulate query failed' }));
+      throw new Error(err.error || 'Simulate query failed');
+    }
+    return await res.json();
+  },
+
+  getExtendedSchema: async (
+    deviceId: string,
+    packageName: string,
+    remotePath: string
+  ): Promise<any> => {
+    if (isWailsApp()) {
+      return await AppBindings.AdbGetDatabaseSchemaExtended(deviceId, packageName, remotePath);
+    }
+    const params = new URLSearchParams({ deviceId, packageName, remotePath });
+    const res = await fetch(`/api/adb/schema-extended?${params.toString()}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Failed to fetch extended schema' }));
+      throw new Error(err.error || 'Failed to fetch extended schema');
+    }
+    return await res.json();
+  },
+
+  createIndex: async (
+    deviceId: string,
+    packageName: string,
+    remotePath: string,
+    indexSql: string
+  ): Promise<boolean> => {
+    if (isWailsApp()) {
+      await AppBindings.AdbCreateIndex(deviceId, packageName, remotePath, indexSql);
+      return true;
+    }
+    const res = await fetch('/api/adb/create-index', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deviceId, packageName, remotePath, indexSql }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Failed to create index' }));
+      throw new Error(err.error || 'Failed to create index');
+    }
+    const data = await res.json();
+    return Boolean(data.success);
+  },
 };
+

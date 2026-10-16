@@ -61,3 +61,20 @@ export function RequestTableData(arg1, arg2, arg3, arg4) {
 export function UpdateRow(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['UpdateRow'](arg1, arg2, arg3, arg4);
 }
+
+export function AdbExplainQuery(arg1, arg2, arg3, arg4) {
+  return window['go']['app']['App']['AdbExplainQuery'](arg1, arg2, arg3, arg4);
+}
+
+export function AdbSimulateQuery(arg1, arg2, arg3, arg4) {
+  return window['go']['app']['App']['AdbSimulateQuery'](arg1, arg2, arg3, arg4);
+}
+
+export function AdbGetDatabaseSchemaExtended(arg1, arg2, arg3) {
+  return window['go']['app']['App']['AdbGetDatabaseSchemaExtended'](arg1, arg2, arg3);
+}
+
+export function AdbCreateIndex(arg1, arg2, arg3, arg4) {
+  return window['go']['app']['App']['AdbCreateIndex'](arg1, arg2, arg3, arg4);
+}
+

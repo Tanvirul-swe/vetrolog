@@ -18,11 +18,11 @@
 ## 🌟 Highlights & Features
 
 - **⚡ Zero-Config ADB Mobile Inspector**: Plug in your Android device via USB and inspect SQLite databases (`.db`) without modifying a single line of code in your Flutter or Android project!
+- **🧠 Intelligent SQL Playground**: Live visual query plan analyzer (`EXPLAIN QUERY PLAN`), schema-aware autocomplete & FK join predictor, safe transaction dry-run simulation, natural language to SQL engine (Offline + BYOK Gemini/OpenAI/Ollama), bidirectional inline cell editing, mobile UI thread FPS profiler, 1-click index advisor, and multi-platform code generator (Flutter, Android Room, iOS GRDB, Go).
 - **🔄 Real-Time Live Sync & WAL Support**: Automatically detects insertions, updates, and deletions on the fly with SQLite Write-Ahead Logging (`-wal`) and Shared Memory (`-shm`) sync.
 - **📊 Real-Time Table Badges**: Dynamic record counts updated automatically in the sidebar database tree.
-- **🔍 Powerful SQL Query Runner**: Run custom SQL queries (`SELECT`, `JOIN`, `UPDATE`, `INDEX`) with tabular results, column sorting, and query execution benchmarks.
-- **✏️ Inline Record Editing**: Double-click cells to update values with automatic write-back sync to the phone sandbox.
-- **🖥️ True Cross-Platform Desktop App**: Native performance and sleek dark glassmorphism on **macOS**, **Windows**, and **Linux**.
+- **✏️ Bidirectional Record Editing**: Double-click cells to update values with automatic write-back sync to the phone sandbox.
+- **🖥️ Dual Mode (Desktop & Web)**: Run as a native desktop application on macOS, Windows, and Linux, or pass `--web` to launch in your browser (`http://localhost:8787`).
 - **🔔 In-App Update Notifications**: Seamless version checks directly against GitHub Releases.
 
 ---

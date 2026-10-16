@@ -32,3 +32,12 @@ export function GetLocalIPAddresses():Promise<Array<string>>;
 export function RequestTableData(arg1:string,arg2:string,arg3:number,arg4:number):Promise<boolean>;
 
 export function UpdateRow(arg1:string,arg2:string,arg3:string,arg4:string):Promise<boolean>;
+
+export function AdbExplainQuery(arg1:string,arg2:string,arg3:string,arg4:string):Promise<any>;
+
+export function AdbSimulateQuery(arg1:string,arg2:string,arg3:string,arg4:string):Promise<any>;
+
+export function AdbGetDatabaseSchemaExtended(arg1:string,arg2:string,arg3:string):Promise<any>;
+
+export function AdbCreateIndex(arg1:string,arg2:string,arg3:string,arg4:string):Promise<any>;
+

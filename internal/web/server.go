@@ -231,6 +231,107 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 		err := s.adbServer.DeleteRow(req.DeviceID, req.PackageName, req.RemotePath, req.Table, req.PrimaryKey)
 		writeJSON(w, http.StatusOK, map[string]bool{"success": err == nil})
 	})
+
+	// Explain custom SQL query (EXPLAIN QUERY PLAN)
+	mux.HandleFunc("/api/adb/explain", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var req struct {
+			DeviceID    string `json:"deviceId"`
+			PackageName string `json:"packageName"`
+			RemotePath  string `json:"remotePath"`
+			Query       string `json:"query"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid JSON body"})
+			return
+		}
+
+		result, err := s.adbServer.ExplainQuery(req.DeviceID, req.PackageName, req.RemotePath, req.Query)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, result)
+	})
+
+	// Simulate mutating query in safe rollback transaction sandbox
+	mux.HandleFunc("/api/adb/simulate", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var req struct {
+			DeviceID    string `json:"deviceId"`
+			PackageName string `json:"packageName"`
+			RemotePath  string `json:"remotePath"`
+			Query       string `json:"query"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid JSON body"})
+			return
+		}
+
+		result, err := s.adbServer.SimulateQuery(req.DeviceID, req.PackageName, req.RemotePath, req.Query)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, result)
+	})
+
+	// Get extended database schema (foreign keys, indexes, columns)
+	mux.HandleFunc("/api/adb/schema-extended", func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		deviceID := q.Get("deviceId")
+		packageName := q.Get("packageName")
+		remotePath := q.Get("remotePath")
+
+		if deviceID == "" || packageName == "" || remotePath == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "deviceId, packageName, and remotePath are required"})
+			return
+		}
+
+		result, err := s.adbServer.GetDatabaseSchemaExtended(deviceID, packageName, remotePath)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, result)
+	})
+
+	// Create index on database and sync back to device
+	mux.HandleFunc("/api/adb/create-index", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var req struct {
+			DeviceID    string `json:"deviceId"`
+			PackageName string `json:"packageName"`
+			RemotePath  string `json:"remotePath"`
+			IndexSQL    string `json:"indexSql"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid JSON body"})
+			return
+		}
+
+		err := s.adbServer.CreateIndex(req.DeviceID, req.PackageName, req.RemotePath, req.IndexSQL)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]bool{"success": true})
+	})
 }
 
 func (s *Server) registerStaticRoutes(mux *http.ServeMux) {

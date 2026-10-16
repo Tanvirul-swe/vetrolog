@@ -9,6 +9,7 @@ import { useSettingsStore } from '@/stores/useSettingsStore';
 import { QRPairingModal } from '@/features/connection/components/QRPairingModal';
 import { AdbDeviceSelector } from '@/features/adb/components/AdbDeviceSelector';
 import { UpdateBadge } from '@/features/updater/UpdateBadge';
+import { isWailsApp } from '@/services/apiBridge';
 import logoIcon from '@/assets/images/vetrolog-icon.png';
 
 interface AppHeaderProps {
@@ -19,6 +20,7 @@ interface AppHeaderProps {
 export function AppHeader({ searchInputRef, onRefresh }: AppHeaderProps) {
   // Hidden for this version per user request; set to true to re-enable QR Pairing
   const SHOW_QR_PAIR = false;
+  const isWails = isWailsApp();
 
   const [isPairingOpen, setIsPairingOpen] = useState(false);
   const isConnected = useConnectionStore((s) => s.isConnected);
@@ -35,8 +37,8 @@ export function AppHeader({ searchInputRef, onRefresh }: AppHeaderProps) {
   return (
     <>
       <header className="wails-drag h-13 border-b border-border/80 bg-card/60 backdrop-blur-md px-4 flex items-center justify-between select-none shrink-0 z-30">
-        {/* Brand & Window Traffic Lights Offset (on macOS) */}
-        <div className="flex items-center gap-3 pl-16">
+        {/* Brand & Window Traffic Lights Offset (on macOS desktop) */}
+        <div className={`flex items-center gap-3 ${isWails ? 'pl-16' : 'pl-2'}`}>
           <div className="size-8 rounded-lg overflow-hidden border border-primary/40 shadow-xs shadow-primary/30 bg-background/80 flex items-center justify-center shrink-0 p-0.5">
             <img src={logoIcon} alt="VetroLog" className="size-full object-cover rounded-md" />
           </div>

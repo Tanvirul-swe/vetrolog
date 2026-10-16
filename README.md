@@ -65,6 +65,23 @@ Get the latest installer for your operating system from **[GitHub Releases](http
 
 ---
 
+### 🌐 Local Web Server Mode (Browser Access)
+
+If you prefer to inspect your databases in **Chrome, Safari, Firefox**, or run VetroLog on a remote machine, headless workstation, or Docker container:
+
+```bash
+# Start VetroLog in Local Web Server mode (auto-opens http://localhost:8787)
+./vetrolog --web
+
+# Or specify a custom port
+./vetrolog --web --port 8080
+
+# Or run headless without auto-opening the browser
+./vetrolog --web --no-browser
+```
+
+---
+
 ## 🛠️ Build from Source
 
 ### Prerequisites

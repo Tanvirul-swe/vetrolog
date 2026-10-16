@@ -2,6 +2,8 @@ package main
 
 import (
 	"embed"
+	"flag"
+	"os"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -10,12 +12,30 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/windows"
 
 	"vetrolog/internal/app"
+	"vetrolog/internal/web"
 )
 
 //go:embed all:frontend/dist
 var assets embed.FS
 
 func main() {
+	// Parse CLI flags
+	webMode := flag.Bool("web", false, "Start VetroLog in Local Web Server mode")
+	webPort := flag.Int("port", 8787, "Port for Web Server mode (default: 8787)")
+	noBrowser := flag.Bool("no-browser", false, "Do not auto-open the browser in Web Server mode")
+	flag.Parse()
+
+	// Check if 'serve' was passed as first argument (e.g. `vetrolog serve`)
+	isServeCmd := len(os.Args) > 1 && os.Args[1] == "serve"
+
+	if *webMode || isServeCmd {
+		err := web.StartServer(assets, *webPort, !*noBrowser)
+		if err != nil {
+			println("Web Server Error:", err.Error())
+		}
+		return
+	}
+
 	// Create an instance of the modular application
 	appInstance := app.NewApp()
 

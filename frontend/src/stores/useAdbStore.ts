@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import * as AppBindings from '../../wailsjs/go/app/App';
+import { apiBridge } from '@/services/apiBridge';
 import { useDatabaseStore } from './useDatabaseStore';
 import { DatabaseInfo } from '../types/database';
 
@@ -112,12 +112,8 @@ export const useAdbStore = create<AdbState>((set, get) => ({
     isPollingInProgress = true;
 
     try {
-      if (typeof window === 'undefined' || !(window as any)?.go?.app?.App?.AdbListDevices) {
-        return;
-      }
-
       // 1. Fetch current devices attached
-      const devs = await AppBindings.AdbListDevices();
+      const devs = await apiBridge.listDevices();
       const currentSelectedDevId = get().selectedDeviceId;
 
       // Case A: No ADB devices attached
@@ -157,8 +153,8 @@ export const useAdbStore = create<AdbState>((set, get) => ({
       const currentPkg = get().selectedPackageName;
 
       // 2. Check if selected app is still running (requires 3 consecutive failures to avoid transient false positives)
-      if (currentPkg && (window as any)?.go?.app?.App?.AdbIsAppRunning) {
-        const isStillRunning = await AppBindings.AdbIsAppRunning(activeDevId, currentPkg);
+      if (currentPkg) {
+        const isStillRunning = await apiBridge.isAppRunning(activeDevId, currentPkg);
         if (!isStillRunning) {
           consecutiveDeadChecks++;
           if (consecutiveDeadChecks >= 3) {
@@ -179,7 +175,7 @@ export const useAdbStore = create<AdbState>((set, get) => ({
 
       // 3. If no app is selected yet, scan for running debug apps to connect
       if (!get().selectedPackageName) {
-        const latestApps = await AppBindings.AdbListApps(activeDevId);
+        const latestApps = await apiBridge.listApps(activeDevId);
         const appsList = latestApps || [];
         set({ apps: appsList });
 
@@ -211,17 +207,13 @@ export const useAdbStore = create<AdbState>((set, get) => ({
   fetchDevices: async () => {
     set({ isLoadingDevices: true });
     try {
-      if (typeof window !== 'undefined' && (window as any)?.go?.app?.App?.AdbListDevices) {
-        const devices = await AppBindings.AdbListDevices();
-        set({ devices: devices || [], isLoadingDevices: false });
+      const devices = await apiBridge.listDevices();
+      set({ devices: devices || [], isLoadingDevices: false });
 
-        const currentSelected = get().selectedDeviceId;
-        if (!currentSelected && devices && devices.length > 0) {
-          // Auto-select first device
-          get().selectDevice(devices[0].id);
-        }
-      } else {
-        set({ isLoadingDevices: false });
+      const currentSelected = get().selectedDeviceId;
+      if (!currentSelected && devices && devices.length > 0) {
+        // Auto-select first device
+        get().selectDevice(devices[0].id);
       }
     } catch {
       set({ isLoadingDevices: false });
@@ -238,15 +230,11 @@ export const useAdbStore = create<AdbState>((set, get) => ({
     });
 
     try {
-      if (typeof window !== 'undefined' && (window as any)?.go?.app?.App?.AdbListApps) {
-        const apps = await AppBindings.AdbListApps(deviceId);
-        set({ apps: apps || [], isLoadingApps: false });
+      const apps = await apiBridge.listApps(deviceId);
+      set({ apps: apps || [], isLoadingApps: false });
 
-        if (apps && apps.length > 0) {
-          get().selectApp(apps[0].packageName);
-        }
-      } else {
-        set({ isLoadingApps: false });
+      if (apps && apps.length > 0) {
+        get().selectApp(apps[0].packageName);
       }
     } catch {
       set({ isLoadingApps: false });
@@ -267,17 +255,16 @@ export const useAdbStore = create<AdbState>((set, get) => ({
     }
 
     try {
-      if (typeof window !== 'undefined' && (window as any)?.go?.app?.App?.AdbDiscoverDatabases) {
-        const dbs = await AppBindings.AdbDiscoverDatabases(deviceId, packageName);
-        set({ isLoadingDatabases: false });
+      const dbs = await apiBridge.discoverDatabases(deviceId, packageName);
+      set({ isLoadingDatabases: false });
 
-        if (dbs && dbs.length > 0) {
-          // Convert to DatabaseInfo structure
-          const formattedDbs: DatabaseInfo[] = dbs.map((db: any) => ({
-            id: db.id,
-            name: db.name,
-            type: db.type as any,
-            path: db.path,
+      if (dbs && dbs.length > 0) {
+        // Convert to DatabaseInfo structure
+        const formattedDbs: DatabaseInfo[] = dbs.map((db: any) => ({
+          id: db.id,
+          name: db.name,
+          type: db.type as any,
+          path: db.path,
             sizeBytes: db.sizeBytes || 0,
             updatedAt: db.updatedAt || Date.now(),
             tables: (db.tables || []).map((t: any) => ({
@@ -313,13 +300,10 @@ export const useAdbStore = create<AdbState>((set, get) => ({
         } else {
           useDatabaseStore.getState().setDatabases([]);
         }
-      } else {
+      } catch {
         set({ isLoadingDatabases: false });
       }
-    } catch {
-      set({ isLoadingDatabases: false });
-    }
-  },
+    },
 
   refreshDatabases: async () => {
     const pkg = get().selectedPackageName;
@@ -353,37 +337,35 @@ export const useAdbStore = create<AdbState>((set, get) => ({
     }
 
     try {
-      if (typeof window !== 'undefined' && (window as any)?.go?.app?.App?.AdbGetTableData) {
-        const result = await AppBindings.AdbGetTableData(
-          deviceId,
-          packageName,
-          remotePath,
-          tableName,
-          page,
-          pageSize
-        );
+      const result = await apiBridge.getTableData(
+        deviceId,
+        packageName,
+        remotePath,
+        tableName,
+        page,
+        pageSize
+      );
 
-        if (result) {
-          // Guard: if user selected a different table while this request was in flight, do not overwrite
-          const activeTable = useDatabaseStore.getState().selectedTableName;
-          if (activeTable && activeTable !== tableName) {
-            return;
-          }
+      if (result) {
+        // Guard: if user selected a different table while this request was in flight, do not overwrite
+        const activeTable = useDatabaseStore.getState().selectedTableName;
+        if (activeTable && activeTable !== tableName) {
+          return;
+        }
 
-          useDatabaseStore.getState().setTableData({
-            databaseId: result.databaseId,
-            tableName: result.tableName,
-            totalRows: result.totalRows,
-            page: result.page,
-            pageSize: result.pageSize,
-            columns: result.columns,
-            rows: result.rows || [],
-          });
+        useDatabaseStore.getState().setTableData({
+          databaseId: result.databaseId,
+          tableName: result.tableName,
+          totalRows: result.totalRows,
+          page: result.page,
+          pageSize: result.pageSize,
+          columns: result.columns,
+          rows: result.rows || [],
+        });
 
-          // Keep left sidebar table counts updated in real-time
-          if ((result as any).tableCounts) {
-            useDatabaseStore.getState().updateTableCounts(result.databaseId, (result as any).tableCounts);
-          }
+        // Keep left sidebar table counts updated in real-time
+        if ((result as any).tableCounts) {
+          useDatabaseStore.getState().updateTableCounts(result.databaseId, (result as any).tableCounts);
         }
       }
     } catch (e) {
@@ -403,52 +385,50 @@ export const useAdbStore = create<AdbState>((set, get) => ({
     if (!deviceId || !packageName || !remotePath) return null;
 
     try {
-      if (typeof window !== 'undefined' && (window as any)?.go?.app?.App?.AdbExecuteQuery) {
-        const result = await AppBindings.AdbExecuteQuery(
-          deviceId,
-          packageName,
-          remotePath,
-          query
-        );
+      const result = await apiBridge.executeQuery(
+        deviceId,
+        packageName,
+        remotePath,
+        query
+      );
 
-        if (result) {
-          useDatabaseStore.getState().setLatestQueryResult({
-            requestId: `adb_${Date.now()}`,
-            databaseId: selectedDbId || packageName,
-            query,
-            columns: [],
-            rows: result.rows || [],
-            affected: result.affected || 0,
-            durationMs: result.durationMs || 0,
-            success: result.success,
-            error: result.error,
-          });
+      if (result) {
+        useDatabaseStore.getState().setLatestQueryResult({
+          requestId: `adb_${Date.now()}`,
+          databaseId: selectedDbId || packageName,
+          query,
+          columns: [],
+          rows: result.rows || [],
+          affected: result.affected || 0,
+          durationMs: result.durationMs || 0,
+          success: result.success,
+          error: result.error,
+        });
 
-          useDatabaseStore.getState().addQueryLog({
-            id: `q_${Date.now()}`,
-            databaseId: selectedDbId || packageName,
-            query,
-            durationMs: result.durationMs || 0,
-            timestamp: Date.now(),
-            success: result.success,
-            error: result.error,
-          });
+        useDatabaseStore.getState().addQueryLog({
+          id: `q_${Date.now()}`,
+          databaseId: selectedDbId || packageName,
+          query,
+          durationMs: result.durationMs || 0,
+          timestamp: Date.now(),
+          success: result.success,
+          error: result.error,
+        });
 
-          // If it was a mutation, refresh table data
-          const upper = query.trim().toUpperCase();
-          if (
-            upper.startsWith('INSERT') ||
-            upper.startsWith('UPDATE') ||
-            upper.startsWith('DELETE')
-          ) {
-            const currentTable = useDatabaseStore.getState().selectedTableName;
-            if (currentTable) {
-              get().loadTableData(currentTable);
-            }
+        // If it was a mutation, refresh table data
+        const upper = query.trim().toUpperCase();
+        if (
+          upper.startsWith('INSERT') ||
+          upper.startsWith('UPDATE') ||
+          upper.startsWith('DELETE')
+        ) {
+          const currentTable = useDatabaseStore.getState().selectedTableName;
+          if (currentTable) {
+            get().loadTableData(currentTable);
           }
         }
-        return result;
       }
+      return result;
     } catch (e) {
       console.error('Error executing ADB query:', e);
     }
@@ -467,21 +447,19 @@ export const useAdbStore = create<AdbState>((set, get) => ({
     if (!deviceId || !packageName || !remotePath) return false;
 
     try {
-      if (typeof window !== 'undefined' && (window as any)?.go?.app?.App?.AdbUpdateRow) {
-        const success = await AppBindings.AdbUpdateRow(
-          deviceId,
-          packageName,
-          remotePath,
-          tableName,
-          JSON.stringify(pk),
-          JSON.stringify(newValues)
-        );
+      const success = await apiBridge.updateRow(
+        deviceId,
+        packageName,
+        remotePath,
+        tableName,
+        pk,
+        newValues
+      );
 
-        if (success) {
-          get().loadTableData(tableName);
-        }
-        return success;
+      if (success) {
+        get().loadTableData(tableName);
       }
+      return success;
     } catch (e) {
       console.error('Error updating ADB row:', e);
     }
@@ -500,20 +478,18 @@ export const useAdbStore = create<AdbState>((set, get) => ({
     if (!deviceId || !packageName || !remotePath) return false;
 
     try {
-      if (typeof window !== 'undefined' && (window as any)?.go?.app?.App?.AdbDeleteRow) {
-        const success = await AppBindings.AdbDeleteRow(
-          deviceId,
-          packageName,
-          remotePath,
-          tableName,
-          JSON.stringify(pk)
-        );
+      const success = await apiBridge.deleteRow(
+        deviceId,
+        packageName,
+        remotePath,
+        tableName,
+        pk
+      );
 
-        if (success) {
-          get().loadTableData(tableName);
-        }
-        return success;
+      if (success) {
+        get().loadTableData(tableName);
       }
+      return success;
     } catch (e) {
       console.error('Error deleting ADB row:', e);
     }

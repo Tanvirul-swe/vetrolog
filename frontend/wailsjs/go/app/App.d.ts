@@ -3,11 +3,17 @@
 import {adb} from '../models';
 import {models} from '../models';
 
+export function AdbCreateIndex(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
+
 export function AdbDeleteRow(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<boolean>;
 
 export function AdbDiscoverDatabases(arg1:string,arg2:string):Promise<Array<adb.DiscoveredDB>>;
 
 export function AdbExecuteQuery(arg1:string,arg2:string,arg3:string,arg4:string):Promise<adb.QueryExecResult>;
+
+export function AdbExplainQuery(arg1:string,arg2:string,arg3:string,arg4:string):Promise<adb.QueryPlanResult>;
+
+export function AdbGetDatabaseSchemaExtended(arg1:string,arg2:string,arg3:string):Promise<adb.ExtendedSchemaResult>;
 
 export function AdbGetTableData(arg1:string,arg2:string,arg3:string,arg4:string,arg5:number,arg6:number):Promise<adb.TableDataResult>;
 
@@ -16,6 +22,8 @@ export function AdbIsAppRunning(arg1:string,arg2:string):Promise<boolean>;
 export function AdbListApps(arg1:string):Promise<Array<adb.App>>;
 
 export function AdbListDevices():Promise<Array<adb.Device>>;
+
+export function AdbSimulateQuery(arg1:string,arg2:string,arg3:string,arg4:string):Promise<adb.SimulationResult>;
 
 export function AdbUpdateRow(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string):Promise<boolean>;
 
@@ -32,12 +40,3 @@ export function GetLocalIPAddresses():Promise<Array<string>>;
 export function RequestTableData(arg1:string,arg2:string,arg3:number,arg4:number):Promise<boolean>;
 
 export function UpdateRow(arg1:string,arg2:string,arg3:string,arg4:string):Promise<boolean>;
-
-export function AdbExplainQuery(arg1:string,arg2:string,arg3:string,arg4:string):Promise<any>;
-
-export function AdbSimulateQuery(arg1:string,arg2:string,arg3:string,arg4:string):Promise<any>;
-
-export function AdbGetDatabaseSchemaExtended(arg1:string,arg2:string,arg3:string):Promise<any>;
-
-export function AdbCreateIndex(arg1:string,arg2:string,arg3:string,arg4:string):Promise<any>;
-

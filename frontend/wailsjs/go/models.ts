@@ -140,6 +140,171 @@ export namespace adb {
 		    return a;
 		}
 	}
+	export class IndexMeta {
+	    seq: number;
+	    name: string;
+	    unique: boolean;
+	    origin: string;
+	    partial: boolean;
+	    columns: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new IndexMeta(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.seq = source["seq"];
+	        this.name = source["name"];
+	        this.unique = source["unique"];
+	        this.origin = source["origin"];
+	        this.partial = source["partial"];
+	        this.columns = source["columns"];
+	    }
+	}
+	export class ForeignKeyMeta {
+	    id: number;
+	    seq: number;
+	    toTable: string;
+	    fromCol: string;
+	    toCol: string;
+	    onUpdate: string;
+	    onDelete: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ForeignKeyMeta(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.seq = source["seq"];
+	        this.toTable = source["toTable"];
+	        this.fromCol = source["fromCol"];
+	        this.toCol = source["toCol"];
+	        this.onUpdate = source["onUpdate"];
+	        this.onDelete = source["onDelete"];
+	    }
+	}
+	export class ExtendedTableSchema {
+	    name: string;
+	    type: string;
+	    rowCount: number;
+	    columns: ColumnMeta[];
+	    foreignKeys: ForeignKeyMeta[];
+	    indexes: IndexMeta[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ExtendedTableSchema(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.type = source["type"];
+	        this.rowCount = source["rowCount"];
+	        this.columns = this.convertValues(source["columns"], ColumnMeta);
+	        this.foreignKeys = this.convertValues(source["foreignKeys"], ForeignKeyMeta);
+	        this.indexes = this.convertValues(source["indexes"], IndexMeta);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ExtendedSchemaResult {
+	    databaseId: string;
+	    tables: ExtendedTableSchema[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ExtendedSchemaResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.databaseId = source["databaseId"];
+	        this.tables = this.convertValues(source["tables"], ExtendedTableSchema);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	
+	
+	export class PlanNode {
+	    id: number;
+	    parentId: number;
+	    detail: string;
+	    operation: string;
+	    table?: string;
+	    indexName?: string;
+	    costAlert: string;
+	    children?: PlanNode[];
+	
+	    static createFrom(source: any = {}) {
+	        return new PlanNode(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.parentId = source["parentId"];
+	        this.detail = source["detail"];
+	        this.operation = source["operation"];
+	        this.table = source["table"];
+	        this.indexName = source["indexName"];
+	        this.costAlert = source["costAlert"];
+	        this.children = this.convertValues(source["children"], PlanNode);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class QueryExecResult {
 	    query: string;
 	    rows: any[];
@@ -157,6 +322,74 @@ export namespace adb {
 	        this.query = source["query"];
 	        this.rows = source["rows"];
 	        this.affected = source["affected"];
+	        this.durationMs = source["durationMs"];
+	        this.success = source["success"];
+	        this.error = source["error"];
+	    }
+	}
+	export class QueryPlanResult {
+	    rawNodes: PlanNode[];
+	    rootNodes: PlanNode[];
+	    hasFullScan: boolean;
+	    hasTempBTree: boolean;
+	    summary: string;
+	    durationMs: number;
+	    success: boolean;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new QueryPlanResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.rawNodes = this.convertValues(source["rawNodes"], PlanNode);
+	        this.rootNodes = this.convertValues(source["rootNodes"], PlanNode);
+	        this.hasFullScan = source["hasFullScan"];
+	        this.hasTempBTree = source["hasTempBTree"];
+	        this.summary = source["summary"];
+	        this.durationMs = source["durationMs"];
+	        this.success = source["success"];
+	        this.error = source["error"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class SimulationResult {
+	    query: string;
+	    isMutation: boolean;
+	    affectedRows: number;
+	    previewRows?: any[];
+	    durationMs: number;
+	    success: boolean;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SimulationResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.query = source["query"];
+	        this.isMutation = source["isMutation"];
+	        this.affectedRows = source["affectedRows"];
+	        this.previewRows = source["previewRows"];
 	        this.durationMs = source["durationMs"];
 	        this.success = source["success"];
 	        this.error = source["error"];

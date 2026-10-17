@@ -20,7 +20,7 @@ func NewMDNSService(port int) *MDNSService {
 		hostname = "vetrolog-host"
 	}
 
-	txt := []string{"version=1.0.0", "app=vetrolog"}
+	txt := []string{"version=1.1.0", "app=vetrolog"}
 
 	// Register _vetrolog._tcp.local.
 	server, err := zeroconf.Register(

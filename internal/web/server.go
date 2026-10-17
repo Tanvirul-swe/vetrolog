@@ -79,7 +79,7 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/status", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]interface{}{
 			"status":  "ok",
-			"version": "1.0.0",
+			"version": "1.1.0",
 			"time":    time.Now().Unix(),
 		})
 	})

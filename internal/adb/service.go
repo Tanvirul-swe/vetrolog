@@ -616,6 +616,8 @@ func (s *Service) ExecuteQuery(deviceID, packageName, remotePath, sqlQuery strin
 		if err != nil {
 			return &QueryExecResult{
 				Query:      sqlQuery,
+				Columns:    []string{},
+				Rows:       []map[string]interface{}{},
 				DurationMs: elapsed,
 				Success:    false,
 				Error:      err.Error(),
@@ -624,7 +626,10 @@ func (s *Service) ExecuteQuery(deviceID, packageName, remotePath, sqlQuery strin
 		defer rows.Close()
 
 		colNames, _ := rows.Columns()
-		var resultRows []map[string]interface{}
+		if colNames == nil {
+			colNames = []string{}
+		}
+		resultRows := make([]map[string]interface{}, 0)
 
 		for rows.Next() {
 			colPointers := make([]interface{}, len(colNames))
@@ -648,6 +653,7 @@ func (s *Service) ExecuteQuery(deviceID, packageName, remotePath, sqlQuery strin
 
 		return &QueryExecResult{
 			Query:      sqlQuery,
+			Columns:    colNames,
 			Rows:       resultRows,
 			Affected:   int64(len(resultRows)),
 			DurationMs: elapsed,
@@ -661,6 +667,8 @@ func (s *Service) ExecuteQuery(deviceID, packageName, remotePath, sqlQuery strin
 	if err != nil {
 		return &QueryExecResult{
 			Query:      sqlQuery,
+			Columns:    []string{},
+			Rows:       []map[string]interface{}{},
 			DurationMs: elapsed,
 			Success:    false,
 			Error:      err.Error(),
@@ -681,6 +689,8 @@ func (s *Service) ExecuteQuery(deviceID, packageName, remotePath, sqlQuery strin
 
 	return &QueryExecResult{
 		Query:      sqlQuery,
+		Columns:    []string{},
+		Rows:       []map[string]interface{}{},
 		Affected:   affected,
 		DurationMs: elapsed,
 		Success:    true,

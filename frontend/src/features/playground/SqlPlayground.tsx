@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Table as TableIcon,
   Layers,
@@ -12,6 +12,11 @@ import {
   Play,
   Edit2,
   Check,
+  Search as SearchIcon,
+  X,
+  ArrowUp,
+  ArrowDown,
+  Database,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -51,6 +56,11 @@ export function SqlPlayground() {
   const [isCodeGenOpen, setIsCodeGenOpen] = useState(false);
   const [isDryRunModalOpen, setIsDryRunModalOpen] = useState(false);
 
+  // Results search & sorting state
+  const [filterText, setFilterText] = useState('');
+  const [sortCol, setSortCol] = useState<string | null>(null);
+  const [sortAsc, setSortAsc] = useState<boolean>(true);
+
   // Inline editing state: rowId + colName
   const [editingCell, setEditingCell] = useState<{ rowIndex: number; colName: string } | null>(null);
   const [editValue, setEditValue] = useState<string>('');
@@ -71,7 +81,48 @@ export function SqlPlayground() {
   }, [simulation]);
 
   const rows = latestResult?.rows || [];
-  const colNames = rows.length > 0 ? Object.keys(rows[0]) : [];
+  const colNames = useMemo<string[]>(() => {
+    if (latestResult?.columns && latestResult.columns.length > 0) {
+      return latestResult.columns.map((c: any) => (typeof c === 'string' ? c : c.name));
+    }
+    return rows.length > 0 ? Object.keys(rows[0]) : [];
+  }, [latestResult, rows]);
+
+  const isMutation = useMemo(() => {
+    if (!latestResult) return false;
+    const q = (latestResult.query || '').trim().toUpperCase();
+    return /^(INSERT|UPDATE|DELETE|REPLACE|CREATE|DROP|ALTER|PRAGMA)\b/i.test(q);
+  }, [latestResult]);
+
+  // Filtered and sorted rows for instantaneous client-side exploration
+  const displayRows = useMemo(() => {
+    let list = [...rows];
+    if (filterText.trim()) {
+      const q = filterText.toLowerCase();
+      list = list.filter((r) =>
+        colNames.some((c) => {
+          const val = r[c];
+          return val !== null && val !== undefined && String(val).toLowerCase().includes(q);
+        })
+      );
+    }
+    if (sortCol) {
+      list.sort((a, b) => {
+        const valA = a[sortCol];
+        const valB = b[sortCol];
+        if (valA === valB) return 0;
+        if (valA === null || valA === undefined) return sortAsc ? 1 : -1;
+        if (valB === null || valB === undefined) return sortAsc ? -1 : 1;
+        if (typeof valA === 'number' && typeof valB === 'number') {
+          return sortAsc ? valA - valB : valB - valA;
+        }
+        return sortAsc
+          ? String(valA).localeCompare(String(valB))
+          : String(valB).localeCompare(String(valA));
+      });
+    }
+    return list;
+  }, [rows, filterText, sortCol, sortAsc, colNames]);
 
   // Determine Primary Key column
   const pkCol = colNames.find(
@@ -84,9 +135,9 @@ export function SqlPlayground() {
   };
 
   const handleCellSave = async () => {
-    if (!editingCell || !latestResult?.rows) return;
+    if (!editingCell || !displayRows) return;
     const { rowIndex, colName } = editingCell;
-    const row = latestResult.rows[rowIndex];
+    const row = displayRows[rowIndex];
     if (!row || !pkCol) return;
 
     const pkVal = row[pkCol];
@@ -106,15 +157,29 @@ export function SqlPlayground() {
     setEditingCell(null);
   };
 
+  const handleSort = (col: string) => {
+    if (sortCol === col) {
+      if (sortAsc) {
+        setSortAsc(false);
+      } else {
+        setSortCol(null);
+        setSortAsc(true);
+      }
+    } else {
+      setSortCol(col);
+      setSortAsc(true);
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-background text-foreground select-none">
       {/* Top Deck: Natural Language + SQL Code Editor */}
       <NaturalLanguageBar />
       <SqlEditor
-        onRunExecute={() => runExecute()}
-        onRunDryRun={() => runDryRun()}
-        onRunExplain={() => {
-          runExplain();
+        onRunExecute={(sql) => runExecute(sql)}
+        onRunDryRun={(sql) => runDryRun(sql)}
+        onRunExplain={(sql) => {
+          runExplain(sql);
           setActiveTab('plan');
         }}
       />
@@ -187,42 +252,93 @@ export function SqlPlayground() {
             </div>
           </div>
 
-          {/* Tab 1: Tabular Results Grid with Bidirectional Cell Editing */}
+          {/* Tab 1: Tabular Results Grid with Sorting, Quick Filter, and Cell Editing */}
           <TabsContent value="results" className="flex-1 overflow-hidden flex flex-col m-0 p-0">
             {latestResult ? (
               <div className="flex-1 flex flex-col overflow-hidden">
                 {/* Meta Summary Ribbon */}
-                <div className="h-7 border-b border-border/40 px-3 flex items-center justify-between bg-card/40 text-[11px] font-mono select-none">
-                  <div className="flex items-center gap-2">
+                <div className="h-8 border-b border-border/40 px-3 flex items-center justify-between bg-card/40 text-[11px] font-mono select-none">
+                  <div className="flex items-center gap-2 min-w-0">
                     {latestResult.success ? (
-                      <Badge variant="success" className="text-[9px] px-1 py-0">
+                      <Badge variant="success" className="text-[9px] px-1 py-0 shrink-0">
                         SUCCESS
                       </Badge>
                     ) : (
-                      <Badge variant="destructive" className="text-[9px] px-1 py-0">
+                      <Badge variant="destructive" className="text-[9px] px-1 py-0 shrink-0">
                         ERROR
                       </Badge>
                     )}
-                    <span className="text-muted-foreground truncate max-w-lg">{latestResult.query}</span>
+                    <span className="text-muted-foreground truncate max-w-xs sm:max-w-md md:max-w-lg">
+                      {latestResult.query}
+                    </span>
                   </div>
 
-                  <div className="flex items-center gap-3 text-muted-foreground">
-                    <span>{rows.length} rows</span>
-                    {latestResult.affected > 0 && <span>{latestResult.affected} affected</span>}
+                  <div className="flex items-center gap-3 shrink-0 text-muted-foreground">
+                    {/* Quick Search within Results */}
+                    {rows.length > 0 && (
+                      <div className="relative flex items-center">
+                        <input
+                          type="text"
+                          value={filterText}
+                          onChange={(e) => setFilterText(e.target.value)}
+                          placeholder="Filter rows..."
+                          className="h-5.5 w-28 focus:w-44 transition-all px-2 pl-6 bg-muted/40 border border-border/50 rounded text-[10px] text-foreground placeholder:text-muted-foreground/40 outline-none"
+                        />
+                        <SearchIcon className="size-3 absolute left-1.5 text-muted-foreground pointer-events-none" />
+                        {filterText && (
+                          <button
+                            type="button"
+                            onClick={() => setFilterText('')}
+                            className="absolute right-1 text-muted-foreground hover:text-foreground"
+                          >
+                            <X className="size-2.5" />
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    <span>
+                      {filterText ? `${displayRows.length} / ${rows.length} rows` : `${rows.length} rows`}
+                    </span>
+                    {latestResult.affected > 0 && (
+                      <span className="text-amber-400 font-medium">
+                        {latestResult.affected} affected
+                      </span>
+                    )}
                     <span>in {formatDuration(latestResult.durationMs)}</span>
                   </div>
                 </div>
 
-                {latestResult.error ? (
-                  <div className="p-4 bg-destructive/10 border-b border-destructive/20 text-red-400 text-xs flex items-center gap-2 font-mono">
+                {/* Error Banner */}
+                {latestResult.error && (
+                  <div className="p-3 bg-destructive/10 border-b border-destructive/20 text-red-400 text-xs flex items-center gap-2 font-mono">
                     <AlertCircle className="size-4 shrink-0" />
                     <span>{latestResult.error}</span>
                   </div>
-                ) : rows.length > 0 ? (
-                  /* Editable Data Grid */
+                )}
+
+                {/* Mutation Feedback Card */}
+                {latestResult.success && (isMutation || latestResult.affected > 0) && (
+                  <div className="m-3 p-3 rounded-md bg-emerald-500/10 border border-emerald-500/30 flex items-start gap-2.5">
+                    <CheckCircle2 className="size-4 text-emerald-400 shrink-0 mt-0.5" />
+                    <div className="text-xs">
+                      <div className="font-semibold text-emerald-300">
+                        {latestResult.affected > 0
+                          ? `Mutation applied: ${latestResult.affected} row${latestResult.affected > 1 ? 's' : ''} affected`
+                          : 'Statement executed successfully'}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5 font-mono">
+                        Operation committed to device database in {formatDuration(latestResult.durationMs)}.
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Data Grid with Sortable Columns */}
+                {colNames.length > 0 ? (
                   <div className="flex-1 overflow-auto">
                     <table className="w-full border-collapse text-left text-xs font-mono">
-                      <thead className="sticky top-0 bg-card/95 backdrop-blur-xs border-b border-border z-10">
+                      <thead className="sticky top-0 bg-card/95 backdrop-blur-xs border-b border-border z-10 select-none">
                         <tr>
                           <th className="px-3 py-1.5 w-12 text-muted-foreground font-semibold border-r border-border/30 text-center">
                             #
@@ -230,14 +346,26 @@ export function SqlPlayground() {
                           {colNames.map((col) => (
                             <th
                               key={col}
-                              className="px-3 py-1.5 text-muted-foreground font-semibold border-r border-border/30 whitespace-nowrap"
+                              onClick={() => handleSort(col)}
+                              className="px-3 py-1.5 text-muted-foreground hover:text-foreground font-semibold border-r border-border/30 whitespace-nowrap cursor-pointer hover:bg-muted/30 transition-colors"
+                              title="Click to sort by this column"
                             >
                               <div className="flex items-center gap-1.5">
                                 <span>{col}</span>
                                 {col === pkCol && (
-                                  <Badge variant="outline" className="text-[8px] font-sans px-1 py-0 text-amber-400 border-amber-500/30">
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[8px] font-sans px-1 py-0 text-amber-400 border-amber-500/30"
+                                  >
                                     PK
                                   </Badge>
+                                )}
+                                {sortCol === col && (
+                                  sortAsc ? (
+                                    <ArrowUp className="size-2.5 text-primary" />
+                                  ) : (
+                                    <ArrowDown className="size-2.5 text-primary" />
+                                  )
                                 )}
                               </div>
                             </th>
@@ -245,74 +373,85 @@ export function SqlPlayground() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border/20">
-                        {rows.map((row, rIdx) => (
-                          <tr key={rIdx} className="hover:bg-muted/30 group">
-                            <td className="px-3 py-1.5 text-muted-foreground/60 text-center border-r border-border/20 select-none">
-                              {rIdx + 1}
-                            </td>
-                            {colNames.map((col) => {
-                              const cellKey = `${rIdx}_${col}`;
-                              const isEditing =
-                                editingCell?.rowIndex === rIdx && editingCell?.colName === col;
-                              const isJustEdited = justEditedCell === cellKey;
+                        {displayRows.length > 0 ? (
+                          displayRows.map((row, rIdx) => (
+                            <tr key={rIdx} className="hover:bg-muted/30 group">
+                              <td className="px-3 py-1.5 text-muted-foreground/60 text-center border-r border-border/20 select-none">
+                                {rIdx + 1}
+                              </td>
+                              {colNames.map((col) => {
+                                const cellKey = `${rIdx}_${col}`;
+                                const isEditing =
+                                  editingCell?.rowIndex === rIdx && editingCell?.colName === col;
+                                const isJustEdited = justEditedCell === cellKey;
 
-                              return (
-                                <td
-                                  key={col}
-                                  onDoubleClick={() => handleCellClick(rIdx, col, row[col])}
-                                  className={`px-3 py-1.5 border-r border-border/20 max-w-xs truncate transition-colors ${
-                                    isJustEdited ? 'bg-emerald-500/20' : ''
-                                  }`}
-                                  title="Double click to edit cell"
-                                >
-                                  {isEditing ? (
-                                    <div className="flex items-center gap-1">
-                                      <input
-                                        type="text"
-                                        autoFocus
-                                        value={editValue}
-                                        onChange={(e) => setEditValue(e.target.value)}
-                                        onKeyDown={(e) => {
-                                          if (e.key === 'Enter') handleCellSave();
-                                          if (e.key === 'Escape') setEditingCell(null);
-                                        }}
-                                        onBlur={handleCellSave}
-                                        className="h-6 w-full px-1.5 bg-background border border-primary text-foreground rounded text-xs font-mono outline-none"
-                                      />
-                                      <Button
-                                        size="icon-sm"
-                                        variant="ghost"
-                                        onClick={handleCellSave}
-                                        className="size-5 shrink-0 text-emerald-400"
-                                      >
-                                        <Check className="size-3" />
-                                      </Button>
-                                    </div>
-                                  ) : (
-                                    <div className="flex items-center justify-between group/cell">
-                                      <CellRenderer value={row[col]} />
-                                      <button
-                                        type="button"
-                                        onClick={() => handleCellClick(rIdx, col, row[col])}
-                                        className="opacity-0 group-hover/cell:opacity-100 p-0.5 text-muted-foreground hover:text-foreground transition-opacity"
-                                      >
-                                        <Edit2 className="size-2.5" />
-                                      </button>
-                                    </div>
-                                  )}
-                                </td>
-                              );
-                            })}
+                                return (
+                                  <td
+                                    key={col}
+                                    onDoubleClick={() => handleCellClick(rIdx, col, row[col])}
+                                    className={`px-3 py-1.5 border-r border-border/20 max-w-xs truncate transition-colors ${
+                                      isJustEdited ? 'bg-emerald-500/20' : ''
+                                    }`}
+                                    title="Double click to edit cell"
+                                  >
+                                    {isEditing ? (
+                                      <div className="flex items-center gap-1">
+                                        <input
+                                          type="text"
+                                          autoFocus
+                                          value={editValue}
+                                          onChange={(e) => setEditValue(e.target.value)}
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter') handleCellSave();
+                                            if (e.key === 'Escape') setEditingCell(null);
+                                          }}
+                                          onBlur={handleCellSave}
+                                          className="h-6 w-full px-1.5 bg-background border border-primary text-foreground rounded text-xs font-mono outline-none"
+                                        />
+                                        <Button
+                                          size="icon-sm"
+                                          variant="ghost"
+                                          onClick={handleCellSave}
+                                          className="size-5 shrink-0 text-emerald-400"
+                                        >
+                                          <Check className="size-3" />
+                                        </Button>
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-center justify-between group/cell">
+                                        <CellRenderer value={row[col]} />
+                                        <button
+                                          type="button"
+                                          onClick={() => handleCellClick(rIdx, col, row[col])}
+                                          className="opacity-0 group-hover/cell:opacity-100 p-0.5 text-muted-foreground hover:text-foreground transition-opacity"
+                                        >
+                                          <Edit2 className="size-2.5" />
+                                        </button>
+                                      </div>
+                                    )}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td
+                              colSpan={colNames.length + 1}
+                              className="py-12 text-center text-xs text-muted-foreground font-mono"
+                            >
+                              {filterText ? 'No rows match filter criteria.' : 'Query returned 0 rows.'}
+                            </td>
                           </tr>
-                        ))}
+                        )}
                       </tbody>
                     </table>
                   </div>
-                ) : (
-                  <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-xs text-muted-foreground">
+                ) : !isMutation ? (
+                  <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-xs text-muted-foreground font-mono">
                     Query completed successfully with 0 rows returned.
                   </div>
-                )}
+                ) : null}
               </div>
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center p-8 text-center select-none text-muted-foreground text-xs">

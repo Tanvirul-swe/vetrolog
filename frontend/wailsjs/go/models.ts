@@ -307,6 +307,7 @@ export namespace adb {
 	}
 	export class QueryExecResult {
 	    query: string;
+	    columns: string[];
 	    rows: any[];
 	    affected: number;
 	    durationMs: number;
@@ -320,6 +321,7 @@ export namespace adb {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.query = source["query"];
+	        this.columns = source["columns"];
 	        this.rows = source["rows"];
 	        this.affected = source["affected"];
 	        this.durationMs = source["durationMs"];

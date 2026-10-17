@@ -58,6 +58,8 @@ interface PlaygroundState {
   // Actions
   loadExtendedSchema: () => Promise<void>;
   runExecute: (overrideSql?: string) => Promise<void>;
+  cancelExecution: () => void;
+  formatSql: () => void;
   runExplain: (overrideSql?: string) => Promise<void>;
   runDryRun: (overrideSql?: string) => Promise<void>;
   applyIndex: (indexSql: string) => Promise<boolean>;
@@ -84,6 +86,36 @@ function loadStoredAiConfig(): AIConfig {
     // Ignore storage parse issues
   }
   return DEFAULT_AI_CONFIG;
+}
+
+function formatSqlQuery(sql: string): string {
+  if (!sql.trim()) return sql;
+  const keywords = [
+    'SELECT', 'DISTINCT', 'FROM', 'WHERE', 'AND', 'OR', 'NOT',
+    'GROUP BY', 'HAVING', 'ORDER BY', 'LIMIT', 'OFFSET',
+    'INNER JOIN', 'LEFT JOIN', 'RIGHT JOIN', 'CROSS JOIN', 'JOIN', 'ON',
+    'INSERT INTO', 'VALUES', 'UPDATE', 'SET', 'DELETE FROM',
+    'CREATE TABLE', 'DROP TABLE', 'ALTER TABLE', 'PRAGMA',
+    'ASC', 'DESC', 'NULL', 'IS NOT NULL', 'IS NULL', 'IN', 'LIKE', 'BETWEEN', 'UNION', 'ALL'
+  ];
+
+  let formatted = sql.trim();
+  keywords.forEach((kw) => {
+    const regex = new RegExp(`\\b${kw}\\b`, 'gi');
+    formatted = formatted.replace(regex, kw);
+  });
+
+  const majorClauses = [
+    'FROM', 'WHERE', 'GROUP BY', 'HAVING', 'ORDER BY', 'LIMIT',
+    'LEFT JOIN', 'INNER JOIN', 'RIGHT JOIN', 'CROSS JOIN', 'JOIN',
+    'SET', 'VALUES'
+  ];
+  majorClauses.forEach((clause) => {
+    const regex = new RegExp(`\\s+(${clause})\\b`, 'g');
+    formatted = formatted.replace(regex, '\n$1');
+  });
+
+  return formatted;
 }
 
 export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
@@ -126,6 +158,15 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
       return { aiConfig: merged };
     }),
 
+  cancelExecution: () => {
+    set({ isExecuting: false, isExplaining: false, isSimulating: false });
+  },
+
+  formatSql: () => {
+    const current = get().query;
+    set({ query: formatSqlQuery(current) });
+  },
+
   loadExtendedSchema: async () => {
     const deviceId = useAdbStore.getState().selectedDeviceId;
     const packageName = useAdbStore.getState().selectedPackageName;
@@ -140,8 +181,10 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
     set({ isLoadingSchema: true });
     try {
       const schema = await apiBridge.getExtendedSchema(deviceId, packageName, remotePath);
-      set({ extendedSchema: schema, isLoadingSchema: false });
+      set({ extendedSchema: schema });
     } catch {
+      // Ignore schema load error
+    } finally {
       set({ isLoadingSchema: false });
     }
   },
@@ -164,7 +207,6 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
         const selectivity = Math.min(100, Math.round((rowsReturned / totalRowsEstimate) * 100));
 
         set((state) => ({
-          isExecuting: false,
           activeTab: 'results',
           lastSelectivity: selectivity,
           profilerHistory: [...state.profilerHistory.slice(-9), result.durationMs || elapsed],
@@ -186,10 +228,10 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
         if (get().activeTab === 'plan' || get().activeTab === 'advisor') {
           get().runExplain(sql);
         }
-      } else {
-        set({ isExecuting: false });
       }
-    } catch {
+    } catch (err) {
+      console.error('Playground executeQuery error:', err);
+    } finally {
       set({ isExecuting: false });
     }
   },
@@ -211,7 +253,7 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
     set({ isExplaining: true });
     try {
       const plan = await apiBridge.explainQuery(deviceId, packageName, remotePath, sql);
-      set({ queryPlan: plan, isExplaining: false });
+      set({ queryPlan: plan });
     } catch (e: any) {
       set({
         queryPlan: {
@@ -224,8 +266,9 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
           success: false,
           error: e.message || 'Explain failed',
         },
-        isExplaining: false,
       });
+    } finally {
+      set({ isExplaining: false });
     }
   },
 
@@ -246,7 +289,7 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
     set({ isSimulating: true });
     try {
       const sim = await apiBridge.simulateQuery(deviceId, packageName, remotePath, sql);
-      set({ simulation: sim, isSimulating: false });
+      set({ simulation: sim });
     } catch (e: any) {
       set({
         simulation: {
@@ -257,8 +300,9 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
           success: false,
           error: e.message || 'Dry-run simulation failed',
         },
-        isSimulating: false,
       });
+    } finally {
+      set({ isSimulating: false });
     }
   },
 

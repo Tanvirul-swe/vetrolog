@@ -45,7 +45,8 @@ func main() {
 		Width:  1280,
 		Height: 800,
 		AssetServer: &assetserver.Options{
-			Assets: assets,
+			Assets:  assets,
+			Handler: web.NewAPIHandler(),
 		},
 		BackgroundColour: &options.RGBA{R: 11, G: 15, B: 25, A: 255}, // Solid deep obsidian
 		OnStartup:        appInstance.Startup,

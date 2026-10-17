@@ -2,6 +2,7 @@ package adb
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 )
 
 // Client coordinates low-level ADB command execution.
@@ -66,13 +68,19 @@ func (c *Client) AdbPath() string {
 
 // Run executes an adb command with arguments.
 func (c *Client) Run(args ...string) (string, error) {
-	cmd := exec.Command(c.adbPath, args...)
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, c.adbPath, args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
 	err := cmd.Run()
 	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return "", fmt.Errorf("adb command timed out after 8s: %v", args)
+		}
 		return "", fmt.Errorf("adb error: %v, stderr: %s", err, strings.TrimSpace(stderr.String()))
 	}
 	return stdout.String(), nil

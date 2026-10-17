@@ -397,7 +397,10 @@ export const useAdbStore = create<AdbState>((set, get) => ({
           requestId: `adb_${Date.now()}`,
           databaseId: selectedDbId || packageName,
           query,
-          columns: [],
+          columns: (result.columns || []).map((col: string) => ({
+            name: col,
+            type: 'TEXT',
+          })),
           rows: result.rows || [],
           affected: result.affected || 0,
           durationMs: result.durationMs || 0,

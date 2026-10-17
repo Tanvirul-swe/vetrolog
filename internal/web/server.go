@@ -33,6 +33,16 @@ func NewServer(assets embed.FS, port int) *Server {
 	}
 }
 
+// NewAPIHandler creates an http.Handler with all VetroLog API routes and CORS support
+func NewAPIHandler() http.Handler {
+	srv := &Server{
+		adbServer: adb.GetService(),
+	}
+	mux := http.NewServeMux()
+	srv.registerAPIRoutes(mux)
+	return enableCORS(mux)
+}
+
 // StartServer launches the HTTP server and optionally launches the browser
 func StartServer(assets embed.FS, port int, openBrowser bool) error {
 	srv := NewServer(assets, port)

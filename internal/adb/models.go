@@ -62,6 +62,7 @@ type TableDataResult struct {
 // QueryExecResult represents the output of a custom SQL execution.
 type QueryExecResult struct {
 	Query      string                   `json:"query"`
+	Columns    []string                 `json:"columns"`
 	Rows       []map[string]interface{} `json:"rows"`
 	Affected   int64                    `json:"affected"`
 	DurationMs float64                  `json:"durationMs"`

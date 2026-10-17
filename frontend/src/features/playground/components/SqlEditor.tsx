@@ -4,6 +4,8 @@ import {
   ShieldAlert,
   Search,
   Eraser,
+  XCircle,
+  Wand2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AutocompletePopup, AutocompleteItem } from './AutocompletePopup';
@@ -52,9 +54,9 @@ const SQL_KEYWORDS = [
 ];
 
 interface SqlEditorProps {
-  onRunExecute: () => void;
-  onRunDryRun: () => void;
-  onRunExplain: () => void;
+  onRunExecute: (overrideSql?: string) => void;
+  onRunDryRun: (overrideSql?: string) => void;
+  onRunExplain: (overrideSql?: string) => void;
 }
 
 export function SqlEditor({
@@ -68,13 +70,35 @@ export function SqlEditor({
   const isExecuting = usePlaygroundStore((s) => s.isExecuting);
   const isSimulating = usePlaygroundStore((s) => s.isSimulating);
   const isExplaining = usePlaygroundStore((s) => s.isExplaining);
+  const cancelExecution = usePlaygroundStore((s) => s.cancelExecution);
+  const formatSql = usePlaygroundStore((s) => s.formatSql);
 
   const selectedDbId = useDatabaseStore((s) => s.selectedDatabaseId);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [cursorPos, setCursorPos] = useState<number>(0);
+  const [hasSelection, setHasSelection] = useState<boolean>(false);
   const [popupPos, setPopupPos] = useState<{ top: number; left: number } | null>(null);
   const [selectedAutoIndex, setSelectedAutoIndex] = useState(0);
+
+  const getExecutableQuery = (): string => {
+    if (textareaRef.current) {
+      const { selectionStart, selectionEnd, value } = textareaRef.current;
+      if (selectionStart !== selectionEnd) {
+        const selected = value.substring(selectionStart, selectionEnd).trim();
+        if (selected) return selected;
+      }
+    }
+    return query;
+  };
+
+  const updateSelectionState = () => {
+    if (textareaRef.current) {
+      const { selectionStart, selectionEnd } = textareaRef.current;
+      setHasSelection(selectionStart !== selectionEnd);
+      setCursorPos(selectionStart);
+    }
+  };
 
   // Split lines for line numbers
   const lines = useMemo(() => query.split('\n'), [query]);
@@ -229,10 +253,11 @@ export function SqlEditor({
     // Keyboard Shortcuts: ⌘Enter / Ctrl+Enter = Run
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault();
+      const targetSql = getExecutableQuery();
       if (e.shiftKey) {
-        onRunDryRun();
+        onRunDryRun(targetSql);
       } else {
-        onRunExecute();
+        onRunExecute(targetSql);
       }
       return;
     }
@@ -252,6 +277,36 @@ export function SqlEditor({
     }
   };
 
+  const handleExecute = () => {
+    onRunExecute(getExecutableQuery());
+  };
+
+  const handleDryRun = () => {
+    onRunDryRun(getExecutableQuery());
+  };
+
+  const handleExplain = () => {
+    onRunExplain(getExecutableQuery());
+  };
+
+  const insertSnippet = (snippet: string) => {
+    if (!textareaRef.current) {
+      setQuery(query ? `${query} ${snippet}` : snippet);
+      return;
+    }
+    const { selectionStart, selectionEnd } = textareaRef.current;
+    const newQuery = query.slice(0, selectionStart) + snippet + query.slice(selectionEnd);
+    setQuery(newQuery);
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        const nextPos = selectionStart + snippet.length;
+        textareaRef.current.setSelectionRange(nextPos, nextPos);
+        setCursorPos(nextPos);
+      }
+    }, 10);
+  };
+
   return (
     <div className="flex flex-col border-b border-border/70 bg-card/40 backdrop-blur-xs relative">
       {/* Editor Action Toolbar */}
@@ -259,23 +314,36 @@ export function SqlEditor({
         <div className="flex items-center gap-1.5">
           <Button
             size="sm"
-            onClick={onRunExecute}
+            onClick={handleExecute}
             disabled={!selectedDbId || !query.trim() || isExecuting}
             className="h-7 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium shadow-xs"
             title="Execute query and commit changes (⌘Enter)"
           >
             <Play className="size-3 fill-white" />
-            <span>{isExecuting ? 'Running...' : 'Execute'}</span>
+            <span>{isExecuting ? 'Running...' : hasSelection ? 'Run Selection' : 'Execute'}</span>
             <kbd className="hidden sm:inline-block text-[9px] bg-emerald-700/60 px-1 py-0.2 rounded font-mono">
               ⌘↵
             </kbd>
           </Button>
 
+          {isExecuting && (
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={cancelExecution}
+              className="h-7 text-xs gap-1 bg-red-600 hover:bg-red-500 text-white font-medium shadow-xs animate-pulse"
+              title="Cancel execution"
+            >
+              <XCircle className="size-3" />
+              <span>Cancel</span>
+            </Button>
+          )}
+
           <Button
             size="sm"
             variant="outline"
-            onClick={onRunDryRun}
-            disabled={!selectedDbId || !query.trim() || isSimulating}
+            onClick={handleDryRun}
+            disabled={!selectedDbId || !query.trim() || isSimulating || isExecuting}
             className="h-7 text-xs gap-1.5 border-amber-500/30 text-amber-400 hover:bg-amber-500/10 font-medium"
             title="Simulate mutating query in safe rollback transaction sandbox (⌘⇧Enter)"
           >
@@ -289,41 +357,72 @@ export function SqlEditor({
           <Button
             size="sm"
             variant="ghost"
-            onClick={onRunExplain}
-            disabled={!selectedDbId || !query.trim() || isExplaining}
+            onClick={handleExplain}
+            disabled={!selectedDbId || !query.trim() || isExplaining || isExecuting}
             className="h-7 text-xs gap-1.5 text-muted-foreground hover:text-foreground hover:bg-muted"
             title="Analyze query with EXPLAIN QUERY PLAN"
           >
             <Search className="size-3" />
             <span>{isExplaining ? 'Analyzing...' : 'Explain Plan'}</span>
           </Button>
+
+          {hasSelection && (
+            <span className="hidden md:inline-flex items-center text-[10px] text-amber-400 font-mono bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+              Selection Mode
+            </span>
+          )}
         </div>
 
-        {/* Quick Snippet Pills */}
+        {/* Quick Snippet Pills & Tools */}
         <div className="hidden lg:flex items-center gap-1">
           <button
             type="button"
-            onClick={() => setQuery('SELECT * FROM ')}
+            onClick={() => insertSnippet('SELECT * FROM ')}
             className="text-[10px] font-mono px-2 py-0.5 rounded bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
           >
-            SELECT * FROM
+            SELECT *
           </button>
           <button
             type="button"
-            onClick={() => setQuery('SELECT COUNT(*) FROM ')}
+            onClick={() => insertSnippet('COUNT(*) ')}
             className="text-[10px] font-mono px-2 py-0.5 rounded bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
           >
             COUNT(*)
           </button>
           <button
             type="button"
-            onClick={() => setQuery('EXPLAIN QUERY PLAN ')}
+            onClick={() => insertSnippet('WHERE ')}
             className="text-[10px] font-mono px-2 py-0.5 rounded bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
           >
-            EXPLAIN
+            WHERE
+          </button>
+          <button
+            type="button"
+            onClick={() => insertSnippet('ORDER BY id DESC ')}
+            className="text-[10px] font-mono px-2 py-0.5 rounded bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+          >
+            ORDER BY
+          </button>
+          <button
+            type="button"
+            onClick={() => insertSnippet('LIMIT 50;')}
+            className="text-[10px] font-mono px-2 py-0.5 rounded bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+          >
+            LIMIT 50
           </button>
 
           <div className="w-px h-3.5 bg-border/60 mx-1" />
+
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={formatSql}
+            title="Format SQL query"
+            className="h-6 text-[10px] gap-1 px-2 text-muted-foreground hover:text-foreground font-mono"
+          >
+            <Wand2 className="size-3 text-sky-400" />
+            <span>Format</span>
+          </Button>
 
           <Button
             size="icon-sm"
@@ -353,10 +452,11 @@ export function SqlEditor({
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
-              setCursorPos(e.target.selectionStart);
+              updateSelectionState();
             }}
-            onClick={(e) => setCursorPos(e.currentTarget.selectionStart)}
-            onKeyUp={(e) => setCursorPos(e.currentTarget.selectionStart)}
+            onClick={updateSelectionState}
+            onKeyUp={updateSelectionState}
+            onSelect={updateSelectionState}
             onKeyDown={handleKeyDown}
             placeholder="Enter SQL statement (e.g. SELECT * FROM users WHERE active = 1 ORDER BY id DESC LIMIT 50;)"
             spellCheck={false}

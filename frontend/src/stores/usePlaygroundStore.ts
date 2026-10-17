@@ -93,7 +93,12 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
   query: 'SELECT * FROM sqlite_master WHERE type="table";',
   setQuery: (query) => set({ query }),
   activeTab: 'results',
-  setActiveTab: (activeTab) => set({ activeTab }),
+  setActiveTab: (activeTab) => {
+    set({ activeTab });
+    if ((activeTab === 'plan' || activeTab === 'advisor') && get().query.trim()) {
+      get().runExplain();
+    }
+  },
 
   isExecuting: false,
   isExplaining: false,
@@ -177,8 +182,10 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
           ],
         }));
 
-        // Automatically trigger Explain in the background to keep Plan & Advisor synced
-        get().runExplain(sql);
+        // Trigger Explain on demand only if user is actively inspecting Plan or Advisor
+        if (get().activeTab === 'plan' || get().activeTab === 'advisor') {
+          get().runExplain(sql);
+        }
       } else {
         set({ isExecuting: false });
       }

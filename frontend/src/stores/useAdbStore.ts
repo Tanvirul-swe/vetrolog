@@ -96,7 +96,7 @@ export const useAdbStore = create<AdbState>((set, get) => ({
     get().pollState();
     pollIntervalId = setInterval(() => {
       get().pollState();
-    }, 1800);
+    }, 3000);
   },
 
   stopPolling: () => {

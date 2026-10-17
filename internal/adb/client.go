@@ -66,9 +66,6 @@ func (c *Client) AdbPath() string {
 
 // Run executes an adb command with arguments.
 func (c *Client) Run(args ...string) (string, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	cmd := exec.Command(c.adbPath, args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout

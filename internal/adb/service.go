@@ -8,15 +8,37 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	_ "modernc.org/sqlite"
 )
 
+type remoteFileStat struct {
+	size  int64
+	mtime string
+}
+
+type dbCacheEntry struct {
+	mu          sync.Mutex
+	localPath   string
+	mainStat    remoteFileStat
+	walStat     remoteFileStat
+	shmStat     remoteFileStat
+	journalStat remoteFileStat
+	lastChecked time.Time
+	tableCounts map[string]int64
+	countsTime  time.Time
+}
+
 // Service provides high-level device, app, database inspection and SQL execution.
 type Service struct {
-	client   *Client
-	cacheDir string
+	client     *Client
+	cacheDir   string
+	dbCaches   map[string]*dbCacheEntry
+	dbCachesMu sync.RWMutex
+	sqlPool    map[string]*sql.DB
+	sqlPoolMu  sync.RWMutex
 }
 
 var defaultService *Service
@@ -30,9 +52,198 @@ func GetService() *Service {
 		defaultService = &Service{
 			client:   GetClient(),
 			cacheDir: cacheDir,
+			dbCaches: make(map[string]*dbCacheEntry),
+			sqlPool:  make(map[string]*sql.DB),
 		}
 	}
 	return defaultService
+}
+
+func (s *Service) getOrCreateCacheEntry(cacheKey, localPath string) *dbCacheEntry {
+	s.dbCachesMu.Lock()
+	defer s.dbCachesMu.Unlock()
+
+	entry, exists := s.dbCaches[cacheKey]
+	if !exists {
+		entry = &dbCacheEntry{
+			localPath:   localPath,
+			tableCounts: make(map[string]int64),
+		}
+		s.dbCaches[cacheKey] = entry
+	}
+	return entry
+}
+
+func (s *Service) closePoolDB(localPath string) {
+	s.sqlPoolMu.Lock()
+	defer s.sqlPoolMu.Unlock()
+	if db, exists := s.sqlPool[localPath]; exists {
+		_ = db.Close()
+		delete(s.sqlPool, localPath)
+	}
+}
+
+func (s *Service) getOrOpenDB(localPath string) (*sql.DB, error) {
+	s.sqlPoolMu.RLock()
+	db, exists := s.sqlPool[localPath]
+	s.sqlPoolMu.RUnlock()
+	if exists {
+		return db, nil
+	}
+
+	s.sqlPoolMu.Lock()
+	defer s.sqlPoolMu.Unlock()
+	if db, exists := s.sqlPool[localPath]; exists {
+		return db, nil
+	}
+
+	newDB, err := sql.Open("sqlite", localPath)
+	if err != nil {
+		return nil, err
+	}
+
+	newDB.SetMaxOpenConns(4)
+	newDB.SetMaxIdleConns(4)
+	newDB.SetConnMaxIdleTime(5 * time.Minute)
+
+	pragmas := []string{
+		"PRAGMA journal_mode = WAL;",
+		"PRAGMA synchronous = NORMAL;",
+		"PRAGMA cache_size = -64000;",   // 64MB memory page cache
+		"PRAGMA temp_store = MEMORY;",
+		"PRAGMA mmap_size = 268435456;", // 256MB memory mapped I/O
+		"PRAGMA busy_timeout = 5000;",
+	}
+	for _, p := range pragmas {
+		_, _ = newDB.Exec(p)
+	}
+
+	s.sqlPool[localPath] = newDB
+	return newDB, nil
+}
+
+func parseRemoteLsOutput(out string) map[string]remoteFileStat {
+	result := make(map[string]remoteFileStat)
+	lines := strings.Split(out, "\n")
+	for _, l := range lines {
+		l = strings.TrimSpace(l)
+		if l == "" || strings.HasPrefix(l, "total") {
+			continue
+		}
+		fields := strings.Fields(l)
+		if len(fields) >= 8 {
+			size, err := strconv.ParseInt(fields[4], 10, 64)
+			if err != nil {
+				continue
+			}
+			mtime := fields[5] + " " + fields[6]
+			name := strings.Join(fields[7:], " ")
+			result[name] = remoteFileStat{size: size, mtime: mtime}
+			result[filepath.Base(name)] = remoteFileStat{size: size, mtime: mtime}
+		}
+	}
+	return result
+}
+
+func (s *Service) ensureDatabaseSynced(deviceID, packageName, remotePath string, forceFresh bool) (*dbCacheEntry, error) {
+	cacheKey := fmt.Sprintf("%s:%s:%s", deviceID, packageName, remotePath)
+	fileName := filepath.Base(remotePath)
+	localPath := s.getLocalCachePath(deviceID, packageName, fileName)
+
+	entry := s.getOrCreateCacheEntry(cacheKey, localPath)
+	entry.mu.Lock()
+	defer entry.mu.Unlock()
+
+	// 1. Debounce check: if checked within last 1500ms and local file is intact, return immediately
+	if !forceFresh && time.Since(entry.lastChecked) < 1500*time.Millisecond {
+		if fi, err := os.Stat(localPath); err == nil && fi.Size() > 0 {
+			return entry, nil
+		}
+	}
+
+	// 2. Fast remote stat check (~20-30ms)
+	cmd := fmt.Sprintf("sh -c 'ls -l \"%s\"* 2>/dev/null'", remotePath)
+	out, err := s.client.RunAs(deviceID, packageName, cmd)
+	if err != nil && strings.TrimSpace(out) == "" {
+		// Fallback to local file if available
+		if fi, errStat := os.Stat(localPath); errStat == nil && fi.Size() > 0 {
+			return entry, nil
+		}
+		return nil, fmt.Errorf("failed inspecting remote database: %v", err)
+	}
+
+	stats := parseRemoteLsOutput(out)
+
+	// Identify main stat
+	mainStat, mainFound := stats[remotePath]
+	if !mainFound {
+		mainStat, mainFound = stats[fileName]
+	}
+
+	walStat, walFound := stats[remotePath+"-wal"]
+	if !walFound {
+		walStat, walFound = stats[fileName+"-wal"]
+	}
+
+	shmStat, shmFound := stats[remotePath+"-shm"]
+	if !shmFound {
+		shmStat, shmFound = stats[fileName+"-shm"]
+	}
+
+	journalStat, journalFound := stats[remotePath+"-journal"]
+	if !journalFound {
+		journalStat, journalFound = stats[fileName+"-journal"]
+	}
+
+	localFi, localErr := os.Stat(localPath)
+	localExists := localErr == nil && localFi.Size() > 0
+
+	needFullPull := !localExists || (mainFound && (mainStat.size != entry.mainStat.size || mainStat.mtime != entry.mainStat.mtime))
+
+	if needFullPull {
+		s.closePoolDB(localPath)
+		if err := s.client.ExecOutCat(deviceID, packageName, remotePath, localPath); err != nil {
+			return nil, err
+		}
+		entry.mainStat = mainStat
+		entry.tableCounts = make(map[string]int64) // Invalidate cached counts
+	}
+
+	// Sync or cleanup -wal
+	if walFound && walStat.size > 0 {
+		if needFullPull || walStat.size != entry.walStat.size || walStat.mtime != entry.walStat.mtime {
+			_ = s.client.ExecOutCat(deviceID, packageName, remotePath+"-wal", localPath+"-wal")
+			entry.walStat = walStat
+		}
+	} else if entry.walStat.size > 0 {
+		_ = os.Remove(localPath + "-wal")
+		entry.walStat = remoteFileStat{}
+	}
+
+	// Sync or cleanup -shm
+	if shmFound && shmStat.size > 0 {
+		if needFullPull || shmStat.size != entry.shmStat.size {
+			_ = s.client.ExecOutCat(deviceID, packageName, remotePath+"-shm", localPath+"-shm")
+			entry.shmStat = shmStat
+		}
+	} else if entry.shmStat.size > 0 {
+		_ = os.Remove(localPath + "-shm")
+		entry.shmStat = remoteFileStat{}
+	}
+
+	// Sync or cleanup -journal
+	if journalFound && journalStat.size > 0 {
+		if needFullPull || journalStat.size != entry.journalStat.size {
+			_ = s.client.ExecOutCat(deviceID, packageName, remotePath+"-journal", localPath+"-journal")
+			entry.journalStat = journalStat
+		}
+	} else if entry.journalStat.size > 0 {
+		_ = os.Remove(localPath + "-journal")
+		entry.journalStat = remoteFileStat{}
+	}
+
+	entry.lastChecked = time.Now()
+	return entry, nil
 }
 
 // ListDevices discovers all USB and Wi-Fi ADB devices attached to the host.
@@ -196,15 +407,12 @@ func (s *Service) DiscoverDatabases(deviceID, packageName string) ([]DiscoveredD
 			remoteFullPath := filepath.Join(d.remoteDir, f.name)
 
 			if d.dbType == "sqlite" && (strings.HasSuffix(f.name, ".db") || strings.HasSuffix(f.name, ".sqlite") || strings.HasSuffix(f.name, ".sqlite3") || !strings.Contains(f.name, ".")) {
-				localPath := s.getLocalCachePath(deviceID, packageName, f.name)
-
-				// Pull only if not already cached with same size
-				localInfo, err := os.Stat(localPath)
-				if err != nil || localInfo.Size() != f.size {
-					_ = s.client.ExecOutCat(deviceID, packageName, remoteFullPath, localPath)
+				entry, err := s.ensureDatabaseSynced(deviceID, packageName, remoteFullPath, false)
+				if err != nil {
+					continue
 				}
 
-				tables, _ := s.inspectSqliteTables(localPath)
+				tables, _ := s.inspectSqliteTables(entry.localPath)
 				result = append(result, DiscoveredDB{
 					ID:        fmt.Sprintf("%s_%s", packageName, f.name),
 					Name:      f.name,
@@ -215,14 +423,12 @@ func (s *Service) DiscoverDatabases(deviceID, packageName string) ([]DiscoveredD
 					Tables:    tables,
 				})
 			} else if d.dbType == "shared_preferences" && strings.HasSuffix(f.name, ".xml") {
-				localPath := s.getLocalCachePath(deviceID, packageName, f.name)
-
-				localInfo, err := os.Stat(localPath)
-				if err != nil || localInfo.Size() != f.size {
-					_ = s.client.ExecOutCat(deviceID, packageName, remoteFullPath, localPath)
+				entry, err := s.ensureDatabaseSynced(deviceID, packageName, remoteFullPath, false)
+				if err != nil {
+					continue
 				}
 
-				rowCount, _ := countSharedPrefsEntries(localPath)
+				rowCount, _ := countSharedPrefsEntries(entry.localPath)
 				tableMeta := TableMeta{
 					Name:     "preferences",
 					Type:     "table",
@@ -258,12 +464,12 @@ func (s *Service) GetTableData(deviceID, packageName, remotePath, tableName stri
 		pageSize = 50
 	}
 
+	entry, err := s.ensureDatabaseSynced(deviceID, packageName, remotePath, false)
+	if err != nil {
+		return nil, err
+	}
+	localPath := entry.localPath
 	fileName := filepath.Base(remotePath)
-	localPath := s.getLocalCachePath(deviceID, packageName, fileName)
-
-	// Refresh copy from device
-	_ = s.client.ExecOutCat(deviceID, packageName, remotePath, localPath)
-	s.syncAuxiliarySqliteFiles(deviceID, packageName, remotePath, localPath)
 
 	// SharedPreferences XML handler
 	if strings.HasSuffix(fileName, ".xml") {
@@ -288,35 +494,46 @@ func (s *Service) GetTableData(deviceID, packageName, remotePath, tableName stri
 	}
 
 	// SQLite handler
-	db, err := sql.Open("sqlite", localPath)
+	db, err := s.getOrOpenDB(localPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed opening sqlite: %v", err)
 	}
-	defer db.Close()
 
 	// Get total row count for the requested table
 	var totalRows int64
 	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM \"%s\"", tableName)
 	_ = db.QueryRow(countQuery).Scan(&totalRows)
 
-	// Fetch counts for all tables in this database to keep the left sidebar updated in real-time
-	tableCounts := make(map[string]int64)
-	tableRows, err := db.Query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
-	if err == nil {
-		defer tableRows.Close()
-		for tableRows.Next() {
-			var tName string
-			if err := tableRows.Scan(&tName); err == nil {
-				if tName == tableName {
-					tableCounts[tName] = totalRows
-				} else {
-					var count int64
-					_ = db.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM \"%s\"", tName)).Scan(&count)
-					tableCounts[tName] = count
+	// Retrieve or refresh table counts for the left sidebar
+	entry.mu.Lock()
+	if entry.tableCounts == nil {
+		entry.tableCounts = make(map[string]int64)
+	}
+	entry.tableCounts[tableName] = totalRows
+
+	// If sidebar counts are missing or older than 30s, do a fast bulk scan
+	if len(entry.tableCounts) <= 1 || time.Since(entry.countsTime) > 30*time.Second {
+		tableRows, err := db.Query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+		if err == nil {
+			for tableRows.Next() {
+				var tName string
+				if err := tableRows.Scan(&tName); err == nil {
+					if tName != tableName {
+						var count int64
+						_ = db.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM \"%s\"", tName)).Scan(&count)
+						entry.tableCounts[tName] = count
+					}
 				}
 			}
+			tableRows.Close()
+			entry.countsTime = time.Now()
 		}
 	}
+	tableCountsCopy := make(map[string]int64, len(entry.tableCounts))
+	for k, v := range entry.tableCounts {
+		tableCountsCopy[k] = v
+	}
+	entry.mu.Unlock()
 
 	// Get columns
 	columns, err := s.getTableColumns(db, tableName)
@@ -367,55 +584,31 @@ func (s *Service) GetTableData(deviceID, packageName, remotePath, tableName stri
 		PageSize:    pageSize,
 		Columns:     columns,
 		Rows:        resultRows,
-		TableCounts: tableCounts,
+		TableCounts: tableCountsCopy,
 	}, nil
 }
 
 func (s *Service) syncAuxiliarySqliteFiles(deviceID, packageName, remotePath, localPath string) {
-	if !strings.HasSuffix(remotePath, ".db") && !strings.HasSuffix(remotePath, ".sqlite") && !strings.HasSuffix(remotePath, ".sqlite3") {
-		return
-	}
-
-	cmd := fmt.Sprintf("for ext in -wal -shm -journal; do if [ -f '%s'$ext ]; then echo HAS:$ext; fi; done", remotePath)
-	out, err := s.client.RunAs(deviceID, packageName, cmd)
-	if err != nil {
-		return
-	}
-
-	foundExts := make(map[string]bool)
-	for _, line := range strings.Split(out, "\n") {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "HAS:") {
-			ext := strings.TrimPrefix(line, "HAS:")
-			foundExts[ext] = true
-			_ = s.client.ExecOutCat(deviceID, packageName, remotePath+ext, localPath+ext)
-		}
-	}
-
-	for _, ext := range []string{"-wal", "-shm", "-journal"} {
-		if !foundExts[ext] {
-			_ = os.Remove(localPath + ext)
-		}
-	}
+	// Maintained for backward compatibility; auxiliary files are now managed automatically by ensureDatabaseSynced
 }
 
 // ExecuteQuery runs a custom SQL query directly on the SQLite database and syncs mutations back.
 func (s *Service) ExecuteQuery(deviceID, packageName, remotePath, sqlQuery string) (*QueryExecResult, error) {
-	fileName := filepath.Base(remotePath)
-	localPath := s.getLocalCachePath(deviceID, packageName, fileName)
-
-	// Refresh latest copy
-	_ = s.client.ExecOutCat(deviceID, packageName, remotePath, localPath)
-
-	db, err := sql.Open("sqlite", localPath)
+	entry, err := s.ensureDatabaseSynced(deviceID, packageName, remotePath, false)
 	if err != nil {
 		return nil, err
 	}
-	defer db.Close()
+	localPath := entry.localPath
+
+	db, err := s.getOrOpenDB(localPath)
+	if err != nil {
+		return nil, err
+	}
 
 	start := time.Now()
 	trimmed := strings.TrimSpace(sqlQuery)
-	isSelect := strings.HasPrefix(strings.ToUpper(trimmed), "SELECT") || strings.HasPrefix(strings.ToUpper(trimmed), "PRAGMA")
+	upper := strings.ToUpper(trimmed)
+	isSelect := strings.HasPrefix(upper, "SELECT") || strings.HasPrefix(upper, "PRAGMA") || strings.HasPrefix(upper, "EXPLAIN")
 
 	if isSelect {
 		rows, err := db.Query(sqlQuery)
@@ -476,8 +669,15 @@ func (s *Service) ExecuteQuery(deviceID, packageName, remotePath, sqlQuery strin
 
 	affected, _ := res.RowsAffected()
 
+	// Checkpoint WAL so main database file contains all mutations before pushing
+	_, _ = db.Exec("PRAGMA wal_checkpoint(TRUNCATE);")
+
 	// Push updated SQLite database back to the device sandbox
 	_ = s.client.PushToSandbox(deviceID, packageName, localPath, remotePath)
+
+	entry.mu.Lock()
+	entry.tableCounts = make(map[string]int64)
+	entry.mu.Unlock()
 
 	return &QueryExecResult{
 		Query:      sqlQuery,
@@ -489,14 +689,16 @@ func (s *Service) ExecuteQuery(deviceID, packageName, remotePath, sqlQuery strin
 
 // UpdateRow updates a row in the SQLite database and syncs back to device.
 func (s *Service) UpdateRow(deviceID, packageName, remotePath, tableName string, pk map[string]interface{}, values map[string]interface{}) error {
-	fileName := filepath.Base(remotePath)
-	localPath := s.getLocalCachePath(deviceID, packageName, fileName)
-
-	db, err := sql.Open("sqlite", localPath)
+	entry, err := s.ensureDatabaseSynced(deviceID, packageName, remotePath, false)
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	localPath := entry.localPath
+
+	db, err := s.getOrOpenDB(localPath)
+	if err != nil {
+		return err
+	}
 
 	var setClauses []string
 	var args []interface{}
@@ -517,19 +719,22 @@ func (s *Service) UpdateRow(deviceID, packageName, remotePath, tableName string,
 		return err
 	}
 
+	_, _ = db.Exec("PRAGMA wal_checkpoint(TRUNCATE);")
 	return s.client.PushToSandbox(deviceID, packageName, localPath, remotePath)
 }
 
 // DeleteRow deletes a row in the SQLite database and syncs back to device.
 func (s *Service) DeleteRow(deviceID, packageName, remotePath, tableName string, pk map[string]interface{}) error {
-	fileName := filepath.Base(remotePath)
-	localPath := s.getLocalCachePath(deviceID, packageName, fileName)
-
-	db, err := sql.Open("sqlite", localPath)
+	entry, err := s.ensureDatabaseSynced(deviceID, packageName, remotePath, false)
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	localPath := entry.localPath
+
+	db, err := s.getOrOpenDB(localPath)
+	if err != nil {
+		return err
+	}
 
 	var whereClauses []string
 	var args []interface{}
@@ -544,6 +749,7 @@ func (s *Service) DeleteRow(deviceID, packageName, remotePath, tableName string,
 		return err
 	}
 
+	_, _ = db.Exec("PRAGMA wal_checkpoint(TRUNCATE);")
 	return s.client.PushToSandbox(deviceID, packageName, localPath, remotePath)
 }
 
@@ -559,11 +765,10 @@ func sanitize(in string) string {
 }
 
 func (s *Service) inspectSqliteTables(dbPath string) ([]TableMeta, error) {
-	db, err := sql.Open("sqlite", dbPath)
+	db, err := s.getOrOpenDB(dbPath)
 	if err != nil {
 		return nil, err
 	}
-	defer db.Close()
 
 	rows, err := db.Query("SELECT name, type FROM sqlite_master WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%' ORDER BY name")
 	if err != nil {
@@ -728,18 +933,16 @@ func parseSharedPrefsRows(xmlPath string, page, pageSize int) ([]map[string]inte
 
 // ExplainQuery executes SQLite's EXPLAIN QUERY PLAN and builds an interactive operation tree.
 func (s *Service) ExplainQuery(deviceID, packageName, remotePath, sqlQuery string) (*QueryPlanResult, error) {
-	fileName := filepath.Base(remotePath)
-	localPath := s.getLocalCachePath(deviceID, packageName, fileName)
-
-	// Ensure latest copy
-	_ = s.client.ExecOutCat(deviceID, packageName, remotePath, localPath)
-	s.syncAuxiliarySqliteFiles(deviceID, packageName, remotePath, localPath)
-
-	db, err := sql.Open("sqlite", localPath)
+	entry, err := s.ensureDatabaseSynced(deviceID, packageName, remotePath, false)
 	if err != nil {
 		return nil, err
 	}
-	defer db.Close()
+	localPath := entry.localPath
+
+	db, err := s.getOrOpenDB(localPath)
+	if err != nil {
+		return nil, err
+	}
 
 	start := time.Now()
 	explainSQL := fmt.Sprintf("EXPLAIN QUERY PLAN %s", strings.TrimRight(strings.TrimSpace(sqlQuery), ";"))
@@ -836,18 +1039,16 @@ func (s *Service) ExplainQuery(deviceID, packageName, remotePath, sqlQuery strin
 
 // SimulateQuery runs mutating queries in an isolated rollback transaction sandbox.
 func (s *Service) SimulateQuery(deviceID, packageName, remotePath, sqlQuery string) (*SimulationResult, error) {
-	fileName := filepath.Base(remotePath)
-	localPath := s.getLocalCachePath(deviceID, packageName, fileName)
-
-	// Ensure latest copy
-	_ = s.client.ExecOutCat(deviceID, packageName, remotePath, localPath)
-	s.syncAuxiliarySqliteFiles(deviceID, packageName, remotePath, localPath)
-
-	db, err := sql.Open("sqlite", localPath)
+	entry, err := s.ensureDatabaseSynced(deviceID, packageName, remotePath, false)
 	if err != nil {
 		return nil, err
 	}
-	defer db.Close()
+	localPath := entry.localPath
+
+	db, err := s.getOrOpenDB(localPath)
+	if err != nil {
+		return nil, err
+	}
 
 	start := time.Now()
 	trimmed := strings.TrimSpace(sqlQuery)
@@ -963,18 +1164,17 @@ func (s *Service) SimulateQuery(deviceID, packageName, remotePath, sqlQuery stri
 
 // GetDatabaseSchemaExtended fetches full metadata including columns, foreign keys, and indexes for all tables.
 func (s *Service) GetDatabaseSchemaExtended(deviceID, packageName, remotePath string) (*ExtendedSchemaResult, error) {
-	fileName := filepath.Base(remotePath)
-	localPath := s.getLocalCachePath(deviceID, packageName, fileName)
-
-	// Ensure latest copy
-	_ = s.client.ExecOutCat(deviceID, packageName, remotePath, localPath)
-	s.syncAuxiliarySqliteFiles(deviceID, packageName, remotePath, localPath)
-
-	db, err := sql.Open("sqlite", localPath)
+	entry, err := s.ensureDatabaseSynced(deviceID, packageName, remotePath, false)
 	if err != nil {
 		return nil, err
 	}
-	defer db.Close()
+	localPath := entry.localPath
+	fileName := filepath.Base(remotePath)
+
+	db, err := s.getOrOpenDB(localPath)
+	if err != nil {
+		return nil, err
+	}
 
 	tableRows, err := db.Query("SELECT name, type FROM sqlite_master WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%' ORDER BY name")
 	if err != nil {
@@ -1014,20 +1214,23 @@ func (s *Service) GetDatabaseSchemaExtended(deviceID, packageName, remotePath st
 
 // CreateIndex executes a CREATE INDEX DDL statement and syncs back to the mobile device.
 func (s *Service) CreateIndex(deviceID, packageName, remotePath, indexSql string) error {
-	fileName := filepath.Base(remotePath)
-	localPath := s.getLocalCachePath(deviceID, packageName, fileName)
-
-	db, err := sql.Open("sqlite", localPath)
+	entry, err := s.ensureDatabaseSynced(deviceID, packageName, remotePath, false)
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	localPath := entry.localPath
+
+	db, err := s.getOrOpenDB(localPath)
+	if err != nil {
+		return err
+	}
 
 	_, err = db.Exec(indexSql)
 	if err != nil {
 		return err
 	}
 
+	_, _ = db.Exec("PRAGMA wal_checkpoint(TRUNCATE);")
 	return s.client.PushToSandbox(deviceID, packageName, localPath, remotePath)
 }
 

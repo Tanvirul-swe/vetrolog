@@ -86,13 +86,37 @@ jobs:
               "VetroLog.app" || true
           fi
 
-      # Build Windows
+      # Build Windows & Sign with SignPath
       - name: Build Windows Executable & NSIS Installer
         if: runner.os == 'Windows'
         run: |
           wails build -platform ${{ matrix.platform.wails_platform }} -clean -nsis
           cd build/bin
           Compress-Archive -Path vetrolog.exe -DestinationPath VetroLog-Windows-x64-Portable.zip
+
+      - name: Upload Unsigned Windows Artifact
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        id: upload-unsigned-windows
+        with:
+          name: unsigned-windows-binaries
+          path: build/bin/
+
+      - name: Submit Signing Request to SignPath
+        if: runner.os == 'Windows'
+        uses: signpath/github-action-submit-signing-request@v2
+        with:
+          api-token: '${{ secrets.SIGNPATH_API_TOKEN }}'
+          organization-id: '${{ secrets.SIGNPATH_ORG_ID }}'
+          project-slug: 'vetrolog'
+          signing-policy-slug: 'test-signing' # Change to 'release-signing' once SignPath Foundation CA is approved
+          github-artifact-id: '${{ steps.upload-unsigned-windows.outputs.artifact-id }}'
+          output-artifact-directory: 'signed-windows'
+
+      - name: Replace with Signed Binaries
+        if: runner.os == 'Windows'
+        run: |
+          Copy-Item -Path "signed-windows\*" -Destination "build\bin\" -Force
 
       # Build Linux
       - name: Build Linux Binary & Debian Package

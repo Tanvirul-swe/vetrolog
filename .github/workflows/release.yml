@@ -133,7 +133,7 @@ jobs:
           cp ../appicon.png deb/usr/share/icons/hicolor/512x512/apps/vetrolog.png
           
           VERSION_NUM="${GITHUB_REF_NAME#v}"
-          VERSION_NUM="${VERSION_NUM:-1.1.0}"
+          VERSION_NUM="${VERSION_NUM:-1.1.1}"
           printf "%s\n" \
             "Package: vetrolog" \
             "Version: $VERSION_NUM" \

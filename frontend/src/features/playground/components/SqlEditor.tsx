@@ -12,6 +12,7 @@ import { AutocompletePopup, AutocompleteItem } from './AutocompletePopup';
 import { predictJoins } from '../services/joinPredictor';
 import { highlightSql } from '../services/sqlHighlighter';
 import { formatSqlIdentifier } from '../services/sqlIdentifier';
+import { parseDotContext, filterTableColumns } from '../services/sqlContextParser';
 import { usePlaygroundStore } from '@/stores/usePlaygroundStore';
 import { useDatabaseStore } from '@/stores/useDatabaseStore';
 
@@ -153,7 +154,22 @@ export function SqlEditor({
   // Contextual autocomplete calculation
   const autocompleteItems = useMemo<AutocompleteItem[]>(() => {
     const textBefore = query.slice(0, cursorPos);
-    const lastWordMatch = textBefore.match(/([a-zA-Z0-9_.]+)$/);
+
+    // 0. Dot Context Autocomplete (e.g. table.col or alias.col)
+    const dotContext = parseDotContext(textBefore, query, availableTables);
+    if (dotContext && dotContext.table) {
+      const filteredCols = filterTableColumns(dotContext.table.columns || [], dotContext.columnPrefix);
+      return filteredCols.map((c) => ({
+        label: c.name,
+        insertText: formatSqlIdentifier(c.name),
+        type: 'column',
+        detail: `${dotContext.tableName}.${c.name}`,
+        meta: c.isPrimaryKey ? 'PK' : c.type || 'COLUMN',
+        isPk: c.isPrimaryKey,
+      }));
+    }
+
+    const lastWordMatch = textBefore.match(/([a-zA-Z0-9_]+)$/);
     const currentWord = lastWordMatch ? lastWordMatch[1].toLowerCase() : '';
 
     // Check if typing after JOIN or FROM
@@ -245,7 +261,7 @@ export function SqlEditor({
 
     // Return up to 100 suggestions so all tables can be scrolled and explored
     return items.slice(0, 100);
-  }, [query, cursorPos, availableTables]);
+  }, [query, cursorPos, availableTables, extendedSchema]);
 
   // Update popup coordinates based on cursor
   useEffect(() => {
@@ -267,8 +283,15 @@ export function SqlEditor({
   const handleSelectAutocomplete = (item: AutocompleteItem) => {
     if (!textareaRef.current) return;
     const textBefore = query.slice(0, cursorPos);
-    const lastWordMatch = textBefore.match(/([a-zA-Z0-9_.]+)$/);
-    const replaceLen = lastWordMatch ? lastWordMatch[1].length : 0;
+    const dotContext = parseDotContext(textBefore, query, availableTables);
+
+    let replaceLen = 0;
+    if (dotContext) {
+      replaceLen = dotContext.replaceLength;
+    } else {
+      const lastWordMatch = textBefore.match(/([a-zA-Z0-9_]+)$/);
+      replaceLen = lastWordMatch ? lastWordMatch[1].length : 0;
+    }
 
     const start = cursorPos - replaceLen;
     const newQuery = query.slice(0, start) + item.insertText + query.slice(cursorPos);

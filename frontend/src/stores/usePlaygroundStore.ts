@@ -6,6 +6,7 @@ import {
   AIConfig,
 } from '@/types/database';
 import { apiBridge } from '@/services/apiBridge';
+import { formatSqlIdentifier } from '@/features/playground/services/sqlIdentifier';
 import { useAdbStore } from './useAdbStore';
 import { useDatabaseStore } from './useDatabaseStore';
 
@@ -66,6 +67,7 @@ interface PlaygroundState {
   renameTab: (tabId: string, newTitle: string) => void;
   setActiveTabId: (tabId: string) => void;
   updateActiveTabState: (updates: Partial<QueryTab>) => void;
+  openTableInPlayground: (tableName: string) => Promise<void>;
 
   // Editor (bound to activeTab)
   query: string;
@@ -400,6 +402,85 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
       );
       return { tabs: updatedTabs };
     });
+  },
+
+  openTableInPlayground: async (tableName) => {
+    const state = get();
+    const formattedTable = formatSqlIdentifier(tableName);
+    const targetSql = `SELECT * FROM ${formattedTable} LIMIT 50;`;
+
+    // 1. Check if a tab is already open for this specific table
+    const existingTab = state.tabs.find(
+      (t) => t.title.toLowerCase() === tableName.toLowerCase()
+    );
+
+    if (existingTab) {
+      set({
+        activeTabId: existingTab.id,
+        query: existingTab.query,
+        queryPlan: existingTab.queryPlan || null,
+        activeTab: 'results',
+      });
+      saveTabsToStorage(state.tabs, existingTab.id);
+      if (!existingTab.result || !existingTab.result.success) {
+        await get().runExecute(existingTab.query);
+      }
+      return;
+    }
+
+    // 2. Check if current active tab is pristine/default and can be repurposed
+    const activeTab = state.tabs.find((t) => t.id === state.activeTabId);
+    const isPristine =
+      activeTab &&
+      activeTab.title.startsWith('Query ') &&
+      !activeTab.result &&
+      (activeTab.query === DEFAULT_INITIAL_QUERY || !activeTab.query.trim());
+
+    if (isPristine) {
+      const updatedTabs = state.tabs.map((t) =>
+        t.id === activeTab.id
+          ? {
+              ...t,
+              title: tableName,
+              query: targetSql,
+            }
+          : t
+      );
+      set({
+        tabs: updatedTabs,
+        query: targetSql,
+        activeTab: 'results',
+      });
+      saveTabsToStorage(updatedTabs, activeTab.id);
+      await get().runExecute(targetSql);
+      return;
+    }
+
+    // 3. Otherwise, open a new tab for this table
+    const newId = `tab_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const newTab: QueryTab = {
+      id: newId,
+      title: tableName,
+      query: targetSql,
+      createdAt: Date.now(),
+      filterText: '',
+      sortCol: null,
+      sortAsc: true,
+      currentPage: 1,
+      pageSize: 50,
+      result: null,
+      queryPlan: null,
+    };
+    const updatedTabs = [...state.tabs, newTab];
+    set({
+      tabs: updatedTabs,
+      activeTabId: newId,
+      query: targetSql,
+      queryPlan: null,
+      activeTab: 'results',
+    });
+    saveTabsToStorage(updatedTabs, newId);
+    await get().runExecute(targetSql);
   },
 
   query: initialActiveTab.query,

@@ -24,6 +24,7 @@ export function TableItem({ table, isSelected, onSelect }: TableItemProps) {
     <button
       type="button"
       onClick={onSelect}
+      title={`Open ${table.name} with data`}
       className={cn(
         'w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors group text-left',
         isSelected

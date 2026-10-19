@@ -1,6 +1,7 @@
 import { FolderTree, Database } from 'lucide-react';
 import { DatabaseTree } from '@/features/databases/components/DatabaseTree';
 import { useDatabaseStore } from '@/stores/useDatabaseStore';
+import { usePlaygroundStore } from '@/stores/usePlaygroundStore';
 
 interface AppSidebarProps {
   onRefresh?: () => void;
@@ -12,6 +13,15 @@ export function AppSidebar(_props: AppSidebarProps) {
   const selectedTableName = useDatabaseStore((s) => s.selectedTableName);
   const selectDatabase = useDatabaseStore((s) => s.selectDatabase);
   const selectTable = useDatabaseStore((s) => s.selectTable);
+  const activeWorkspaceView = usePlaygroundStore((s) => s.activeWorkspaceView);
+  const openTableInPlayground = usePlaygroundStore((s) => s.openTableInPlayground);
+
+  const handleSelectTable = (tableName: string) => {
+    selectTable(tableName);
+    if (activeWorkspaceView === 'playground') {
+      openTableInPlayground(tableName);
+    }
+  };
 
   return (
     <aside className="w-64 border-r border-border/80 bg-sidebar/50 flex flex-col shrink-0 select-none overflow-hidden h-full">
@@ -33,7 +43,7 @@ export function AppSidebar(_props: AppSidebarProps) {
           selectedDatabaseId={selectedDbId}
           selectedTableName={selectedTableName}
           onSelectDatabase={selectDatabase}
-          onSelectTable={selectTable}
+          onSelectTable={handleSelectTable}
         />
       </div>
 

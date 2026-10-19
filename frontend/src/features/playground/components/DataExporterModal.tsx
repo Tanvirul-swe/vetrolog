@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Download, Copy, Check, X, FileJson, FileSpreadsheet, FileCode, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { formatSqlIdentifier } from '../services/sqlIdentifier';
 
 interface DataExporterModalProps {
   isOpen: boolean;
@@ -42,8 +43,9 @@ export function DataExporterModal({ isOpen, onClose, rows, tableName = 'result_s
     if (format === 'sql') {
       const headers = Object.keys(rows[0]);
       const sqlRows: string[] = [];
+      const tbl = formatSqlIdentifier(tableName);
       for (const row of rows) {
-        const colList = headers.map((h) => `"${h}"`).join(', ');
+        const colList = headers.map(formatSqlIdentifier).join(', ');
         const valList = headers
           .map((h) => {
             const val = row[h];
@@ -53,7 +55,7 @@ export function DataExporterModal({ isOpen, onClose, rows, tableName = 'result_s
             return `'${String(val).replace(/'/g, "''")}'`;
           })
           .join(', ');
-        sqlRows.push(`INSERT INTO "${tableName}" (${colList}) VALUES (${valList});`);
+        sqlRows.push(`INSERT INTO ${tbl} (${colList}) VALUES (${valList});`);
       }
       return sqlRows.join('\n');
     }

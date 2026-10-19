@@ -1,4 +1,5 @@
 import { ExtendedTableSchema } from '@/types/database';
+import { formatSqlIdentifier } from './sqlIdentifier';
 
 export interface JoinPrediction {
   targetTable: string;
@@ -24,20 +25,23 @@ export function predictJoins(
 
   if (!current || !target) return [];
 
+  const curT = formatSqlIdentifier(current.name);
+  const tgtT = formatSqlIdentifier(target.name);
+
   const predictions: JoinPrediction[] = [];
 
   // 1. Direct Foreign Key: currentTable -> targetTable
   for (const fk of current.foreignKeys || []) {
     if (fk.toTable.toLowerCase() === target.name.toLowerCase()) {
-      const fromCol = fk.fromCol;
-      const toCol = fk.toCol || 'id';
+      const fromCol = formatSqlIdentifier(fk.fromCol);
+      const toCol = formatSqlIdentifier(fk.toCol || 'id');
       predictions.push({
         targetTable: target.name,
         sourceTable: current.name,
-        sourceCol: fromCol,
-        targetCol: toCol,
-        onClause: `"${current.name}"."${fromCol}" = "${target.name}"."${toCol}"`,
-        joinStatement: `JOIN "${target.name}" ON "${current.name}"."${fromCol}" = "${target.name}"."${toCol}"`,
+        sourceCol: fk.fromCol,
+        targetCol: fk.toCol || 'id',
+        onClause: `${curT}.${fromCol} = ${tgtT}.${toCol}`,
+        joinStatement: `JOIN ${tgtT} ON ${curT}.${fromCol} = ${tgtT}.${toCol}`,
         isForeignKey: true,
         confidence: 1.0,
       });
@@ -47,15 +51,15 @@ export function predictJoins(
   // 2. Reverse Foreign Key: targetTable -> currentTable
   for (const fk of target.foreignKeys || []) {
     if (fk.toTable.toLowerCase() === current.name.toLowerCase()) {
-      const fromCol = fk.fromCol;
-      const toCol = fk.toCol || 'id';
+      const fromCol = formatSqlIdentifier(fk.fromCol);
+      const toCol = formatSqlIdentifier(fk.toCol || 'id');
       predictions.push({
         targetTable: target.name,
         sourceTable: current.name,
-        sourceCol: toCol,
-        targetCol: fromCol,
-        onClause: `"${current.name}"."${toCol}" = "${target.name}"."${fromCol}"`,
-        joinStatement: `JOIN "${target.name}" ON "${current.name}"."${toCol}" = "${target.name}"."${fromCol}"`,
+        sourceCol: fk.toCol || 'id',
+        targetCol: fk.fromCol,
+        onClause: `${curT}.${toCol} = ${tgtT}.${fromCol}`,
+        joinStatement: `JOIN ${tgtT} ON ${curT}.${toCol} = ${tgtT}.${fromCol}`,
         isForeignKey: true,
         confidence: 0.95,
       });
@@ -69,13 +73,15 @@ export function predictJoins(
 
   if (matchingFromCol) {
     const targetPk = target.columns.find((c) => c.isPrimaryKey)?.name || 'id';
+    const fromCol = formatSqlIdentifier(matchingFromCol.name);
+    const toCol = formatSqlIdentifier(targetPk);
     predictions.push({
       targetTable: target.name,
       sourceTable: current.name,
       sourceCol: matchingFromCol.name,
       targetCol: targetPk,
-      onClause: `"${current.name}"."${matchingFromCol.name}" = "${target.name}"."${targetPk}"`,
-      joinStatement: `JOIN "${target.name}" ON "${current.name}"."${matchingFromCol.name}" = "${target.name}"."${targetPk}"`,
+      onClause: `${curT}.${fromCol} = ${tgtT}.${toCol}`,
+      joinStatement: `JOIN ${tgtT} ON ${curT}.${fromCol} = ${tgtT}.${toCol}`,
       isForeignKey: false,
       confidence: 0.85,
     });
@@ -88,13 +94,15 @@ export function predictJoins(
 
   if (matchingToCol) {
     const currentPk = current.columns.find((c) => c.isPrimaryKey)?.name || 'id';
+    const fromCol = formatSqlIdentifier(currentPk);
+    const toCol = formatSqlIdentifier(matchingToCol.name);
     predictions.push({
       targetTable: target.name,
       sourceTable: current.name,
       sourceCol: currentPk,
       targetCol: matchingToCol.name,
-      onClause: `"${current.name}"."${currentPk}" = "${target.name}"."${matchingToCol.name}"`,
-      joinStatement: `JOIN "${target.name}" ON "${current.name}"."${currentPk}" = "${target.name}"."${matchingToCol.name}"`,
+      onClause: `${curT}.${fromCol} = ${tgtT}.${toCol}`,
+      joinStatement: `JOIN ${tgtT} ON ${curT}.${fromCol} = ${tgtT}.${toCol}`,
       isForeignKey: false,
       confidence: 0.8,
     });

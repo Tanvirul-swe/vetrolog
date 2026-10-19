@@ -10,6 +10,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { AutocompletePopup, AutocompleteItem } from './AutocompletePopup';
 import { predictJoins } from '../services/joinPredictor';
+import { highlightSql } from '../services/sqlHighlighter';
+import { formatSqlIdentifier } from '../services/sqlIdentifier';
 import { usePlaygroundStore } from '@/stores/usePlaygroundStore';
 import { useDatabaseStore } from '@/stores/useDatabaseStore';
 
@@ -73,13 +75,53 @@ export function SqlEditor({
   const cancelExecution = usePlaygroundStore((s) => s.cancelExecution);
   const formatSql = usePlaygroundStore((s) => s.formatSql);
 
+  const databases = useDatabaseStore((s) => s.databases);
   const selectedDbId = useDatabaseStore((s) => s.selectedDatabaseId);
+  const activeDb = useMemo(() => databases.find((d) => d.id === selectedDbId), [databases, selectedDbId]);
+
+  // Combine extendedSchema with activeDb.tables to guarantee all tables are always available
+  const availableTables = useMemo(() => {
+    if (extendedSchema?.tables && extendedSchema.tables.length > 0) {
+      return extendedSchema.tables;
+    }
+    return activeDb?.tables || [];
+  }, [extendedSchema, activeDb]);
+
+  // Pre-index known table and column names for instant syntax highlighting
+  const { tableSet, columnSet } = useMemo(() => {
+    const tSet = new Set<string>();
+    const cSet = new Set<string>();
+    for (const t of availableTables) {
+      tSet.add(t.name.toLowerCase());
+      for (const c of t.columns || []) {
+        cSet.add(c.name.toLowerCase());
+      }
+    }
+    return { tableSet: tSet, columnSet: cSet };
+  }, [availableTables]);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const preRef = useRef<HTMLPreElement>(null);
+  const gutterRef = useRef<HTMLDivElement>(null);
+
   const [cursorPos, setCursorPos] = useState<number>(0);
   const [hasSelection, setHasSelection] = useState<boolean>(false);
   const [popupPos, setPopupPos] = useState<{ top: number; left: number } | null>(null);
   const [selectedAutoIndex, setSelectedAutoIndex] = useState(0);
+
+  // Synchronize scrolling across textarea, pre-highlighting layer, and line number gutter
+  const handleScroll = () => {
+    if (textareaRef.current) {
+      const { scrollTop, scrollLeft } = textareaRef.current;
+      if (preRef.current) {
+        preRef.current.scrollTop = scrollTop;
+        preRef.current.scrollLeft = scrollLeft;
+      }
+      if (gutterRef.current) {
+        gutterRef.current.scrollTop = scrollTop;
+      }
+    }
+  };
 
   const getExecutableQuery = (): string => {
     if (textareaRef.current) {
@@ -103,13 +145,16 @@ export function SqlEditor({
   // Split lines for line numbers
   const lines = useMemo(() => query.split('\n'), [query]);
 
+  // Real-time SQL syntax highlighting
+  const highlightedTokens = useMemo(() => {
+    return highlightSql(query, tableSet, columnSet);
+  }, [query, tableSet, columnSet]);
+
   // Contextual autocomplete calculation
   const autocompleteItems = useMemo<AutocompleteItem[]>(() => {
     const textBefore = query.slice(0, cursorPos);
     const lastWordMatch = textBefore.match(/([a-zA-Z0-9_.]+)$/);
     const currentWord = lastWordMatch ? lastWordMatch[1].toLowerCase() : '';
-
-    const tables = extendedSchema?.tables || [];
 
     // Check if typing after JOIN or FROM
     const isJoinContext = /(?:JOIN|FROM)\s+([a-zA-Z0-9_]*)$/i.test(textBefore);
@@ -123,7 +168,7 @@ export function SqlEditor({
       if (match) {
         const fromTable = match[1];
         const joinTable = match[2];
-        const predictions = predictJoins(fromTable, joinTable, tables);
+        const predictions = predictJoins(fromTable, joinTable, extendedSchema?.tables || []);
         for (const p of predictions) {
           items.push({
             label: `ON ${p.onClause}`,
@@ -136,29 +181,44 @@ export function SqlEditor({
       }
     }
 
-    // 2. Tables Suggestion
+    // 2. Tables Suggestion (all available tables with relevance sorting)
     if (isJoinContext || currentWord.length > 0) {
-      for (const t of tables) {
-        if (!currentWord || t.name.toLowerCase().includes(currentWord)) {
-          items.push({
-            label: t.name,
-            insertText: `"${t.name}" `,
-            type: 'table',
-            detail: `${t.rowCount} rows`,
-            meta: t.type,
-          });
-        }
+      const matchingTables = availableTables.filter(
+        (t) => !currentWord || t.name.toLowerCase().includes(currentWord)
+      );
+
+      // Smart sorting: exact matches first, startsWith second, then alphabetical
+      matchingTables.sort((a, b) => {
+        const aLow = a.name.toLowerCase();
+        const bLow = b.name.toLowerCase();
+        if (aLow === currentWord) return -1;
+        if (bLow === currentWord) return 1;
+        const aStarts = aLow.startsWith(currentWord);
+        const bStarts = bLow.startsWith(currentWord);
+        if (aStarts && !bStarts) return -1;
+        if (!aStarts && bStarts) return 1;
+        return aLow.localeCompare(bLow);
+      });
+
+      for (const t of matchingTables) {
+        items.push({
+          label: t.name,
+          insertText: `${formatSqlIdentifier(t.name)} `,
+          type: 'table',
+          detail: `${t.rowCount || 0} rows`,
+          meta: t.type || 'table',
+        });
       }
     }
 
     // 3. Columns Suggestion (Match all columns across active tables)
     if (currentWord.length > 0) {
-      for (const t of tables) {
-        for (const c of t.columns) {
+      for (const t of availableTables) {
+        for (const c of t.columns || []) {
           if (c.name.toLowerCase().includes(currentWord)) {
             items.push({
               label: `${c.name}`,
-              insertText: `"${c.name}"`,
+              insertText: formatSqlIdentifier(c.name),
               type: 'column',
               detail: `${t.name}.${c.name}`,
               meta: c.type,
@@ -183,8 +243,9 @@ export function SqlEditor({
       }
     }
 
-    return items.slice(0, 10);
-  }, [query, cursorPos, extendedSchema]);
+    // Return up to 100 suggestions so all tables can be scrolled and explored
+    return items.slice(0, 100);
+  }, [query, cursorPos, availableTables]);
 
   // Update popup coordinates based on cursor
   useEffect(() => {
@@ -221,12 +282,13 @@ export function SqlEditor({
       if (textareaRef.current) {
         textareaRef.current.focus();
         textareaRef.current.setSelectionRange(newPos, newPos);
+        handleScroll();
       }
     }, 10);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Autocomplete navigation
+    // Autocomplete Navigation
     if (popupPos && autocompleteItems.length > 0) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -250,20 +312,19 @@ export function SqlEditor({
       }
     }
 
-    // Keyboard Shortcuts: ⌘Enter / Ctrl+Enter = Run
+    // ⌘+Enter or Ctrl+Enter -> Execute Query
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault();
-      const targetSql = getExecutableQuery();
       if (e.shiftKey) {
-        onRunDryRun(targetSql);
+        onRunDryRun(getExecutableQuery());
       } else {
-        onRunExecute(targetSql);
+        onRunExecute(getExecutableQuery());
       }
       return;
     }
 
-    // Tab key indent
-    if (e.key === 'Tab' && !popupPos) {
+    // Tab key -> Insert 2 spaces
+    if (e.key === 'Tab' && !e.shiftKey) {
       e.preventDefault();
       const start = e.currentTarget.selectionStart;
       const end = e.currentTarget.selectionEnd;
@@ -272,6 +333,7 @@ export function SqlEditor({
       setTimeout(() => {
         if (textareaRef.current) {
           textareaRef.current.selectionStart = textareaRef.current.selectionEnd = start + 2;
+          handleScroll();
         }
       }, 0);
     }
@@ -303,6 +365,7 @@ export function SqlEditor({
         const nextPos = selectionStart + snippet.length;
         textareaRef.current.setSelectionRange(nextPos, nextPos);
         setCursorPos(nextPos);
+        handleScroll();
       }
     }, 10);
   };
@@ -310,7 +373,7 @@ export function SqlEditor({
   return (
     <div className="flex flex-col border-b border-border/70 bg-card/40 backdrop-blur-xs relative flex-1 min-h-0 h-full">
       {/* Editor Action Toolbar */}
-      <div className="h-10 px-3 border-b border-border/60 bg-muted/20 flex items-center justify-between gap-2 select-none">
+      <div className="h-10 px-3 border-b border-border/60 bg-muted/20 flex items-center justify-between gap-2 select-none shrink-0">
         <div className="flex items-center gap-1.5">
           <Button
             size="sm"
@@ -349,9 +412,6 @@ export function SqlEditor({
           >
             <ShieldAlert className="size-3 text-amber-400" />
             <span>{isSimulating ? 'Simulating...' : 'Dry Run'}</span>
-            <kbd className="hidden sm:inline-block text-[9px] bg-muted px-1 py-0.2 rounded font-mono text-muted-foreground">
-              ⌘⇧↵
-            </kbd>
           </Button>
 
           <Button
@@ -359,22 +419,16 @@ export function SqlEditor({
             variant="ghost"
             onClick={handleExplain}
             disabled={!selectedDbId || !query.trim() || isExplaining || isExecuting}
-            className="h-7 text-xs gap-1.5 text-muted-foreground hover:text-foreground hover:bg-muted"
-            title="Analyze query with EXPLAIN QUERY PLAN"
+            className="h-7 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
+            title="Inspect visual execution plan tree"
           >
             <Search className="size-3" />
-            <span>{isExplaining ? 'Analyzing...' : 'Explain Plan'}</span>
+            <span>Explain Plan</span>
           </Button>
-
-          {hasSelection && (
-            <span className="hidden md:inline-flex items-center text-[10px] text-amber-400 font-mono bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
-              Selection Mode
-            </span>
-          )}
         </div>
 
-        {/* Quick Snippet Pills & Tools */}
-        <div className="hidden lg:flex items-center gap-1">
+        {/* Quick SQL Snippets */}
+        <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={() => insertSnippet('SELECT * FROM ')}
@@ -436,17 +490,33 @@ export function SqlEditor({
         </div>
       </div>
 
-      {/* Code Textarea & Gutter */}
+      {/* Code Textarea & Gutter with Overlaid Real-Time Syntax Highlighting */}
       <div className="flex flex-1 min-h-[90px] overflow-hidden relative font-mono text-xs">
         {/* Line Numbers Gutter */}
-        <div className="w-10 select-none py-2 bg-muted/30 border-r border-border/40 text-muted-foreground/40 text-right pr-2 text-[11px] leading-5 shrink-0 overflow-hidden font-mono">
+        <div
+          ref={gutterRef}
+          className="w-10 select-none py-2 bg-muted/30 border-r border-border/40 text-muted-foreground/40 text-right pr-2 text-[11px] leading-5 shrink-0 overflow-hidden font-mono"
+        >
           {lines.map((_, i) => (
             <div key={i}>{i + 1}</div>
           ))}
         </div>
 
-        {/* Textarea Input */}
-        <div className="flex-1 relative overflow-auto">
+        {/* Textarea & Highlighting Stack */}
+        <div className="flex-1 relative overflow-hidden h-full">
+          {/* Syntax Highlighting Background Layer */}
+          <pre
+            ref={preRef}
+            aria-hidden="true"
+            className="absolute inset-0 p-2 m-0 bg-transparent pointer-events-none font-mono text-xs leading-5 whitespace-pre-wrap break-words overflow-hidden select-none"
+          >
+            <code>
+              {highlightedTokens}
+              {query.endsWith('\n') ? ' ' : ''}
+            </code>
+          </pre>
+
+          {/* Interactive Foreground Textarea */}
           <textarea
             ref={textareaRef}
             value={query}
@@ -454,13 +524,14 @@ export function SqlEditor({
               setQuery(e.target.value);
               updateSelectionState();
             }}
+            onScroll={handleScroll}
             onClick={updateSelectionState}
             onKeyUp={updateSelectionState}
             onSelect={updateSelectionState}
             onKeyDown={handleKeyDown}
             placeholder="Enter SQL statement (e.g. SELECT * FROM users WHERE active = 1 ORDER BY id DESC LIMIT 50;)"
             spellCheck={false}
-            className="w-full h-full p-2 bg-transparent text-foreground placeholder:text-muted-foreground/40 resize-none outline-none leading-5 font-mono text-xs select-text"
+            className="absolute inset-0 p-2 m-0 w-full h-full bg-transparent text-transparent caret-sky-400 selection:bg-sky-500/30 selection:text-transparent placeholder:text-muted-foreground/40 resize-none outline-none font-mono text-xs leading-5 whitespace-pre-wrap break-words select-text z-10"
           />
 
           {/* Autocomplete Popup */}

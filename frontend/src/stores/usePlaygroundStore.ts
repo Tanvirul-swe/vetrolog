@@ -122,7 +122,7 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
   activeWorkspaceView: 'grid',
   setActiveWorkspaceView: (view) => set({ activeWorkspaceView: view }),
 
-  query: 'SELECT * FROM sqlite_master WHERE type="table";',
+  query: "SELECT * FROM sqlite_master WHERE type = 'table';",
   setQuery: (query) => set({ query }),
   activeTab: 'results',
   setActiveTab: (activeTab) => {

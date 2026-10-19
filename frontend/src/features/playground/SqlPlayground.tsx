@@ -435,23 +435,6 @@ export function SqlPlayground() {
                   </div>
                 )}
 
-                {/* Mutation Feedback Card */}
-                {latestResult.success && (isMutation || latestResult.affected > 0) && (
-                  <div className="m-3 p-3 rounded-md bg-emerald-500/10 border border-emerald-500/30 flex items-start gap-2.5 shrink-0">
-                    <CheckCircle2 className="size-4 text-emerald-400 shrink-0 mt-0.5" />
-                    <div className="text-xs">
-                      <div className="font-semibold text-emerald-300">
-                        {latestResult.affected > 0
-                          ? `Mutation applied: ${latestResult.affected} row${latestResult.affected > 1 ? 's' : ''} affected`
-                          : 'Statement executed successfully'}
-                      </div>
-                      <div className="text-[11px] text-muted-foreground mt-0.5 font-mono">
-                        Operation committed to device database in {formatDuration(latestResult.durationMs)}.
-                      </div>
-                    </div>
-                  </div>
-                )}
-
                 {/* Data Grid with Sortable Columns */}
                 {colNames.length > 0 ? (
                   <div className="flex-1 min-h-0 overflow-auto">

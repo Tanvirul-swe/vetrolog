@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { formatSqlIdentifier } from '../services/sqlIdentifier';
 import { usePlaygroundStore } from '@/stores/usePlaygroundStore';
 
 interface IndexRecommendation {
@@ -60,9 +61,8 @@ export function IndexAdvisor() {
       if (matchedCols.length > 0) {
         const colList = matchedCols.slice(0, 2);
         const idxName = `idx_${tableName}_${colList.join('_')}`.toLowerCase();
-        const createSql = `CREATE INDEX IF NOT EXISTS "${idxName}" ON "${tableName}" (${colList
-          .map((c) => `"${c}"`)
-          .join(', ')});`;
+        const formattedCols = colList.map(formatSqlIdentifier).join(', ');
+        const createSql = `CREATE INDEX IF NOT EXISTS ${formatSqlIdentifier(idxName)} ON ${formatSqlIdentifier(tableName)} (${formattedCols});`;
 
         recs.push({
           tableName,

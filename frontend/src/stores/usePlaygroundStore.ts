@@ -22,12 +22,52 @@ export interface HistoryItem {
   error?: string;
 }
 
+export interface QueryResultData {
+  requestId: string;
+  databaseId: string;
+  query: string;
+  columns: { name: string; type: string }[];
+  rows: Record<string, unknown>[];
+  affected: number;
+  durationMs: number;
+  success: boolean;
+  error?: string;
+  defaultLimitApplied?: boolean;
+}
+
+export interface QueryTab {
+  id: string;
+  title: string;
+  query: string;
+  createdAt: number;
+  isExecuting?: boolean;
+  result?: QueryResultData | null;
+  queryPlan?: QueryPlanResult | null;
+  filterText?: string;
+  sortCol?: string | null;
+  sortAsc?: boolean;
+  currentPage?: number;
+  pageSize?: number;
+}
+
 interface PlaygroundState {
   // Navigation & Workspace
   activeWorkspaceView: WorkspaceView;
   setActiveWorkspaceView: (view: WorkspaceView) => void;
 
-  // Editor
+  // Tabs State
+  tabs: QueryTab[];
+  activeTabId: string;
+  addTab: (initialQuery?: string, title?: string) => string;
+  closeTab: (tabId: string) => void;
+  closeOtherTabs: (tabId: string) => void;
+  closeTabsToTheRight: (tabId: string) => void;
+  duplicateTab: (tabId: string) => string;
+  renameTab: (tabId: string, newTitle: string) => void;
+  setActiveTabId: (tabId: string) => void;
+  updateActiveTabState: (updates: Partial<QueryTab>) => void;
+
+  // Editor (bound to activeTab)
   query: string;
   setQuery: (query: string) => void;
   activeTab: PlaygroundTab;
@@ -43,7 +83,7 @@ interface PlaygroundState {
   isLoadingSchema: boolean;
 
   // Profiler Metrics
-  profilerHistory: number[]; // recent execution durations
+  profilerHistory: number[];
   lastSelectivity: number | null;
 
   // History & Bookmarks
@@ -78,6 +118,9 @@ const DEFAULT_AI_CONFIG: AIConfig = {
   ollamaBaseUrl: 'http://localhost:11434',
 };
 
+const TABS_STORAGE_KEY = 'vetrolog_query_tabs';
+const DEFAULT_INITIAL_QUERY = "SELECT * FROM sqlite_master WHERE type = 'table';";
+
 function loadStoredAiConfig(): AIConfig {
   try {
     const raw = localStorage.getItem('vetrolog_ai_config');
@@ -86,6 +129,66 @@ function loadStoredAiConfig(): AIConfig {
     // Ignore storage parse issues
   }
   return DEFAULT_AI_CONFIG;
+}
+
+function loadStoredTabs(): { tabs: QueryTab[]; activeTabId: string } {
+  try {
+    const raw = localStorage.getItem(TABS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed.tabs) && parsed.tabs.length > 0) {
+        const tabs: QueryTab[] = parsed.tabs.map((t: any, idx: number) => ({
+          id: t.id || `tab_${Date.now()}_${idx}`,
+          title: t.title || `Query ${idx + 1}`,
+          query: typeof t.query === 'string' ? t.query : DEFAULT_INITIAL_QUERY,
+          createdAt: t.createdAt || Date.now(),
+          result: null,
+          queryPlan: null,
+          filterText: '',
+          sortCol: null,
+          sortAsc: true,
+          currentPage: 1,
+          pageSize: 50,
+        }));
+        const activeTabId = tabs.some((t) => t.id === parsed.activeTabId)
+          ? parsed.activeTabId
+          : tabs[0].id;
+        return { tabs, activeTabId };
+      }
+    }
+  } catch {
+    // Ignore parse issues
+  }
+
+  const defaultTab: QueryTab = {
+    id: `tab_${Date.now()}`,
+    title: 'Query 1',
+    query: DEFAULT_INITIAL_QUERY,
+    createdAt: Date.now(),
+    filterText: '',
+    sortCol: null,
+    sortAsc: true,
+    currentPage: 1,
+    pageSize: 50,
+  };
+  return { tabs: [defaultTab], activeTabId: defaultTab.id };
+}
+
+function saveTabsToStorage(tabs: QueryTab[], activeTabId: string) {
+  try {
+    const serialized = tabs.map((t) => ({
+      id: t.id,
+      title: t.title,
+      query: t.query,
+      createdAt: t.createdAt,
+    }));
+    localStorage.setItem(
+      TABS_STORAGE_KEY,
+      JSON.stringify({ tabs: serialized, activeTabId })
+    );
+  } catch {
+    // Ignore storage write issues
+  }
 }
 
 function formatSqlQuery(sql: string): string {
@@ -118,12 +221,198 @@ function formatSqlQuery(sql: string): string {
   return formatted;
 }
 
+const initialTabsState = loadStoredTabs();
+const initialActiveTab = initialTabsState.tabs.find((t) => t.id === initialTabsState.activeTabId) || initialTabsState.tabs[0];
+
 export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
   activeWorkspaceView: 'grid',
   setActiveWorkspaceView: (view) => set({ activeWorkspaceView: view }),
 
-  query: "SELECT * FROM sqlite_master WHERE type = 'table';",
-  setQuery: (query) => set({ query }),
+  tabs: initialTabsState.tabs,
+  activeTabId: initialTabsState.activeTabId,
+
+  addTab: (initialQuery, title) => {
+    const state = get();
+    const newId = `tab_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const nextNumber = state.tabs.length + 1;
+    const newTab: QueryTab = {
+      id: newId,
+      title: title || `Query ${nextNumber}`,
+      query: initialQuery !== undefined ? initialQuery : DEFAULT_INITIAL_QUERY,
+      createdAt: Date.now(),
+      filterText: '',
+      sortCol: null,
+      sortAsc: true,
+      currentPage: 1,
+      pageSize: 50,
+      result: null,
+      queryPlan: null,
+    };
+    const updatedTabs = [...state.tabs, newTab];
+    set({
+      tabs: updatedTabs,
+      activeTabId: newId,
+      query: newTab.query,
+      queryPlan: null,
+    });
+    saveTabsToStorage(updatedTabs, newId);
+    return newId;
+  },
+
+  closeTab: (tabId) => {
+    const state = get();
+    // If only one tab left, reset it rather than leaving empty workspace
+    if (state.tabs.length <= 1) {
+      const resetTab: QueryTab = {
+        id: `tab_${Date.now()}`,
+        title: 'Query 1',
+        query: DEFAULT_INITIAL_QUERY,
+        createdAt: Date.now(),
+        filterText: '',
+        sortCol: null,
+        sortAsc: true,
+        currentPage: 1,
+        pageSize: 50,
+        result: null,
+        queryPlan: null,
+      };
+      set({
+        tabs: [resetTab],
+        activeTabId: resetTab.id,
+        query: resetTab.query,
+        queryPlan: null,
+      });
+      saveTabsToStorage([resetTab], resetTab.id);
+      return;
+    }
+
+    const closeIndex = state.tabs.findIndex((t) => t.id === tabId);
+    const updatedTabs = state.tabs.filter((t) => t.id !== tabId);
+
+    let nextActiveId = state.activeTabId;
+    if (state.activeTabId === tabId) {
+      const nextIndex = Math.max(0, closeIndex - 1);
+      nextActiveId = updatedTabs[nextIndex]?.id || updatedTabs[0].id;
+    }
+
+    const nextTab = updatedTabs.find((t) => t.id === nextActiveId) || updatedTabs[0];
+    set({
+      tabs: updatedTabs,
+      activeTabId: nextActiveId,
+      query: nextTab.query,
+      queryPlan: nextTab.queryPlan || null,
+    });
+    saveTabsToStorage(updatedTabs, nextActiveId);
+  },
+
+  closeOtherTabs: (tabId) => {
+    const state = get();
+    const keptTab = state.tabs.find((t) => t.id === tabId) || state.tabs[0];
+    const updatedTabs = [keptTab];
+    set({
+      tabs: updatedTabs,
+      activeTabId: keptTab.id,
+      query: keptTab.query,
+      queryPlan: keptTab.queryPlan || null,
+    });
+    saveTabsToStorage(updatedTabs, keptTab.id);
+  },
+
+  closeTabsToTheRight: (tabId) => {
+    const state = get();
+    const targetIdx = state.tabs.findIndex((t) => t.id === tabId);
+    if (targetIdx === -1) return;
+
+    const updatedTabs = state.tabs.slice(0, targetIdx + 1);
+    let nextActiveId = state.activeTabId;
+    if (!updatedTabs.some((t) => t.id === nextActiveId)) {
+      nextActiveId = tabId;
+    }
+    const nextTab = updatedTabs.find((t) => t.id === nextActiveId) || updatedTabs[0];
+    set({
+      tabs: updatedTabs,
+      activeTabId: nextActiveId,
+      query: nextTab.query,
+      queryPlan: nextTab.queryPlan || null,
+    });
+    saveTabsToStorage(updatedTabs, nextActiveId);
+  },
+
+  duplicateTab: (tabId) => {
+    const state = get();
+    const sourceTab = state.tabs.find((t) => t.id === tabId);
+    if (!sourceTab) return state.activeTabId;
+
+    const newId = `tab_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const newTab: QueryTab = {
+      ...sourceTab,
+      id: newId,
+      title: `${sourceTab.title} (Copy)`,
+      createdAt: Date.now(),
+    };
+
+    const targetIdx = state.tabs.findIndex((t) => t.id === tabId);
+    const updatedTabs = [
+      ...state.tabs.slice(0, targetIdx + 1),
+      newTab,
+      ...state.tabs.slice(targetIdx + 1),
+    ];
+
+    set({
+      tabs: updatedTabs,
+      activeTabId: newId,
+      query: newTab.query,
+      queryPlan: newTab.queryPlan || null,
+    });
+    saveTabsToStorage(updatedTabs, newId);
+    return newId;
+  },
+
+  renameTab: (tabId, newTitle) => {
+    const trimmed = newTitle.trim();
+    if (!trimmed) return;
+    set((state) => {
+      const updatedTabs = state.tabs.map((t) =>
+        t.id === tabId ? { ...t, title: trimmed } : t
+      );
+      saveTabsToStorage(updatedTabs, state.activeTabId);
+      return { tabs: updatedTabs };
+    });
+  },
+
+  setActiveTabId: (tabId) => {
+    const state = get();
+    const targetTab = state.tabs.find((t) => t.id === tabId);
+    if (!targetTab) return;
+
+    set({
+      activeTabId: tabId,
+      query: targetTab.query,
+      queryPlan: targetTab.queryPlan || null,
+    });
+    saveTabsToStorage(state.tabs, tabId);
+  },
+
+  updateActiveTabState: (updates) => {
+    set((state) => {
+      const updatedTabs = state.tabs.map((t) =>
+        t.id === state.activeTabId ? { ...t, ...updates } : t
+      );
+      return { tabs: updatedTabs };
+    });
+  },
+
+  query: initialActiveTab.query,
+  setQuery: (query) => {
+    set((state) => {
+      const updatedTabs = state.tabs.map((t) =>
+        t.id === state.activeTabId ? { ...t, query } : t
+      );
+      saveTabsToStorage(updatedTabs, state.activeTabId);
+      return { query, tabs: updatedTabs };
+    });
+  },
+
   activeTab: 'results',
   setActiveTab: (activeTab) => {
     set({ activeTab });
@@ -159,12 +448,19 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
     }),
 
   cancelExecution: () => {
-    set({ isExecuting: false, isExplaining: false, isSimulating: false });
+    set((state) => ({
+      isExecuting: false,
+      isExplaining: false,
+      isSimulating: false,
+      tabs: state.tabs.map((t) =>
+        t.id === state.activeTabId ? { ...t, isExecuting: false } : t
+      ),
+    }));
   },
 
   formatSql: () => {
     const current = get().query;
-    set({ query: formatSqlQuery(current) });
+    get().setQuery(formatSqlQuery(current));
   },
 
   loadExtendedSchema: async () => {
@@ -193,7 +489,15 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
     const sql = overrideSql || get().query;
     if (!sql.trim()) return;
 
-    set({ isExecuting: true });
+    const targetTabId = get().activeTabId;
+
+    set((state) => ({
+      isExecuting: true,
+      tabs: state.tabs.map((t) =>
+        t.id === targetTabId ? { ...t, isExecuting: true } : t
+      ),
+    }));
+
     const startTime = performance.now();
 
     try {
@@ -201,15 +505,39 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
       const elapsed = performance.now() - startTime;
 
       if (result) {
-        // Calculate selectivity
         const rowsReturned = result.rows ? result.rows.length : 0;
         const totalRowsEstimate = useDatabaseStore.getState().totalRows || rowsReturned || 1;
         const selectivity = Math.min(100, Math.round((rowsReturned / totalRowsEstimate) * 100));
+
+        const tabResult: QueryResultData = {
+          requestId: `adb_${Date.now()}`,
+          databaseId: useDatabaseStore.getState().selectedDatabaseId || '',
+          query: sql,
+          columns: (result.columns || []).map((col: string) => ({
+            name: col,
+            type: 'TEXT',
+          })),
+          rows: result.rows || [],
+          affected: result.affected || 0,
+          durationMs: result.durationMs || elapsed,
+          success: result.success,
+          error: result.error,
+          defaultLimitApplied: Boolean(result.defaultLimitApplied),
+        };
 
         set((state) => ({
           activeTab: 'results',
           lastSelectivity: selectivity,
           profilerHistory: [...state.profilerHistory.slice(-9), result.durationMs || elapsed],
+          tabs: state.tabs.map((t) =>
+            t.id === targetTabId
+              ? {
+                  ...t,
+                  isExecuting: false,
+                  result: tabResult,
+                }
+              : t
+          ),
           executionHistory: [
             {
               id: `run_${Date.now()}`,
@@ -232,7 +560,12 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
     } catch (err) {
       console.error('Playground executeQuery error:', err);
     } finally {
-      set({ isExecuting: false });
+      set((state) => ({
+        isExecuting: false,
+        tabs: state.tabs.map((t) =>
+          t.id === targetTabId ? { ...t, isExecuting: false } : t
+        ),
+      }));
     }
   },
 
@@ -250,23 +583,34 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
 
     if (!deviceId || !packageName || !remotePath) return;
 
+    const targetTabId = get().activeTabId;
     set({ isExplaining: true });
+
     try {
       const plan = await apiBridge.explainQuery(deviceId, packageName, remotePath, sql);
-      set({ queryPlan: plan });
+      set((state) => ({
+        queryPlan: plan,
+        tabs: state.tabs.map((t) =>
+          t.id === targetTabId ? { ...t, queryPlan: plan } : t
+        ),
+      }));
     } catch (e: any) {
-      set({
-        queryPlan: {
-          rawNodes: [],
-          rootNodes: [],
-          hasFullScan: false,
-          hasTempBTree: false,
-          summary: 'Failed to explain query',
-          durationMs: 0,
-          success: false,
-          error: e.message || 'Explain failed',
-        },
-      });
+      const fallbackPlan: QueryPlanResult = {
+        rawNodes: [],
+        rootNodes: [],
+        hasFullScan: false,
+        hasTempBTree: false,
+        summary: 'Failed to explain query',
+        durationMs: 0,
+        success: false,
+        error: e.message || 'Explain failed',
+      };
+      set((state) => ({
+        queryPlan: fallbackPlan,
+        tabs: state.tabs.map((t) =>
+          t.id === targetTabId ? { ...t, queryPlan: fallbackPlan } : t
+        ),
+      }));
     } finally {
       set({ isExplaining: false });
     }
@@ -320,7 +664,6 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
     try {
       const ok = await apiBridge.createIndex(deviceId, packageName, remotePath, indexSql);
       if (ok) {
-        // Re-load schema and re-explain current query to show updated index in tree
         await get().loadExtendedSchema();
         await get().runExplain();
       }
@@ -353,7 +696,7 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
       );
 
       if (success) {
-        // Update latestQueryResult in database store
+        const targetTabId = get().activeTabId;
         const currentResult = useDatabaseStore.getState().latestQueryResult;
         if (currentResult && currentResult.rows) {
           const updatedRows = currentResult.rows.map((r) =>
@@ -364,6 +707,22 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
             rows: updatedRows,
           });
         }
+
+        // Also update tab's local result state
+        set((state) => ({
+          tabs: state.tabs.map((t) => {
+            if (t.id === targetTabId && t.result && t.result.rows) {
+              const updatedRows = t.result.rows.map((r) =>
+                r[pkField] === pkValue ? { ...r, [colName]: newVal } : r
+              );
+              return {
+                ...t,
+                result: { ...t.result, rows: updatedRows },
+              };
+            }
+            return t;
+          }),
+        }));
       }
       return success;
     } catch {

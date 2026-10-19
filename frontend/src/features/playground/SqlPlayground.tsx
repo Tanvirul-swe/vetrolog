@@ -29,6 +29,7 @@ import { formatDuration } from '@/lib/formatters';
 import { CellRenderer } from '@/features/datagrid/components/CellRenderer';
 import { SqlEditor } from './components/SqlEditor';
 import { NaturalLanguageBar } from './components/NaturalLanguageBar';
+import { QueryTabStrip } from './components/QueryTabStrip';
 import { VisualQueryPlan } from './components/VisualQueryPlan';
 import { PerformanceProfiler } from './components/PerformanceProfiler';
 import { IndexAdvisor } from './components/IndexAdvisor';
@@ -50,9 +51,22 @@ export function SqlPlayground() {
   const updateResultCell = usePlaygroundStore((s) => s.updateResultCell);
   const setQuery = usePlaygroundStore((s) => s.setQuery);
 
-  const latestResult = useDatabaseStore((s) => s.latestQueryResult);
+  const tabs = usePlaygroundStore((s) => s.tabs);
+  const activeTabId = usePlaygroundStore((s) => s.activeTabId);
+  const addTab = usePlaygroundStore((s) => s.addTab);
+  const closeTab = usePlaygroundStore((s) => s.closeTab);
+  const setActiveTabId = usePlaygroundStore((s) => s.setActiveTabId);
+  const updateActiveTabState = usePlaygroundStore((s) => s.updateActiveTabState);
+
   const selectedDbId = useDatabaseStore((s) => s.selectedDatabaseId);
   const selectedTable = useDatabaseStore((s) => s.selectedTableName);
+
+  const activeQueryTab = useMemo(() => {
+    return tabs.find((t) => t.id === activeTabId) || tabs[0];
+  }, [tabs, activeTabId]);
+
+  // Tab-isolated query result (null if active tab has not run yet)
+  const currentResult = activeQueryTab?.result || null;
 
   // Height adjustable layout state
   const containerRef = useRef<HTMLDivElement>(null);
@@ -67,19 +81,80 @@ export function SqlPlayground() {
   const [isCodeGenOpen, setIsCodeGenOpen] = useState(false);
   const [isDryRunModalOpen, setIsDryRunModalOpen] = useState(false);
 
-  // Results search & sorting state
-  const [filterText, setFilterText] = useState('');
-  const [sortCol, setSortCol] = useState<string | null>(null);
-  const [sortAsc, setSortAsc] = useState<boolean>(true);
+  // Per-tab filter & sort state
+  const filterText = activeQueryTab?.filterText || '';
+  const setFilterText = (text: string) => {
+    updateActiveTabState({ filterText: text, currentPage: 1 });
+  };
 
-  // Client-side pagination state
-  const [pageSize, setPageSize] = useState<number>(50);
-  const [currentPage, setCurrentPage] = useState<number>(1);
+  const sortCol = activeQueryTab?.sortCol ?? null;
+  const sortAsc = activeQueryTab?.sortAsc ?? true;
+
+  const pageSize = activeQueryTab?.pageSize || 50;
+  const setPageSize = (sz: number) => {
+    updateActiveTabState({ pageSize: sz, currentPage: 1 });
+  };
+
+  const currentPage = activeQueryTab?.currentPage || 1;
+  const setCurrentPage = (pageOrFn: number | ((prev: number) => number)) => {
+    const nextVal = typeof pageOrFn === 'function' ? pageOrFn(currentPage) : pageOrFn;
+    updateActiveTabState({ currentPage: nextVal });
+  };
 
   // Inline editing state: rowId + colName
   const [editingCell, setEditingCell] = useState<{ rowIndex: number; colName: string } | null>(null);
   const [editValue, setEditValue] = useState<string>('');
   const [justEditedCell, setJustEditedCell] = useState<string | null>(null);
+
+  // Global Keyboard Shortcuts (⌘T, ⌘W, Ctrl+Tab, ⌘1-9)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA');
+
+      // ⌘T or Ctrl+T -> New Query Tab
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 't' && !e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        addTab();
+        return;
+      }
+
+      // ⌘W or Ctrl+W -> Close Active Tab
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'w' && !e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        closeTab(activeTabId);
+        return;
+      }
+
+      // Ctrl+Tab / Ctrl+Shift+Tab -> Cycle tabs
+      if (e.ctrlKey && e.key === 'Tab') {
+        e.preventDefault();
+        const currentIdx = tabs.findIndex((t) => t.id === activeTabId);
+        if (currentIdx !== -1) {
+          const nextIdx = e.shiftKey
+            ? (currentIdx - 1 + tabs.length) % tabs.length
+            : (currentIdx + 1) % tabs.length;
+          setActiveTabId(tabs[nextIdx].id);
+        }
+        return;
+      }
+
+      // ⌘1 - ⌘9 -> Jump to tab index (when not typing inside inputs)
+      if ((e.metaKey || e.ctrlKey) && !isInput && !e.shiftKey && !e.altKey) {
+        const num = parseInt(e.key, 10);
+        if (!isNaN(num) && num >= 1 && num <= 9) {
+          const targetTab = tabs[num - 1];
+          if (targetTab) {
+            e.preventDefault();
+            setActiveTabId(targetTab.id);
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [tabs, activeTabId, addTab, closeTab, setActiveTabId]);
 
   // Load schema metadata when database changes
   useEffect(() => {
@@ -95,24 +170,19 @@ export function SqlPlayground() {
     }
   }, [simulation]);
 
-  // Reset pagination when result or filter text changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [latestResult, filterText]);
-
-  const rows = latestResult?.rows || [];
+  const rows = currentResult?.rows || [];
   const colNames = useMemo<string[]>(() => {
-    if (latestResult?.columns && latestResult.columns.length > 0) {
-      return latestResult.columns.map((c: any) => (typeof c === 'string' ? c : c.name));
+    if (currentResult?.columns && currentResult.columns.length > 0) {
+      return currentResult.columns.map((c: any) => (typeof c === 'string' ? c : c.name));
     }
     return rows.length > 0 ? Object.keys(rows[0]) : [];
-  }, [latestResult, rows]);
+  }, [currentResult, rows]);
 
   const isMutation = useMemo(() => {
-    if (!latestResult) return false;
-    const q = (latestResult.query || '').trim().toUpperCase();
+    if (!currentResult) return false;
+    const q = (currentResult.query || '').trim().toUpperCase();
     return /^(INSERT|UPDATE|DELETE|REPLACE|CREATE|DROP|ALTER|PRAGMA)\b/i.test(q);
-  }, [latestResult]);
+  }, [currentResult]);
 
   // Filtered and sorted rows for instantaneous client-side exploration
   const displayRows = useMemo(() => {
@@ -200,14 +270,12 @@ export function SqlPlayground() {
   const handleSort = (col: string) => {
     if (sortCol === col) {
       if (sortAsc) {
-        setSortAsc(false);
+        updateActiveTabState({ sortAsc: false });
       } else {
-        setSortCol(null);
-        setSortAsc(true);
+        updateActiveTabState({ sortCol: null, sortAsc: true });
       }
     } else {
-      setSortCol(col);
-      setSortAsc(true);
+      updateActiveTabState({ sortCol: col, sortAsc: true });
     }
   };
 
@@ -246,8 +314,9 @@ export function SqlPlayground() {
 
   return (
     <div ref={containerRef} className="flex-1 flex flex-col overflow-hidden bg-background text-foreground select-none relative">
-      {/* Top Deck: Natural Language + SQL Code Editor */}
+      {/* Top Deck: Query Tabs + Natural Language + SQL Code Editor */}
       <div style={{ height: editorHeight }} className="flex flex-col shrink-0 overflow-hidden">
+        <QueryTabStrip />
         <NaturalLanguageBar />
         <SqlEditor
           onRunExecute={(sql) => runExecute(sql)}
@@ -352,12 +421,12 @@ export function SqlPlayground() {
 
           {/* Tab 1: Tabular Results Grid with Sorting, Quick Filter, Pagination, and Cell Editing */}
           <TabsContent value="results" className="flex-1 min-h-0 overflow-hidden flex flex-col m-0 p-0">
-            {latestResult ? (
+            {currentResult ? (
               <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
                 {/* Meta Summary Ribbon */}
                 <div className="h-8 border-b border-border/40 px-3 flex items-center justify-between bg-card/40 text-[11px] font-mono select-none shrink-0">
                   <div className="flex items-center gap-2 min-w-0">
-                    {latestResult.success ? (
+                    {currentResult.success ? (
                       <Badge variant="success" className="text-[9px] px-1 py-0 shrink-0">
                         SUCCESS
                       </Badge>
@@ -367,13 +436,13 @@ export function SqlPlayground() {
                       </Badge>
                     )}
 
-                    {latestResult.defaultLimitApplied && (
+                    {currentResult.defaultLimitApplied && (
                       <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[10px] shrink-0 font-sans">
                         <span>⚡ 100 rows default limit</span>
                         <button
                           type="button"
                           onClick={() => {
-                            const cleanQuery = latestResult.query.trim().replace(/;$/, '');
+                            const cleanQuery = currentResult.query.trim().replace(/;$/, '');
                             const unlimitedQuery = `${cleanQuery} LIMIT 10000;`;
                             setQuery(unlimitedQuery);
                             runExecute(unlimitedQuery);
@@ -387,7 +456,7 @@ export function SqlPlayground() {
                     )}
 
                     <span className="text-muted-foreground truncate max-w-xs sm:max-w-md md:max-w-lg">
-                      {latestResult.query}
+                      {currentResult.query}
                     </span>
                   </div>
 
@@ -418,20 +487,20 @@ export function SqlPlayground() {
                     <span>
                       {filterText ? `${displayRows.length} / ${rows.length} rows` : `${rows.length} rows`}
                     </span>
-                    {latestResult.affected > 0 && (
+                    {currentResult.affected > 0 && (
                       <span className="text-amber-400 font-medium">
-                        {latestResult.affected} affected
+                        {currentResult.affected} affected
                       </span>
                     )}
-                    <span>in {formatDuration(latestResult.durationMs)}</span>
+                    <span>in {formatDuration(currentResult.durationMs)}</span>
                   </div>
                 </div>
 
                 {/* Error Banner */}
-                {latestResult.error && (
+                {currentResult.error && (
                   <div className="p-3 bg-destructive/10 border-b border-destructive/20 text-red-400 text-xs flex items-center gap-2 font-mono shrink-0">
                     <AlertCircle className="size-4 shrink-0" />
-                    <span>{latestResult.error}</span>
+                    <span>{currentResult.error}</span>
                   </div>
                 )}
 

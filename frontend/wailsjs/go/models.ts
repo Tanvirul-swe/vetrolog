@@ -313,6 +313,7 @@ export namespace adb {
 	    durationMs: number;
 	    success: boolean;
 	    error?: string;
+	    defaultLimitApplied?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new QueryExecResult(source);
@@ -327,6 +328,7 @@ export namespace adb {
 	        this.durationMs = source["durationMs"];
 	        this.success = source["success"];
 	        this.error = source["error"];
+	        this.defaultLimitApplied = source["defaultLimitApplied"];
 	    }
 	}
 	export class QueryPlanResult {

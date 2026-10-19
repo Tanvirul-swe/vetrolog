@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Copy, Check } from 'lucide-react';
+import { Copy, Check, Binary } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 interface CellRendererProps {
@@ -59,12 +59,25 @@ export function CellRenderer({ value }: CellRendererProps) {
 
   const str = String(value);
 
+  // Check if string represents a binary BLOB preview from backend
+  if (str.startsWith('[BLOB - ') && str.endsWith(']')) {
+    return (
+      <Badge
+        variant="outline"
+        className="text-[10px] font-mono px-1.5 py-0 bg-purple-500/10 text-purple-400 border-purple-500/30 gap-1 inline-flex items-center select-none"
+      >
+        <Binary className="size-2.5 text-purple-400" />
+        <span>{str.slice(1, -1)}</span>
+      </Badge>
+    );
+  }
+
   // Check if string is a valid JSON string
   if ((str.startsWith('{') && str.endsWith('}')) || (str.startsWith('[') && str.endsWith(']'))) {
     return (
       <div className="flex items-center gap-1.5 max-w-xs group">
         <span className="font-mono text-[11px] text-amber-300 truncate bg-amber-500/10 px-1 rounded border border-amber-500/20">
-          {str}
+          {str.length > 300 ? str.slice(0, 300) + '...' : str}
         </span>
         <button
           type="button"
@@ -78,9 +91,12 @@ export function CellRenderer({ value }: CellRendererProps) {
     );
   }
 
+  // Display truncated preview for very long strings to protect DOM rendering
+  const displayStr = str.length > 500 ? str.slice(0, 500) + '...' : str;
+
   return (
-    <span className="truncate max-w-sm block text-foreground/90 font-mono text-xs" title={str}>
-      {str}
+    <span className="truncate max-w-sm block text-foreground/90 font-mono text-xs" title={str.length > 500 ? `${str.slice(0, 200)}...` : str}>
+      {displayStr}
     </span>
   );
 }

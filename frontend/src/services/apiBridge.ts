@@ -27,19 +27,6 @@ export interface AdbApp {
 }
 
 /**
- * Helper to race a promise against a timeout.
- */
-function withTimeout<T>(promise: Promise<T>, ms: number, errorMsg = 'Operation timed out'): Promise<T> {
-  let timer: any;
-  const timeoutPromise = new Promise<T>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(errorMsg)), ms);
-  });
-  return Promise.race([promise, timeoutPromise]).finally(() => {
-    clearTimeout(timer);
-  });
-}
-
-/**
  * Universal API Bridge that transparently calls Wails IPC bindings in desktop mode,
  * or standard HTTP REST endpoints in web browser mode.
  */
@@ -48,27 +35,19 @@ export const apiBridge = {
 
   listDevices: async (): Promise<AdbDevice[]> => {
     if (isWailsApp()) {
-      try {
-        return (await withTimeout(AppBindings.AdbListDevices(), 4000)) as AdbDevice[];
-      } catch (e) {
-        console.warn('Wails AdbListDevices failed or timed out, falling back to HTTP:', e);
-      }
+      return (await AppBindings.AdbListDevices()) as AdbDevice[];
     }
-    const res = await fetch('/api/adb/devices', { signal: AbortSignal.timeout(5000) });
+    const res = await fetch('/api/adb/devices', { signal: AbortSignal.timeout(10000) });
     if (!res.ok) return [];
     return (await res.json()) as AdbDevice[];
   },
 
   listApps: async (deviceId: string): Promise<AdbApp[]> => {
     if (isWailsApp()) {
-      try {
-        return (await withTimeout(AppBindings.AdbListApps(deviceId), 5000)) as AdbApp[];
-      } catch (e) {
-        console.warn('Wails AdbListApps failed or timed out, falling back to HTTP:', e);
-      }
+      return (await AppBindings.AdbListApps(deviceId)) as AdbApp[];
     }
     const res = await fetch(`/api/adb/apps?deviceId=${encodeURIComponent(deviceId)}`, {
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.timeout(10000),
     });
     if (!res.ok) return [];
     return (await res.json()) as AdbApp[];
@@ -76,15 +55,11 @@ export const apiBridge = {
 
   isAppRunning: async (deviceId: string, packageName: string): Promise<boolean> => {
     if (isWailsApp()) {
-      try {
-        return await withTimeout(AppBindings.AdbIsAppRunning(deviceId, packageName), 3000);
-      } catch (e) {
-        console.warn('Wails AdbIsAppRunning failed or timed out, falling back to HTTP:', e);
-      }
+      return await AppBindings.AdbIsAppRunning(deviceId, packageName);
     }
     const res = await fetch(
       `/api/adb/is-running?deviceId=${encodeURIComponent(deviceId)}&packageName=${encodeURIComponent(packageName)}`,
-      { signal: AbortSignal.timeout(4000) }
+      { signal: AbortSignal.timeout(8000) }
     );
     if (!res.ok) return false;
     const data = await res.json();
@@ -93,15 +68,11 @@ export const apiBridge = {
 
   discoverDatabases: async (deviceId: string, packageName: string): Promise<any[]> => {
     if (isWailsApp()) {
-      try {
-        return await withTimeout(AppBindings.AdbDiscoverDatabases(deviceId, packageName), 6000);
-      } catch (e) {
-        console.warn('Wails AdbDiscoverDatabases failed or timed out, falling back to HTTP:', e);
-      }
+      return await AppBindings.AdbDiscoverDatabases(deviceId, packageName);
     }
     const res = await fetch(
       `/api/adb/databases?deviceId=${encodeURIComponent(deviceId)}&packageName=${encodeURIComponent(packageName)}`,
-      { signal: AbortSignal.timeout(8000) }
+      { signal: AbortSignal.timeout(15000) }
     );
     if (!res.ok) return [];
     return await res.json();
@@ -116,14 +87,14 @@ export const apiBridge = {
     pageSize = 50
   ): Promise<any> => {
     if (isWailsApp()) {
-      try {
-        return await withTimeout(
-          AppBindings.AdbGetTableData(deviceId, packageName, remotePath, tableName, page, pageSize),
-          6000
-        );
-      } catch (e) {
-        console.warn('Wails AdbGetTableData failed or timed out, falling back to HTTP:', e);
-      }
+      return await AppBindings.AdbGetTableData(
+        deviceId,
+        packageName,
+        remotePath,
+        tableName,
+        page,
+        pageSize
+      );
     }
     const params = new URLSearchParams({
       deviceId,
@@ -134,7 +105,7 @@ export const apiBridge = {
       pageSize: String(pageSize),
     });
     const res = await fetch(`/api/adb/table-data?${params.toString()}`, {
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(30000),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: 'Failed to fetch table data' }));
@@ -150,21 +121,13 @@ export const apiBridge = {
     query: string
   ): Promise<any> => {
     if (isWailsApp()) {
-      try {
-        return await withTimeout(
-          AppBindings.AdbExecuteQuery(deviceId, packageName, remotePath, query),
-          4000,
-          'Wails IPC AdbExecuteQuery timed out'
-        );
-      } catch (e) {
-        console.warn('Wails AdbExecuteQuery failed or timed out, falling back to HTTP:', e);
-      }
+      return await AppBindings.AdbExecuteQuery(deviceId, packageName, remotePath, query);
     }
     const res = await fetch('/api/adb/query', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ deviceId, packageName, remotePath, query }),
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(60000),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: 'Query execution failed' }));
@@ -182,21 +145,14 @@ export const apiBridge = {
     newValues: Record<string, any>
   ): Promise<boolean> => {
     if (isWailsApp()) {
-      try {
-        return await withTimeout(
-          AppBindings.AdbUpdateRow(
-            deviceId,
-            packageName,
-            remotePath,
-            tableName,
-            JSON.stringify(primaryKey),
-            JSON.stringify(newValues)
-          ),
-          5000
-        );
-      } catch (e) {
-        console.warn('Wails AdbUpdateRow failed or timed out, falling back to HTTP:', e);
-      }
+      return await AppBindings.AdbUpdateRow(
+        deviceId,
+        packageName,
+        remotePath,
+        tableName,
+        JSON.stringify(primaryKey),
+        JSON.stringify(newValues)
+      );
     }
     const res = await fetch('/api/adb/update-row', {
       method: 'POST',
@@ -209,7 +165,7 @@ export const apiBridge = {
         pk: primaryKey,
         values: newValues,
       }),
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.timeout(30000),
     });
     if (!res.ok) return false;
     const data = await res.json();
@@ -224,20 +180,13 @@ export const apiBridge = {
     primaryKey: Record<string, any>
   ): Promise<boolean> => {
     if (isWailsApp()) {
-      try {
-        return await withTimeout(
-          AppBindings.AdbDeleteRow(
-            deviceId,
-            packageName,
-            remotePath,
-            tableName,
-            JSON.stringify(primaryKey)
-          ),
-          5000
-        );
-      } catch (e) {
-        console.warn('Wails AdbDeleteRow failed or timed out, falling back to HTTP:', e);
-      }
+      return await AppBindings.AdbDeleteRow(
+        deviceId,
+        packageName,
+        remotePath,
+        tableName,
+        JSON.stringify(primaryKey)
+      );
     }
     const res = await fetch('/api/adb/delete-row', {
       method: 'POST',
@@ -249,7 +198,7 @@ export const apiBridge = {
         table: tableName,
         pk: primaryKey,
       }),
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.timeout(30000),
     });
     if (!res.ok) return false;
     const data = await res.json();
@@ -263,20 +212,13 @@ export const apiBridge = {
     query: string
   ): Promise<any> => {
     if (isWailsApp()) {
-      try {
-        return await withTimeout(
-          AppBindings.AdbExplainQuery(deviceId, packageName, remotePath, query),
-          5000
-        );
-      } catch (e) {
-        console.warn('Wails AdbExplainQuery failed or timed out, falling back to HTTP:', e);
-      }
+      return await AppBindings.AdbExplainQuery(deviceId, packageName, remotePath, query);
     }
     const res = await fetch('/api/adb/explain', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ deviceId, packageName, remotePath, query }),
-      signal: AbortSignal.timeout(7000),
+      signal: AbortSignal.timeout(30000),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: 'Explain query failed' }));
@@ -292,20 +234,13 @@ export const apiBridge = {
     query: string
   ): Promise<any> => {
     if (isWailsApp()) {
-      try {
-        return await withTimeout(
-          AppBindings.AdbSimulateQuery(deviceId, packageName, remotePath, query),
-          5000
-        );
-      } catch (e) {
-        console.warn('Wails AdbSimulateQuery failed or timed out, falling back to HTTP:', e);
-      }
+      return await AppBindings.AdbSimulateQuery(deviceId, packageName, remotePath, query);
     }
     const res = await fetch('/api/adb/simulate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ deviceId, packageName, remotePath, query }),
-      signal: AbortSignal.timeout(7000),
+      signal: AbortSignal.timeout(30000),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: 'Simulate query failed' }));
@@ -320,18 +255,11 @@ export const apiBridge = {
     remotePath: string
   ): Promise<any> => {
     if (isWailsApp()) {
-      try {
-        return await withTimeout(
-          AppBindings.AdbGetDatabaseSchemaExtended(deviceId, packageName, remotePath),
-          6000
-        );
-      } catch (e) {
-        console.warn('Wails AdbGetDatabaseSchemaExtended failed or timed out, falling back to HTTP:', e);
-      }
+      return await AppBindings.AdbGetDatabaseSchemaExtended(deviceId, packageName, remotePath);
     }
     const params = new URLSearchParams({ deviceId, packageName, remotePath });
     const res = await fetch(`/api/adb/schema-extended?${params.toString()}`, {
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(30000),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: 'Failed to fetch extended schema' }));
@@ -347,21 +275,14 @@ export const apiBridge = {
     indexSql: string
   ): Promise<boolean> => {
     if (isWailsApp()) {
-      try {
-        await withTimeout(
-          AppBindings.AdbCreateIndex(deviceId, packageName, remotePath, indexSql),
-          5000
-        );
-        return true;
-      } catch (e) {
-        console.warn('Wails AdbCreateIndex failed or timed out, falling back to HTTP:', e);
-      }
+      await AppBindings.AdbCreateIndex(deviceId, packageName, remotePath, indexSql);
+      return true;
     }
     const res = await fetch('/api/adb/create-index', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ deviceId, packageName, remotePath, indexSql }),
-      signal: AbortSignal.timeout(7000),
+      signal: AbortSignal.timeout(30000),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: 'Failed to create index' }));
@@ -371,4 +292,3 @@ export const apiBridge = {
     return Boolean(data.success);
   },
 };
-

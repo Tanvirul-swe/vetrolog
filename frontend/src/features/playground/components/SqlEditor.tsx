@@ -308,7 +308,7 @@ export function SqlEditor({
   };
 
   return (
-    <div className="flex flex-col border-b border-border/70 bg-card/40 backdrop-blur-xs relative">
+    <div className="flex flex-col border-b border-border/70 bg-card/40 backdrop-blur-xs relative flex-1 min-h-0 h-full">
       {/* Editor Action Toolbar */}
       <div className="h-10 px-3 border-b border-border/60 bg-muted/20 flex items-center justify-between gap-2 select-none">
         <div className="flex items-center gap-1.5">
@@ -437,7 +437,7 @@ export function SqlEditor({
       </div>
 
       {/* Code Textarea & Gutter */}
-      <div className="flex min-h-[140px] max-h-[220px] overflow-hidden relative font-mono text-xs">
+      <div className="flex flex-1 min-h-[90px] overflow-hidden relative font-mono text-xs">
         {/* Line Numbers Gutter */}
         <div className="w-10 select-none py-2 bg-muted/30 border-r border-border/40 text-muted-foreground/40 text-right pr-2 text-[11px] leading-5 shrink-0 overflow-hidden font-mono">
           {lines.map((_, i) => (

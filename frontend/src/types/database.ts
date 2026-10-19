@@ -70,6 +70,7 @@ export interface QueryResult {
   durationMs: number;
   success: boolean;
   error?: string;
+  defaultLimitApplied?: boolean;
 }
 
 export type OperationType = 'SCAN' | 'SEARCH' | 'TEMP_BTREE' | 'COMPOUND' | 'OTHER';

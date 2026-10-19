@@ -6,13 +6,17 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	_ "modernc.org/sqlite"
 )
+
+var limitRegex = regexp.MustCompile(`(?i)\bLIMIT\s+\d+`)
 
 type remoteFileStat struct {
 	size  int64
@@ -20,7 +24,7 @@ type remoteFileStat struct {
 }
 
 type dbCacheEntry struct {
-	mu          sync.Mutex
+	mu          sync.RWMutex
 	localPath   string
 	mainStat    remoteFileStat
 	walStat     remoteFileStat
@@ -455,6 +459,15 @@ func (s *Service) DiscoverDatabases(deviceID, packageName string) ([]DiscoveredD
 	return result, nil
 }
 
+func formatByteSize(bytes int64) string {
+	if bytes < 1024 {
+		return fmt.Sprintf("%d B", bytes)
+	} else if bytes < 1024*1024 {
+		return fmt.Sprintf("%.1f KB", float64(bytes)/1024.0)
+	}
+	return fmt.Sprintf("%.1f MB", float64(bytes)/(1024.0*1024.0))
+}
+
 // GetTableData reads rows from the target SQLite or SharedPreferences database.
 func (s *Service) GetTableData(deviceID, packageName, remotePath, tableName string, page, pageSize int) (*TableDataResult, error) {
 	if page < 1 {
@@ -504,31 +517,46 @@ func (s *Service) GetTableData(deviceID, packageName, remotePath, tableName stri
 	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM \"%s\"", tableName)
 	_ = db.QueryRow(countQuery).Scan(&totalRows)
 
-	// Retrieve or refresh table counts for the left sidebar
+	// Update active table count immediately
 	entry.mu.Lock()
 	if entry.tableCounts == nil {
 		entry.tableCounts = make(map[string]int64)
 	}
 	entry.tableCounts[tableName] = totalRows
 
-	// If sidebar counts are missing or older than 30s, do a fast bulk scan
-	if len(entry.tableCounts) <= 1 || time.Since(entry.countsTime) > 30*time.Second {
-		tableRows, err := db.Query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
-		if err == nil {
-			for tableRows.Next() {
+	// Asynchronously refresh other table counts in background if older than 60s
+	if len(entry.tableCounts) <= 1 || time.Since(entry.countsTime) > 60*time.Second {
+		entry.countsTime = time.Now()
+		go func(bgLocalPath string) {
+			bgDB, err := s.getOrOpenDB(bgLocalPath)
+			if err != nil {
+				return
+			}
+			tRows, err := bgDB.Query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+			if err != nil {
+				return
+			}
+			defer tRows.Close()
+
+			var tableNames []string
+			for tRows.Next() {
 				var tName string
-				if err := tableRows.Scan(&tName); err == nil {
-					if tName != tableName {
-						var count int64
-						_ = db.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM \"%s\"", tName)).Scan(&count)
-						entry.tableCounts[tName] = count
-					}
+				if err := tRows.Scan(&tName); err == nil && tName != tableName {
+					tableNames = append(tableNames, tName)
 				}
 			}
-			tableRows.Close()
-			entry.countsTime = time.Now()
-		}
+
+			for _, tName := range tableNames {
+				var count int64
+				if err := bgDB.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM \"%s\"", tName)).Scan(&count); err == nil {
+					entry.mu.Lock()
+					entry.tableCounts[tName] = count
+					entry.mu.Unlock()
+				}
+			}
+		}(localPath)
 	}
+
 	tableCountsCopy := make(map[string]int64, len(entry.tableCounts))
 	for k, v := range entry.tableCounts {
 		tableCountsCopy[k] = v
@@ -568,7 +596,13 @@ func (s *Service) GetTableData(deviceID, packageName, remotePath, tableName stri
 		for i, colName := range colNames {
 			val := colValues[i]
 			if b, ok := val.([]byte); ok {
-				rowMap[colName] = string(b)
+				if !utf8.Valid(b) {
+					rowMap[colName] = fmt.Sprintf("[BLOB - %s]", formatByteSize(int64(len(b))))
+				} else if len(b) > 4096 {
+					rowMap[colName] = string(b[:4096]) + fmt.Sprintf(" ... [%s]", formatByteSize(int64(len(b))))
+				} else {
+					rowMap[colName] = string(b)
+				}
 			} else {
 				rowMap[colName] = val
 			}
@@ -611,7 +645,22 @@ func (s *Service) ExecuteQuery(deviceID, packageName, remotePath, sqlQuery strin
 	isSelect := strings.HasPrefix(upper, "SELECT") || strings.HasPrefix(upper, "PRAGMA") || strings.HasPrefix(upper, "EXPLAIN")
 
 	if isSelect {
-		rows, err := db.Query(sqlQuery)
+		queryToRun := sqlQuery
+		defaultLimitApplied := false
+
+		// Apply safe default limit of 100 rows for SELECT queries lacking an explicit LIMIT
+		if strings.HasPrefix(upper, "SELECT") && !limitRegex.MatchString(trimmed) {
+			cleanSQL := strings.TrimRight(trimmed, ";")
+			queryToRun = fmt.Sprintf("SELECT * FROM (%s) LIMIT 100", cleanSQL)
+			defaultLimitApplied = true
+		}
+
+		rows, err := db.Query(queryToRun)
+		// If wrapped subquery fails for any dialect reasons, fallback to raw query
+		if err != nil && defaultLimitApplied {
+			rows, err = db.Query(sqlQuery)
+		}
+
 		elapsed := float64(time.Since(start).Microseconds()) / 1000.0
 		if err != nil {
 			return &QueryExecResult{
@@ -632,6 +681,9 @@ func (s *Service) ExecuteQuery(deviceID, packageName, remotePath, sqlQuery strin
 		resultRows := make([]map[string]interface{}, 0)
 
 		for rows.Next() {
+			if defaultLimitApplied && len(resultRows) >= 100 {
+				break
+			}
 			colPointers := make([]interface{}, len(colNames))
 			colValues := make([]interface{}, len(colNames))
 			for i := range colValues {
@@ -642,7 +694,13 @@ func (s *Service) ExecuteQuery(deviceID, packageName, remotePath, sqlQuery strin
 				for i, colName := range colNames {
 					val := colValues[i]
 					if b, ok := val.([]byte); ok {
-						rowMap[colName] = string(b)
+						if !utf8.Valid(b) {
+							rowMap[colName] = fmt.Sprintf("[BLOB - %s]", formatByteSize(int64(len(b))))
+						} else if len(b) > 4096 {
+							rowMap[colName] = string(b[:4096]) + fmt.Sprintf(" ... [%s]", formatByteSize(int64(len(b))))
+						} else {
+							rowMap[colName] = string(b)
+						}
 					} else {
 						rowMap[colName] = val
 					}
@@ -652,12 +710,13 @@ func (s *Service) ExecuteQuery(deviceID, packageName, remotePath, sqlQuery strin
 		}
 
 		return &QueryExecResult{
-			Query:      sqlQuery,
-			Columns:    colNames,
-			Rows:       resultRows,
-			Affected:   int64(len(resultRows)),
-			DurationMs: elapsed,
-			Success:    true,
+			Query:               sqlQuery,
+			Columns:             colNames,
+			Rows:                resultRows,
+			Affected:            int64(len(resultRows)),
+			DurationMs:          elapsed,
+			Success:             true,
+			DefaultLimitApplied: defaultLimitApplied,
 		}, nil
 	}
 
@@ -1190,25 +1249,36 @@ func (s *Service) GetDatabaseSchemaExtended(deviceID, packageName, remotePath st
 	if err != nil {
 		return nil, err
 	}
-	defer tableRows.Close()
+	type tableBasic struct {
+		name  string
+		tType string
+	}
+	var tables []tableBasic
+	for tableRows.Next() {
+		var tb tableBasic
+		if err := tableRows.Scan(&tb.name, &tb.tType); err == nil {
+			tables = append(tables, tb)
+		}
+	}
+	_ = tableRows.Close()
+
+	entry.mu.RLock()
+	cachedCounts := make(map[string]int64, len(entry.tableCounts))
+	for k, v := range entry.tableCounts {
+		cachedCounts[k] = v
+	}
+	entry.mu.RUnlock()
 
 	var extendedTables []ExtendedTableSchema
-	for tableRows.Next() {
-		var name, tType string
-		if err := tableRows.Scan(&name, &tType); err != nil {
-			continue
-		}
-
-		var rowCount int64
-		_ = db.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM \"%s\"", name)).Scan(&rowCount)
-
-		cols, _ := s.getTableColumns(db, name)
-		fks, _ := s.getTableForeignKeys(db, name)
-		idxs, _ := s.getTableIndexes(db, name)
+	for _, t := range tables {
+		rowCount := cachedCounts[t.name]
+		cols, _ := s.getTableColumns(db, t.name)
+		fks, _ := s.getTableForeignKeys(db, t.name)
+		idxs, _ := s.getTableIndexes(db, t.name)
 
 		extendedTables = append(extendedTables, ExtendedTableSchema{
-			Name:        name,
-			Type:        tType,
+			Name:        t.name,
+			Type:        t.tType,
 			RowCount:    rowCount,
 			Columns:     cols,
 			ForeignKeys: fks,

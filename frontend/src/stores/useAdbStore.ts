@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { apiBridge } from '@/services/apiBridge';
 import { useDatabaseStore } from './useDatabaseStore';
+import { usePlaygroundStore } from './usePlaygroundStore';
 import { DatabaseInfo } from '../types/database';
 
 export interface AdbDevice {
@@ -189,7 +190,9 @@ export const useAdbStore = create<AdbState>((set, get) => ({
       }
 
       // 4. Real-time live table records update and left sidebar row counts
-      if (get().isLiveSync && get().selectedPackageName && !useDatabaseStore.getState().isLoadingTable) {
+      // Skip polling table records when user is in the SQL Playground to prevent query contention and lock latency
+      const isPlaygroundActive = usePlaygroundStore.getState().activeWorkspaceView === 'playground';
+      if (!isPlaygroundActive && get().isLiveSync && get().selectedPackageName && !useDatabaseStore.getState().isLoadingTable) {
         const activeTable = useDatabaseStore.getState().selectedTableName;
         if (activeTable) {
           const currentPage = useDatabaseStore.getState().page;
@@ -406,6 +409,7 @@ export const useAdbStore = create<AdbState>((set, get) => ({
           durationMs: result.durationMs || 0,
           success: result.success,
           error: result.error,
+          defaultLimitApplied: Boolean(result.defaultLimitApplied),
         });
 
         useDatabaseStore.getState().addQueryLog({

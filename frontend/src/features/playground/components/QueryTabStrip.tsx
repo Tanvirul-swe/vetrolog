@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Code2,
   Plus,
@@ -10,6 +10,8 @@ import {
   Edit3,
   XCircle,
   ArrowRightToLine,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { usePlaygroundStore, QueryTab } from '@/stores/usePlaygroundStore';
 
@@ -28,6 +30,11 @@ export function QueryTabStrip() {
   const [editingTitle, setEditingTitle] = useState('');
   const editInputRef = useRef<HTMLInputElement>(null);
 
+  // Horizontal scroll state
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
   // Context Menu state
   const [contextMenu, setContextMenu] = useState<{
     tabId: string;
@@ -35,7 +42,47 @@ export function QueryTabStrip() {
     y: number;
   } | null>(null);
 
-  const containerRef = useRef<HTMLDivElement>(null);
+  const updateScrollButtons = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (el) {
+      const { scrollLeft, scrollWidth, clientWidth } = el;
+      setCanScrollLeft(scrollLeft > 2);
+      setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 2);
+    }
+  }, []);
+
+  // Check scroll buttons on tab change and resize
+  useEffect(() => {
+    updateScrollButtons();
+    const el = scrollContainerRef.current;
+    if (el) {
+      el.addEventListener('scroll', updateScrollButtons, { passive: true });
+      window.addEventListener('resize', updateScrollButtons);
+      return () => {
+        el.removeEventListener('scroll', updateScrollButtons);
+        window.removeEventListener('resize', updateScrollButtons);
+      };
+    }
+  }, [tabs.length, updateScrollButtons]);
+
+  // Auto-scroll active tab into view when activeTabId changes
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      const activeEl = scrollContainerRef.current.querySelector<HTMLElement>(
+        `[data-tab-id="${activeTabId}"]`
+      );
+      if (activeEl) {
+        activeEl.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+          inline: 'nearest',
+        });
+      }
+    }
+    // Delay check to allow smooth scroll animation to finish
+    const timer = setTimeout(updateScrollButtons, 300);
+    return () => clearTimeout(timer);
+  }, [activeTabId, updateScrollButtons]);
 
   // Focus rename input on start
   useEffect(() => {
@@ -75,13 +122,37 @@ export function QueryTabStrip() {
     });
   };
 
+  const handleScrollBy = (amount: number) => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollBy({ left: amount, behavior: 'smooth' });
+    }
+  };
+
   return (
-    <div
-      ref={containerRef}
-      className="h-9 border-b border-border/70 bg-muted/20 flex items-center px-2 gap-1 overflow-x-auto no-scrollbar select-none relative shrink-0"
-    >
-      {/* Scrollable Tabs List */}
-      <div className="flex items-center gap-1 min-w-0">
+    <div className="h-10 border-b border-border/70 bg-muted/20 flex items-center px-1.5 gap-1 select-none relative shrink-0">
+      {/* Scroll Left Button (visible when content is scrolled) */}
+      {canScrollLeft && (
+        <button
+          type="button"
+          onClick={() => handleScrollBy(-160)}
+          className="h-6 w-5 flex items-center justify-center rounded-sm hover:bg-muted text-muted-foreground hover:text-foreground shrink-0 transition-colors z-20 border border-border/40 bg-card/60"
+          title="Scroll tabs left"
+        >
+          <ChevronLeft className="size-3.5" />
+        </button>
+      )}
+
+      {/* Horizontally Scrollable Tabs Container */}
+      <div
+        ref={scrollContainerRef}
+        onWheel={(e) => {
+          // Translate vertical mouse wheel scrolling into horizontal tab scrolling
+          if (e.deltaY !== 0 && scrollContainerRef.current) {
+            scrollContainerRef.current.scrollLeft += e.deltaY;
+          }
+        }}
+        className="flex-1 min-w-0 flex items-center gap-1 overflow-x-auto overflow-y-hidden h-full py-1 tab-strip-scroll"
+      >
         {tabs.map((tab) => {
           const isActive = tab.id === activeTabId;
           const isEditing = tab.id === editingTabId;
@@ -89,6 +160,7 @@ export function QueryTabStrip() {
           return (
             <div
               key={tab.id}
+              data-tab-id={tab.id}
               onClick={() => setActiveTabId(tab.id)}
               onContextMenu={(e) => handleContextMenu(e, tab.id)}
               onAuxClick={(e) => {
@@ -98,7 +170,7 @@ export function QueryTabStrip() {
                   closeTab(tab.id);
                 }
               }}
-              className={`group relative flex items-center gap-1.5 h-7 px-2.5 rounded-t-md text-xs font-mono transition-all cursor-pointer select-none max-w-[200px] min-w-[100px] border ${
+              className={`group relative flex items-center gap-1.5 h-7 px-2.5 rounded-t-md text-xs font-mono transition-all cursor-pointer select-none max-w-[200px] min-w-[110px] shrink-0 border ${
                 isActive
                   ? 'bg-card text-foreground border-border/80 shadow-xs font-medium border-b-transparent -mb-[1px] z-10'
                   : 'bg-muted/30 text-muted-foreground hover:bg-muted/60 hover:text-foreground border-transparent'
@@ -164,18 +236,30 @@ export function QueryTabStrip() {
         })}
       </div>
 
-      {/* New Tab Button */}
+      {/* Scroll Right Button (visible when content extends past right edge) */}
+      {canScrollRight && (
+        <button
+          type="button"
+          onClick={() => handleScrollBy(160)}
+          className="h-6 w-5 flex items-center justify-center rounded-sm hover:bg-muted text-muted-foreground hover:text-foreground shrink-0 transition-colors z-20 border border-border/40 bg-card/60"
+          title="Scroll tabs right"
+        >
+          <ChevronRight className="size-3.5" />
+        </button>
+      )}
+
+      {/* Pinned New Tab Button (always visible and accessible) */}
       <button
         type="button"
         onClick={() => addTab()}
-        className="h-6 w-6 flex items-center justify-center rounded-sm hover:bg-muted text-muted-foreground hover:text-foreground transition-colors ml-0.5 shrink-0"
+        className="h-6 w-6 flex items-center justify-center rounded-sm hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0 border border-border/40 bg-card/40 ml-1"
         title="New Query Tab (⌘T)"
       >
         <Plus className="size-3.5" />
       </button>
 
       {/* Right-Side Meta / Shortcut info */}
-      <div className="ml-auto flex items-center gap-2 text-[10px] text-muted-foreground/50 font-mono hidden sm:flex pr-1">
+      <div className="ml-auto flex items-center gap-2 text-[10px] text-muted-foreground/50 font-mono hidden sm:flex pl-2 pr-1 shrink-0">
         <span>⌘T new</span>
         <span>⌘W close</span>
       </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   Table as TableIcon,
   Layers,
@@ -91,15 +91,19 @@ export function SqlPlayground() {
   const sortAsc = activeQueryTab?.sortAsc ?? true;
 
   const pageSize = activeQueryTab?.pageSize || 50;
-  const setPageSize = (sz: number) => {
+  const setPageSize = useCallback((sz: number) => {
     updateActiveTabState({ pageSize: sz, currentPage: 1 });
-  };
+  }, [updateActiveTabState]);
 
   const currentPage = activeQueryTab?.currentPage || 1;
-  const setCurrentPage = (pageOrFn: number | ((prev: number) => number)) => {
-    const nextVal = typeof pageOrFn === 'function' ? pageOrFn(currentPage) : pageOrFn;
+  const setCurrentPage = useCallback((pageOrFn: number | ((prev: number) => number)) => {
+    const currentTab = usePlaygroundStore.getState().tabs.find(
+      (t) => t.id === usePlaygroundStore.getState().activeTabId
+    );
+    const prevPage = currentTab?.currentPage || 1;
+    const nextVal = typeof pageOrFn === 'function' ? pageOrFn(prevPage) : pageOrFn;
     updateActiveTabState({ currentPage: nextVal });
-  };
+  }, [updateActiveTabState]);
 
   // Inline editing state: rowId + colName
   const [editingCell, setEditingCell] = useState<{ rowIndex: number; colName: string } | null>(null);
@@ -170,7 +174,7 @@ export function SqlPlayground() {
     }
   }, [simulation]);
 
-  const rows = currentResult?.rows || [];
+  const rows = useMemo(() => currentResult?.rows || [], [currentResult?.rows]);
   const colNames = useMemo<string[]>(() => {
     if (currentResult?.columns && currentResult.columns.length > 0) {
       return currentResult.columns.map((c: any) => (typeof c === 'string' ? c : c.name));
@@ -225,7 +229,7 @@ export function SqlPlayground() {
     if (currentPage > totalPages) {
       setCurrentPage(totalPages);
     }
-  }, [currentPage, totalPages]);
+  }, [currentPage, totalPages, setCurrentPage]);
 
   // Paginated rows slice for DOM rendering
   const paginatedRows = useMemo(() => {

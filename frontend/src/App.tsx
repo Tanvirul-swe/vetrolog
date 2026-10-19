@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import { SplitLayout } from './components/layout/SplitLayout';
 import { useWailsEvent } from './hooks/useWailsEvent';
 import { EVENTS } from './constants/events';
@@ -94,7 +94,7 @@ export function App() {
   });
 
   // 4. Request table data on selection or page change
-  const handleRequestTableData = (targetPage = page) => {
+  const handleRequestTableData = useCallback((targetPage = page) => {
     if (!selectedTableName) return;
 
     if (useAdbStore.getState().isAdbMode) {
@@ -115,13 +115,13 @@ export function App() {
         // Safe fallback
       }
     }
-  };
+  }, [page, pageSize, selectedDbId, selectedTableName]);
 
   useEffect(() => {
     if (selectedTableName) {
       handleRequestTableData(1);
     }
-  }, [selectedDbId, selectedTableName]);
+  }, [selectedDbId, selectedTableName, handleRequestTableData]);
 
   // 5. Query execution trigger
   const handleExecuteQuery = (query: string) => {

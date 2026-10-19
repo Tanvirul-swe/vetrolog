@@ -36,5 +36,6 @@ export function useWailsEvent<K extends keyof VetroLogEventMap>(
     } catch (err) {
       console.warn(`[VetroLog] Failed to register Wails event "${eventName}":`, err);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventName, ...deps]);
 }

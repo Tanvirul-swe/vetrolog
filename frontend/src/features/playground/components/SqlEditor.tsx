@@ -285,13 +285,9 @@ export function SqlEditor({
     const textBefore = query.slice(0, cursorPos);
     const dotContext = parseDotContext(textBefore, query, availableTables);
 
-    let replaceLen = 0;
-    if (dotContext) {
-      replaceLen = dotContext.replaceLength;
-    } else {
-      const lastWordMatch = textBefore.match(/([a-zA-Z0-9_]+)$/);
-      replaceLen = lastWordMatch ? lastWordMatch[1].length : 0;
-    }
+    const replaceLen = dotContext
+      ? dotContext.replaceLength
+      : (textBefore.match(/([a-zA-Z0-9_]+)$/)?.[1].length ?? 0);
 
     const start = cursorPos - replaceLen;
     const newQuery = query.slice(0, start) + item.insertText + query.slice(cursorPos);

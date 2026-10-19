@@ -10,7 +10,7 @@ import { formatSqlIdentifier } from '@/features/playground/services/sqlIdentifie
 import { useAdbStore } from './useAdbStore';
 import { useDatabaseStore } from './useDatabaseStore';
 
-export type PlaygroundTab = 'results' | 'plan' | 'profiler' | 'advisor' | 'codegen' | 'history';
+export type PlaygroundTab = 'results' | 'plan' | 'profiler' | 'advisor' | 'history';
 export type WorkspaceView = 'grid' | 'playground';
 
 export interface HistoryItem {

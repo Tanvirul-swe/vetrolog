@@ -3,7 +3,10 @@ package app
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"time"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"vetrolog/internal/adb"
 	"vetrolog/internal/discovery"
@@ -177,5 +180,45 @@ func (a *App) AdbGetDatabaseSchemaExtended(deviceID, packageName, remotePath str
 // AdbCreateIndex executes a CREATE INDEX DDL statement and syncs back to device
 func (a *App) AdbCreateIndex(deviceID, packageName, remotePath, indexSql string) error {
 	return adb.GetService().CreateIndex(deviceID, packageName, remotePath, indexSql)
+}
+
+// SaveExportFile opens a native desktop Save File dialog and writes exported content to disk safely
+func (a *App) SaveExportFile(defaultFilename string, filePattern string, content string) (string, error) {
+	if a.ctx == nil {
+		return "", fmt.Errorf("application context not initialized")
+	}
+
+	dialogOptions := runtime.SaveDialogOptions{
+		DefaultFilename: defaultFilename,
+		Title:           "Save Exported Data",
+	}
+
+	if filePattern != "" {
+		dialogOptions.Filters = []runtime.FileFilter{
+			{
+				DisplayName: "Export File",
+				Pattern:     filePattern,
+			},
+			{
+				DisplayName: "All Files (*.*)",
+				Pattern:     "*.*",
+			},
+		}
+	}
+
+	savePath, err := runtime.SaveFileDialog(a.ctx, dialogOptions)
+	if err != nil {
+		return "", err
+	}
+	if savePath == "" {
+		// User cancelled dialog
+		return "", nil
+	}
+
+	if err := os.WriteFile(savePath, []byte(content), 0644); err != nil {
+		return "", fmt.Errorf("failed to write export file: %w", err)
+	}
+
+	return savePath, nil
 }
 

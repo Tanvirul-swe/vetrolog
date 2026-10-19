@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import {
   Play,
   ShieldAlert,
@@ -6,13 +6,23 @@ import {
   Eraser,
   XCircle,
   Wand2,
+  Keyboard,
+  ChevronDown,
+  Code2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AutocompletePopup, AutocompleteItem } from './AutocompletePopup';
+import { ShortcutsModal } from './ShortcutsModal';
 import { predictJoins } from '../services/joinPredictor';
 import { highlightSql } from '../services/sqlHighlighter';
 import { formatSqlIdentifier } from '../services/sqlIdentifier';
 import { parseDotContext, filterTableColumns } from '../services/sqlContextParser';
+import {
+  toggleComment,
+  indentLines,
+  duplicateLine,
+  moveLines,
+} from '../services/editorShortcuts';
 import { usePlaygroundStore } from '@/stores/usePlaygroundStore';
 import { useDatabaseStore } from '@/stores/useDatabaseStore';
 
@@ -69,12 +79,29 @@ export function SqlEditor({
 }: SqlEditorProps) {
   const query = usePlaygroundStore((s) => s.query);
   const setQuery = usePlaygroundStore((s) => s.setQuery);
+  const activeTabId = usePlaygroundStore((s) => s.activeTabId);
   const extendedSchema = usePlaygroundStore((s) => s.extendedSchema);
   const isExecuting = usePlaygroundStore((s) => s.isExecuting);
   const isSimulating = usePlaygroundStore((s) => s.isSimulating);
   const isExplaining = usePlaygroundStore((s) => s.isExplaining);
   const cancelExecution = usePlaygroundStore((s) => s.cancelExecution);
   const formatSql = usePlaygroundStore((s) => s.formatSql);
+
+  const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
+  const [isSnippetsMenuOpen, setIsSnippetsMenuOpen] = useState(false);
+  const snippetsMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close snippets menu when clicking outside
+  useEffect(() => {
+    if (!isSnippetsMenuOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (snippetsMenuRef.current && !snippetsMenuRef.current.contains(e.target as Node)) {
+        setIsSnippetsMenuOpen(false);
+      }
+    };
+    window.addEventListener('mousedown', handleClickOutside);
+    return () => window.removeEventListener('mousedown', handleClickOutside);
+  }, [isSnippetsMenuOpen]);
 
   const databases = useDatabaseStore((s) => s.databases);
   const selectedDbId = useDatabaseStore((s) => s.selectedDatabaseId);
@@ -110,6 +137,15 @@ export function SqlEditor({
   const [popupPos, setPopupPos] = useState<{ top: number; left: number } | null>(null);
   const [selectedAutoIndex, setSelectedAutoIndex] = useState(0);
 
+  // Undo / Redo History Stack per query tab
+  const historyRef = useRef<{ text: string; cursorStart: number; cursorEnd: number }[]>([
+    { text: query, cursorStart: 0, cursorEnd: 0 },
+  ]);
+  const historyIdxRef = useRef<number>(0);
+  const isUndoRedoActionRef = useRef<boolean>(false);
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevTabIdRef = useRef<string>(activeTabId);
+
   // Synchronize scrolling across textarea, pre-highlighting layer, and line number gutter
   const handleScroll = () => {
     if (textareaRef.current) {
@@ -121,6 +157,82 @@ export function SqlEditor({
       if (gutterRef.current) {
         gutterRef.current.scrollTop = scrollTop;
       }
+    }
+  };
+
+  const applyTextEdit = useCallback(
+    (newText: string, newStart: number, newEnd: number, recordHistory = true) => {
+      setQuery(newText);
+      setCursorPos(newStart);
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+          textareaRef.current.setSelectionRange(newStart, newEnd);
+          handleScroll();
+        }
+      }, 0);
+
+      if (recordHistory) {
+        const newHistory = historyRef.current.slice(0, historyIdxRef.current + 1);
+        newHistory.push({ text: newText, cursorStart: newStart, cursorEnd: newEnd });
+        if (newHistory.length > 100) newHistory.shift();
+        historyRef.current = newHistory;
+        historyIdxRef.current = newHistory.length - 1;
+      }
+    },
+    [setQuery]
+  );
+
+  const handleUndo = useCallback(() => {
+    if (historyIdxRef.current > 0) {
+      historyIdxRef.current -= 1;
+      const snap = historyRef.current[historyIdxRef.current];
+      isUndoRedoActionRef.current = true;
+      applyTextEdit(snap.text, snap.cursorStart, snap.cursorEnd, false);
+      setTimeout(() => {
+        isUndoRedoActionRef.current = false;
+      }, 50);
+    }
+  }, [applyTextEdit]);
+
+  const handleRedo = useCallback(() => {
+    if (historyIdxRef.current < historyRef.current.length - 1) {
+      historyIdxRef.current += 1;
+      const snap = historyRef.current[historyIdxRef.current];
+      isUndoRedoActionRef.current = true;
+      applyTextEdit(snap.text, snap.cursorStart, snap.cursorEnd, false);
+      setTimeout(() => {
+        isUndoRedoActionRef.current = false;
+      }, 50);
+    }
+  }, [applyTextEdit]);
+
+  // Reset history stack when active query tab changes
+  useEffect(() => {
+    if (prevTabIdRef.current !== activeTabId) {
+      prevTabIdRef.current = activeTabId;
+      historyRef.current = [{ text: query, cursorStart: 0, cursorEnd: 0 }];
+      historyIdxRef.current = 0;
+    }
+  }, [activeTabId, query]);
+
+  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    const start = e.target.selectionStart;
+    const end = e.target.selectionEnd;
+    setQuery(val);
+    setHasSelection(start !== end);
+    setCursorPos(start);
+
+    if (!isUndoRedoActionRef.current) {
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+      typingTimerRef.current = setTimeout(() => {
+        const newHistory = historyRef.current.slice(0, historyIdxRef.current + 1);
+        newHistory.push({ text: val, cursorStart: start, cursorEnd: end });
+        if (newHistory.length > 100) newHistory.shift();
+        historyRef.current = newHistory;
+        historyIdxRef.current = newHistory.length - 1;
+      }, 350);
     }
   };
 
@@ -291,23 +403,16 @@ export function SqlEditor({
 
     const start = cursorPos - replaceLen;
     const newQuery = query.slice(0, start) + item.insertText + query.slice(cursorPos);
-    setQuery(newQuery);
-
     const newPos = start + item.insertText.length;
-    setCursorPos(newPos);
-    setPopupPos(null);
 
-    setTimeout(() => {
-      if (textareaRef.current) {
-        textareaRef.current.focus();
-        textareaRef.current.setSelectionRange(newPos, newPos);
-        handleScroll();
-      }
-    }, 10);
+    setPopupPos(null);
+    applyTextEdit(newQuery, newPos, newPos, true);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Autocomplete Navigation
+    const isMod = e.metaKey || e.ctrlKey;
+
+    // 1. Autocomplete Navigation
     if (popupPos && autocompleteItems.length > 0) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -331,8 +436,25 @@ export function SqlEditor({
       }
     }
 
-    // ⌘+Enter or Ctrl+Enter -> Execute Query
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+    // 2. Undo: ⌘Z or Ctrl+Z
+    if (isMod && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+      e.preventDefault();
+      handleUndo();
+      return;
+    }
+
+    // 3. Redo: ⌘Shift+Z, Ctrl+Shift+Z, or Ctrl+Y
+    if (
+      (isMod && e.shiftKey && e.key.toLowerCase() === 'z') ||
+      (!e.metaKey && e.ctrlKey && e.key.toLowerCase() === 'y')
+    ) {
+      e.preventDefault();
+      handleRedo();
+      return;
+    }
+
+    // 4. ⌘+Enter or Ctrl+Enter -> Execute Query (Shift for Dry Run)
+    if (isMod && e.key === 'Enter') {
       e.preventDefault();
       if (e.shiftKey) {
         onRunDryRun(getExecutableQuery());
@@ -342,19 +464,80 @@ export function SqlEditor({
       return;
     }
 
-    // Tab key -> Insert 2 spaces
-    if (e.key === 'Tab' && !e.shiftKey) {
+    // 5. Toggle Line Comment: ⌘/ or Ctrl+/
+    if (isMod && (e.key === '/' || e.code === 'Slash')) {
       e.preventDefault();
       const start = e.currentTarget.selectionStart;
       const end = e.currentTarget.selectionEnd;
-      const newQuery = query.substring(0, start) + '  ' + query.substring(end);
-      setQuery(newQuery);
-      setTimeout(() => {
-        if (textareaRef.current) {
-          textareaRef.current.selectionStart = textareaRef.current.selectionEnd = start + 2;
-          handleScroll();
-        }
-      }, 0);
+      const res = toggleComment(query, start, end);
+      applyTextEdit(res.text, res.newStart, res.newEnd);
+      return;
+    }
+
+    // 6. Indentation (Tab) and Outdentation (Shift+Tab)
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const start = e.currentTarget.selectionStart;
+      const end = e.currentTarget.selectionEnd;
+      const res = indentLines(query, start, end, e.shiftKey);
+      applyTextEdit(res.text, res.newStart, res.newEnd);
+      return;
+    }
+
+    // 7. Format SQL: ⌘Shift+F, Ctrl+Shift+F, or Alt+Shift+F
+    if (
+      (isMod && e.shiftKey && e.key.toLowerCase() === 'f') ||
+      (e.altKey && e.shiftKey && e.key.toLowerCase() === 'f')
+    ) {
+      e.preventDefault();
+      formatSql();
+      return;
+    }
+
+    // 8. Duplicate Line or Selection: ⌘D or Ctrl+D, or Shift+Alt+ArrowDown
+    if (
+      (isMod && e.key.toLowerCase() === 'd' && !e.shiftKey) ||
+      (e.shiftKey && e.altKey && e.key === 'ArrowDown')
+    ) {
+      e.preventDefault();
+      const start = e.currentTarget.selectionStart;
+      const end = e.currentTarget.selectionEnd;
+      const res = duplicateLine(query, start, end);
+      applyTextEdit(res.text, res.newStart, res.newEnd);
+      return;
+    }
+
+    // 9. Move Line Up: Alt+ArrowUp / Option+ArrowUp
+    if (e.altKey && !e.shiftKey && e.key === 'ArrowUp') {
+      e.preventDefault();
+      const start = e.currentTarget.selectionStart;
+      const end = e.currentTarget.selectionEnd;
+      const res = moveLines(query, start, end, 'up');
+      applyTextEdit(res.text, res.newStart, res.newEnd);
+      return;
+    }
+
+    // 10. Move Line Down: Alt+ArrowDown / Option+ArrowDown
+    if (e.altKey && !e.shiftKey && e.key === 'ArrowDown') {
+      e.preventDefault();
+      const start = e.currentTarget.selectionStart;
+      const end = e.currentTarget.selectionEnd;
+      const res = moveLines(query, start, end, 'down');
+      applyTextEdit(res.text, res.newStart, res.newEnd);
+      return;
+    }
+
+    // 11. Select All: ⌘A or Ctrl+A (explicit fallback)
+    if (isMod && e.key.toLowerCase() === 'a' && !e.shiftKey && !e.altKey) {
+      e.currentTarget.select();
+      return;
+    }
+
+    // 12. Explain Plan: ⌘E or Ctrl+E
+    if (isMod && e.key.toLowerCase() === 'e' && !e.shiftKey && !e.altKey) {
+      e.preventDefault();
+      onRunExplain(getExecutableQuery());
+      return;
     }
   };
 
@@ -372,33 +555,26 @@ export function SqlEditor({
 
   const insertSnippet = (snippet: string) => {
     if (!textareaRef.current) {
-      setQuery(query ? `${query} ${snippet}` : snippet);
+      const nextQuery = query ? `${query} ${snippet}` : snippet;
+      applyTextEdit(nextQuery, nextQuery.length, nextQuery.length, true);
       return;
     }
     const { selectionStart, selectionEnd } = textareaRef.current;
     const newQuery = query.slice(0, selectionStart) + snippet + query.slice(selectionEnd);
-    setQuery(newQuery);
-    setTimeout(() => {
-      if (textareaRef.current) {
-        textareaRef.current.focus();
-        const nextPos = selectionStart + snippet.length;
-        textareaRef.current.setSelectionRange(nextPos, nextPos);
-        setCursorPos(nextPos);
-        handleScroll();
-      }
-    }, 10);
+    const nextPos = selectionStart + snippet.length;
+    applyTextEdit(newQuery, nextPos, nextPos, true);
   };
 
   return (
     <div className="flex flex-col border-b border-border/70 bg-card/40 backdrop-blur-xs relative flex-1 min-h-0 h-full">
       {/* Editor Action Toolbar */}
-      <div className="h-10 px-3 border-b border-border/60 bg-muted/20 flex items-center justify-between gap-2 select-none shrink-0">
-        <div className="flex items-center gap-1.5">
+      <div className="h-10 px-3 border-b border-border/60 bg-muted/20 flex items-center justify-between gap-2 select-none shrink-0 overflow-x-auto no-scrollbar flex-nowrap">
+        <div className="flex items-center gap-1.5 shrink-0">
           <Button
             size="sm"
             onClick={handleExecute}
             disabled={!selectedDbId || !query.trim() || isExecuting}
-            className="h-7 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium shadow-xs"
+            className="h-7 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium shadow-xs shrink-0"
             title="Execute query and commit changes (⌘Enter)"
           >
             <Play className="size-3 fill-white" />
@@ -413,7 +589,7 @@ export function SqlEditor({
               size="sm"
               variant="destructive"
               onClick={cancelExecution}
-              className="h-7 text-xs gap-1 bg-red-600 hover:bg-red-500 text-white font-medium shadow-xs animate-pulse"
+              className="h-7 text-xs gap-1 bg-red-600 hover:bg-red-500 text-white font-medium shadow-xs animate-pulse shrink-0"
               title="Cancel execution"
             >
               <XCircle className="size-3" />
@@ -426,7 +602,7 @@ export function SqlEditor({
             variant="outline"
             onClick={handleDryRun}
             disabled={!selectedDbId || !query.trim() || isSimulating || isExecuting}
-            className="h-7 text-xs gap-1.5 border-amber-500/30 text-amber-400 hover:bg-amber-500/10 font-medium"
+            className="h-7 text-xs gap-1.5 border-amber-500/30 text-amber-400 hover:bg-amber-500/10 font-medium shrink-0"
             title="Simulate mutating query in safe rollback transaction sandbox (⌘⇧Enter)"
           >
             <ShieldAlert className="size-3 text-amber-400" />
@@ -438,71 +614,127 @@ export function SqlEditor({
             variant="ghost"
             onClick={handleExplain}
             disabled={!selectedDbId || !query.trim() || isExplaining || isExecuting}
-            className="h-7 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
+            className="h-7 text-xs gap-1.5 text-muted-foreground hover:text-foreground shrink-0"
             title="Inspect visual execution plan tree"
           >
             <Search className="size-3" />
-            <span>Explain Plan</span>
+            <span>Explain<span className="hidden md:inline"> Plan</span></span>
           </Button>
         </div>
 
-        {/* Quick SQL Snippets */}
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => insertSnippet('SELECT * FROM ')}
-            className="text-[10px] font-mono px-2 py-0.5 rounded bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-          >
-            SELECT *
-          </button>
-          <button
-            type="button"
-            onClick={() => insertSnippet('COUNT(*) ')}
-            className="text-[10px] font-mono px-2 py-0.5 rounded bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-          >
-            COUNT(*)
-          </button>
-          <button
-            type="button"
-            onClick={() => insertSnippet('WHERE ')}
-            className="text-[10px] font-mono px-2 py-0.5 rounded bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-          >
-            WHERE
-          </button>
-          <button
-            type="button"
-            onClick={() => insertSnippet('ORDER BY id DESC ')}
-            className="text-[10px] font-mono px-2 py-0.5 rounded bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-          >
-            ORDER BY
-          </button>
-          <button
-            type="button"
-            onClick={() => insertSnippet('LIMIT 50;')}
-            className="text-[10px] font-mono px-2 py-0.5 rounded bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-          >
-            LIMIT 50
-          </button>
+        {/* Quick SQL Snippets & Tools */}
+        <div className="flex items-center gap-1 shrink-0">
+          {/* Quick SQL Snippets on Wide Screens (xl+) */}
+          <div className="hidden xl:flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => insertSnippet('SELECT * FROM ')}
+              className="text-[10px] font-mono px-2 py-0.5 rounded bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
+            >
+              SELECT *
+            </button>
+            <button
+              type="button"
+              onClick={() => insertSnippet('COUNT(*) ')}
+              className="text-[10px] font-mono px-2 py-0.5 rounded bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
+            >
+              COUNT(*)
+            </button>
+            <button
+              type="button"
+              onClick={() => insertSnippet('WHERE ')}
+              className="text-[10px] font-mono px-2 py-0.5 rounded bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
+            >
+              WHERE
+            </button>
+            <button
+              type="button"
+              onClick={() => insertSnippet('ORDER BY id DESC ')}
+              className="text-[10px] font-mono px-2 py-0.5 rounded bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
+            >
+              ORDER BY
+            </button>
+            <button
+              type="button"
+              onClick={() => insertSnippet('LIMIT 50;')}
+              className="text-[10px] font-mono px-2 py-0.5 rounded bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
+            >
+              LIMIT 50
+            </button>
+          </div>
 
-          <div className="w-px h-3.5 bg-border/60 mx-1" />
+          {/* Snippets Dropdown on Narrower Screens (< xl) */}
+          <div className="relative xl:hidden" ref={snippetsMenuRef}>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setIsSnippetsMenuOpen((v) => !v)}
+              title="Insert SQL snippets"
+              className="h-6 text-[10px] gap-1 px-1.5 text-muted-foreground hover:text-foreground font-mono shrink-0"
+            >
+              <Code2 className="size-3 text-sky-400" />
+              <span>Snippets</span>
+              <ChevronDown className="size-2.5 opacity-60" />
+            </Button>
 
+            {isSnippetsMenuOpen && (
+              <div className="absolute right-0 top-full mt-1 w-44 rounded-md border border-border/80 bg-popover/95 backdrop-blur-md p-1 shadow-lg z-50 text-xs font-mono animate-in fade-in zoom-in-95">
+                {[
+                  { label: 'SELECT * FROM ...', snippet: 'SELECT * FROM ' },
+                  { label: 'COUNT(*)', snippet: 'COUNT(*) ' },
+                  { label: 'WHERE ...', snippet: 'WHERE ' },
+                  { label: 'ORDER BY id DESC', snippet: 'ORDER BY id DESC ' },
+                  { label: 'LIMIT 50;', snippet: 'LIMIT 50;' },
+                ].map((s) => (
+                  <button
+                    key={s.snippet}
+                    type="button"
+                    onClick={() => {
+                      insertSnippet(s.snippet);
+                      setIsSnippetsMenuOpen(false);
+                    }}
+                    className="w-full text-left px-2 py-1.5 rounded hover:bg-accent hover:text-accent-foreground text-[11px] transition-colors"
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="w-px h-3.5 bg-border/60 mx-1 shrink-0" />
+
+          {/* Format Query Button */}
           <Button
             size="sm"
             variant="ghost"
             onClick={formatSql}
-            title="Format SQL query"
-            className="h-6 text-[10px] gap-1 px-2 text-muted-foreground hover:text-foreground font-mono"
+            title="Format SQL query (⌘⇧F / Ctrl+⇧F)"
+            className="h-6 text-[10px] gap-1 px-2 text-muted-foreground hover:text-foreground font-mono shrink-0"
           >
             <Wand2 className="size-3 text-sky-400" />
-            <span>Format</span>
+            <span className="hidden sm:inline">Format</span>
           </Button>
 
+          {/* Shortcuts Reference Button */}
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setIsShortcutsOpen(true)}
+            title="Keyboard shortcuts reference (⌘/)"
+            className="h-6 text-[10px] gap-1 px-2 text-muted-foreground hover:text-foreground font-mono shrink-0"
+          >
+            <Keyboard className="size-3 text-sky-400" />
+            <span className="hidden sm:inline">Shortcuts</span>
+          </Button>
+
+          {/* Clear Editor Button */}
           <Button
             size="icon-sm"
             variant="ghost"
-            onClick={() => setQuery('')}
+            onClick={() => applyTextEdit('', 0, 0, true)}
             title="Clear Editor"
-            className="size-6 text-muted-foreground hover:text-foreground"
+            className="size-6 text-muted-foreground hover:text-foreground shrink-0"
           >
             <Eraser className="size-3" />
           </Button>
@@ -539,10 +771,7 @@ export function SqlEditor({
           <textarea
             ref={textareaRef}
             value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              updateSelectionState();
-            }}
+            onChange={handleTextareaChange}
             onScroll={handleScroll}
             onClick={updateSelectionState}
             onKeyUp={updateSelectionState}
@@ -564,6 +793,12 @@ export function SqlEditor({
           )}
         </div>
       </div>
+
+      {/* Keyboard Shortcuts Reference Modal */}
+      <ShortcutsModal
+        isOpen={isShortcutsOpen}
+        onClose={() => setIsShortcutsOpen(false)}
+      />
     </div>
   );
 }

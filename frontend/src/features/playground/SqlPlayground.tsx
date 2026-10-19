@@ -4,7 +4,6 @@ import {
   Layers,
   Gauge,
   Sparkles,
-  Code2,
   History,
   Download,
   CheckCircle2,
@@ -34,7 +33,6 @@ import { VisualQueryPlan } from './components/VisualQueryPlan';
 import { PerformanceProfiler } from './components/PerformanceProfiler';
 import { IndexAdvisor } from './components/IndexAdvisor';
 import { DataExporterModal } from './components/DataExporterModal';
-import { CodeGeneratorModal } from './components/CodeGeneratorModal';
 import { DryRunModal } from './components/DryRunModal';
 import { AiSettingsDialog } from './components/AiSettingsDialog';
 import { usePlaygroundStore, PlaygroundTab } from '@/stores/usePlaygroundStore';
@@ -72,13 +70,28 @@ export function SqlPlayground() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [editorHeight, setEditorHeight] = useState<number>(() => {
     const saved = localStorage.getItem('vetrolog_playground_editor_height');
-    return saved ? Math.max(140, Math.min(800, Number(saved))) : 260;
+    return saved ? Math.max(180, Math.min(800, Number(saved))) : 260;
   });
   const [isResizing, setIsResizing] = useState(false);
 
+  // Keep editorHeight within safe bounds on window/container resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (containerRef.current) {
+        const containerH = containerRef.current.clientHeight;
+        if (containerH > 320) {
+          const maxAllowed = Math.max(180, containerH - 160);
+          setEditorHeight((current) => Math.min(current, maxAllowed));
+        }
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    handleResize();
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // Modals state
   const [isExportOpen, setIsExportOpen] = useState(false);
-  const [isCodeGenOpen, setIsCodeGenOpen] = useState(false);
   const [isDryRunModalOpen, setIsDryRunModalOpen] = useState(false);
 
   // Per-tab filter & sort state
@@ -294,7 +307,7 @@ export function SqlPlayground() {
       const deltaY = moveEvent.clientY - startY;
       const containerHeight = containerRef.current?.clientHeight || 800;
       const maxAllowed = Math.max(200, containerHeight - 160);
-      const newHeight = Math.max(140, Math.min(maxAllowed, startHeight + deltaY));
+      const newHeight = Math.max(180, Math.min(maxAllowed, startHeight + deltaY));
       setEditorHeight(newHeight);
     };
 
@@ -319,7 +332,10 @@ export function SqlPlayground() {
   return (
     <div ref={containerRef} className="flex-1 flex flex-col overflow-hidden bg-background text-foreground select-none relative">
       {/* Top Deck: Query Tabs + Natural Language + SQL Code Editor */}
-      <div style={{ height: editorHeight }} className="flex flex-col shrink-0 overflow-hidden">
+      <div
+        style={{ height: editorHeight }}
+        className="flex flex-col shrink-0 overflow-hidden min-h-[180px] max-h-[calc(100%-140px)]"
+      >
         <QueryTabStrip />
         <NaturalLanguageBar />
         <SqlEditor
@@ -356,69 +372,60 @@ export function SqlPlayground() {
       </div>
 
       {/* Bottom Deck: Intelligence & Results Tabs */}
-      <div className="flex-1 min-h-0 flex flex-col overflow-hidden bg-card/20">
+      <div className="flex-1 min-h-[140px] flex flex-col overflow-hidden bg-card/20">
         <Tabs
           value={activeTab}
           onValueChange={(val) => setActiveTab(val as PlaygroundTab)}
           className="flex-1 flex flex-col overflow-hidden"
         >
           {/* Deck Navigation Bar */}
-          <div className="h-9 border-b border-border/70 px-3 flex items-center justify-between bg-card/60 backdrop-blur-xs shrink-0 select-none">
-            <TabsList className="h-7 bg-muted/40 p-0.5">
-              <TabsTrigger value="results" className="h-6 text-[11px] px-2.5 gap-1.5">
-                <TableIcon className="size-3 text-sky-400" />
-                <span>Results</span>
-                {rows.length > 0 && (
-                  <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4">
-                    {rows.length}
-                  </Badge>
-                )}
-              </TabsTrigger>
+          <div className="h-9 border-b border-border/70 px-3 flex items-center justify-between gap-2 bg-card/60 backdrop-blur-xs shrink-0 select-none">
+            <div className="min-w-0 flex-1 overflow-x-auto no-scrollbar">
+              <TabsList className="h-7 bg-muted/40 p-0.5 inline-flex flex-nowrap">
+                <TabsTrigger value="results" className="h-6 text-[11px] px-2.5 gap-1.5 shrink-0">
+                  <TableIcon className="size-3 text-sky-400" />
+                  <span>Results</span>
+                  {rows.length > 0 && (
+                    <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4">
+                      {rows.length}
+                    </Badge>
+                  )}
+                </TabsTrigger>
 
-              <TabsTrigger value="plan" className="h-6 text-[11px] px-2.5 gap-1.5">
-                <Layers className="size-3 text-emerald-400" />
-                <span>Visual Query Plan</span>
-              </TabsTrigger>
+                <TabsTrigger value="plan" className="h-6 text-[11px] px-2.5 gap-1.5 shrink-0">
+                  <Layers className="size-3 text-emerald-400" />
+                  <span><span className="hidden sm:inline">Visual </span>Plan</span>
+                </TabsTrigger>
 
-              <TabsTrigger value="profiler" className="h-6 text-[11px] px-2.5 gap-1.5">
-                <Gauge className="size-3 text-amber-400" />
-                <span>Profiler & FPS</span>
-              </TabsTrigger>
+                <TabsTrigger value="profiler" className="h-6 text-[11px] px-2.5 gap-1.5 shrink-0">
+                  <Gauge className="size-3 text-amber-400" />
+                  <span>Profiler<span className="hidden md:inline"> & FPS</span></span>
+                </TabsTrigger>
 
-              <TabsTrigger value="advisor" className="h-6 text-[11px] px-2.5 gap-1.5">
-                <Sparkles className="size-3 text-primary" />
-                <span>Index Advisor</span>
-              </TabsTrigger>
+                <TabsTrigger value="advisor" className="h-6 text-[11px] px-2.5 gap-1.5 shrink-0">
+                  <Sparkles className="size-3 text-primary" />
+                  <span><span className="hidden sm:inline">Index </span>Advisor</span>
+                </TabsTrigger>
 
-              <TabsTrigger value="history" className="h-6 text-[11px] px-2.5 gap-1.5">
-                <History className="size-3 text-muted-foreground" />
-                <span>History</span>
-              </TabsTrigger>
-            </TabsList>
+                <TabsTrigger value="history" className="h-6 text-[11px] px-2.5 gap-1.5 shrink-0">
+                  <History className="size-3 text-muted-foreground" />
+                  <span>History</span>
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
-            {/* Quick Actions (Export & CodeGen) */}
-            <div className="flex items-center gap-1.5">
+            {/* Quick Actions (Export) */}
+            <div className="flex items-center gap-1.5 shrink-0">
               <Button
                 size="sm"
                 variant="ghost"
                 disabled={rows.length === 0}
                 onClick={() => setIsExportOpen(true)}
-                className="h-6 text-[11px] gap-1 px-2 text-muted-foreground hover:text-foreground"
+                className="h-6 text-[11px] gap-1 px-2 text-muted-foreground hover:text-foreground shrink-0 border border-transparent hover:border-border/40"
                 title="Export results to JSON, CSV, SQL, Markdown"
               >
-                <Download className="size-3" />
+                <Download className="size-3 text-sky-400" />
                 <span>Export</span>
-              </Button>
-
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setIsCodeGenOpen(true)}
-                className="h-6 text-[11px] gap-1 px-2 text-muted-foreground hover:text-foreground"
-                title="Generate Flutter, Room, GRDB, Go query code"
-              >
-                <Code2 className="size-3" />
-                <span>Code Gen</span>
               </Button>
             </div>
           </div>
@@ -800,11 +807,6 @@ export function SqlPlayground() {
         onClose={() => setIsExportOpen(false)}
         rows={displayRows}
         tableName={selectedTable || 'result_set'}
-      />
-
-      <CodeGeneratorModal
-        isOpen={isCodeGenOpen}
-        onClose={() => setIsCodeGenOpen(false)}
       />
 
       <DryRunModal

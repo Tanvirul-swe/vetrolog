@@ -51,17 +51,17 @@ export function NaturalLanguageBar() {
   return (
     <div className="p-2 border-b border-border/60 bg-muted/10 flex flex-col gap-1.5 select-none">
       <form onSubmit={handleGenerate} className="flex items-center gap-2">
-        <div className="relative flex-1">
+        <div className="relative flex-1 min-w-0">
           <Sparkles className="absolute left-2.5 top-2.5 size-3.5 text-primary shrink-0" />
           <Input
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             placeholder="Ask in plain English: (e.g. 'Show top 10 users created this week who haven't logged in')"
-            className="pl-8 pr-20 h-8 text-xs bg-card/60 border-border/60 focus:bg-background"
+            className="pl-8 pr-4 sm:pr-36 h-8 text-xs bg-card/60 border-border/60 focus:bg-background"
           />
           <Badge
             variant="outline"
-            className="absolute right-2 top-1.5 text-[9px] px-1 py-0 capitalize text-muted-foreground border-border/60"
+            className="hidden sm:inline-flex absolute right-2 top-1.5 text-[9px] px-1 py-0 capitalize text-muted-foreground border-border/60"
           >
             {aiConfig.provider === 'offline' ? 'Offline Rule Engine' : `${aiConfig.provider} AI`}
           </Badge>
@@ -83,7 +83,7 @@ export function NaturalLanguageBar() {
           size="icon-sm"
           onClick={() => setIsAiSettingsOpen(true)}
           title="Configure AI Provider (Gemini / OpenAI / Ollama)"
-          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+          className="h-8 w-8 text-muted-foreground hover:text-foreground shrink-0"
         >
           <Settings className="size-3.5" />
         </Button>

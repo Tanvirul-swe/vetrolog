@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { Download, Copy, Check, X, FileJson, FileSpreadsheet, FileCode, FileText } from 'lucide-react';
+import { Download, Copy, Check, X, FileJson, FileSpreadsheet, FileCode, FileText, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatSqlIdentifier } from '../services/sqlIdentifier';
+import * as AppBindings from '../../../../wailsjs/go/app/App';
 
 interface DataExporterModalProps {
   isOpen: boolean;
@@ -14,6 +15,8 @@ interface DataExporterModalProps {
 export function DataExporterModal({ isOpen, onClose, rows, tableName = 'result_set' }: DataExporterModalProps) {
   const [format, setFormat] = useState<'json' | 'csv' | 'sql' | 'markdown'>('json');
   const [copied, setCopied] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   const formattedContent = useMemo(() => {
     if (!rows || rows.length === 0) return '';
@@ -82,29 +85,77 @@ export function DataExporterModal({ isOpen, onClose, rows, tableName = 'result_s
     setTimeout(() => setCopied(false), 1500);
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     const extMap: Record<string, string> = {
       json: 'json',
       csv: 'csv',
       sql: 'sql',
       markdown: 'md',
     };
-    const mimeMap: Record<string, string> = {
-      json: 'application/json',
-      csv: 'text/csv',
-      sql: 'text/plain',
-      markdown: 'text/markdown',
+    const filterMap: Record<string, string> = {
+      json: '*.json',
+      csv: '*.csv',
+      sql: '*.sql',
+      markdown: '*.md',
     };
 
     const ext = extMap[format];
-    const mime = mimeMap[format];
-    const blob = new Blob([formattedContent], { type: mime });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${tableName}_export.${ext}`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const defaultFilename = `${tableName}_export.${ext}`;
+
+    setIsSaving(true);
+    try {
+      // 1. Try native desktop save dialog via Wails AppBindings (eliminates macOS WebKit sandbox error)
+      if (
+        typeof window !== 'undefined' &&
+        // @ts-expect-error window.go may be undefined
+        typeof window?.go?.app?.App?.SaveExportFile === 'function'
+      ) {
+        const savedPath = await AppBindings.SaveExportFile(
+          defaultFilename,
+          filterMap[format] || '*.*',
+          formattedContent
+        );
+        if (savedPath) {
+          setSaveSuccess(true);
+          setTimeout(() => {
+            setSaveSuccess(false);
+            onClose();
+          }, 800);
+        }
+        return;
+      }
+    } catch (err) {
+      console.warn('[VetroLog] Native save dialog failed, using fallback:', err);
+    } finally {
+      setIsSaving(false);
+    }
+
+    // 2. Browser fallback for web mode
+    try {
+      const mimeMap: Record<string, string> = {
+        json: 'application/json',
+        csv: 'text/csv',
+        sql: 'text/plain',
+        markdown: 'text/markdown',
+      };
+      const mime = mimeMap[format];
+      const blob = new Blob([formattedContent], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = defaultFilename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setSaveSuccess(true);
+      setTimeout(() => {
+        setSaveSuccess(false);
+        onClose();
+      }, 800);
+    } catch (e) {
+      console.error('[VetroLog] Browser export fallback failed:', e);
+    }
   };
 
   if (!isOpen) return null;
@@ -172,9 +223,28 @@ export function DataExporterModal({ isOpen, onClose, rows, tableName = 'result_s
               {copied ? <Check className="size-3 text-emerald-400" /> : <Copy className="size-3" />}
               <span>{copied ? 'Copied' : 'Copy'}</span>
             </Button>
-            <Button size="sm" onClick={handleDownload} className="h-7 text-xs gap-1.5">
-              <Download className="size-3" />
-              <span>Download File</span>
+            <Button
+              size="sm"
+              onClick={handleDownload}
+              disabled={isSaving}
+              className="h-7 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="size-3 animate-spin" />
+                  <span>Saving...</span>
+                </>
+              ) : saveSuccess ? (
+                <>
+                  <Check className="size-3 text-white" />
+                  <span>Saved!</span>
+                </>
+              ) : (
+                <>
+                  <Download className="size-3" />
+                  <span>Download File</span>
+                </>
+              )}
             </Button>
           </div>
         </div>

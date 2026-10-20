@@ -5,6 +5,8 @@ import {
   Plus,
   Zap,
   Layers,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +20,8 @@ interface IndexRecommendation {
   createSql: string;
   reason: string;
   estimatedSpeedup: string;
+  beforeEstimate: string;
+  afterEstimate: string;
 }
 
 export function IndexAdvisor() {
@@ -25,11 +29,14 @@ export function IndexAdvisor() {
   const queryPlan = usePlaygroundStore((s) => s.queryPlan);
   const extendedSchema = usePlaygroundStore((s) => s.extendedSchema);
   const applyIndex = usePlaygroundStore((s) => s.applyIndex);
+  const runExplain = usePlaygroundStore((s) => s.runExplain);
+  const loadExtendedSchema = usePlaygroundStore((s) => s.loadExtendedSchema);
 
   const [applyingIndex, setApplyingIndex] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [copiedIndex, setCopiedIndex] = useState<string | null>(null);
 
-  // Generate recommendations based on active query & query plan
+  // Generate intelligent recommendations based on active query & query plan
   const recommendations = useMemo<IndexRecommendation[]>(() => {
     if (!queryPlan || !queryPlan.hasFullScan) return [];
 
@@ -43,34 +50,72 @@ export function IndexAdvisor() {
       const tableMeta = tables.find((t) => t.name.toLowerCase() === tableName.toLowerCase());
       if (!tableMeta) continue;
 
-      // Find columns mentioned in query for this table
       const colNames = tableMeta.columns.map((c) => c.name);
-      const matchedCols: string[] = [];
+      const equalityCols: string[] = [];
+      const rangeCols: string[] = [];
+      const orderCols: string[] = [];
+
+      // Parse WHERE clause & ORDER BY clause from query
+      const whereMatch = query.match(/WHERE\s+([\s\S]*?)(?:GROUP\s+BY|ORDER\s+BY|LIMIT|;|$)/i);
+      const whereClause = whereMatch ? whereMatch[1] : '';
+
+      const orderMatch = query.match(/ORDER\s+BY\s+([\s\S]*?)(?:LIMIT|;|$)/i);
+      const orderClause = orderMatch ? orderMatch[1] : '';
 
       for (const col of colNames) {
         // Skip primary keys (already indexed in SQLite)
         const isPk = tableMeta.columns.find((c) => c.name === col)?.isPrimaryKey;
         if (isPk) continue;
 
-        const reg = new RegExp(`\\b${col}\\b`, 'i');
-        if (reg.test(query)) {
-          matchedCols.push(col);
+        const colRegex = new RegExp(`\\b${col}\\b`, 'i');
+
+        // 1. Check Equality in WHERE (e.g. col = 'x' or col IS 'x')
+        const eqRegex = new RegExp(`\\b${col}\\s*(=|IS)\\s*`, 'i');
+        if (whereClause && eqRegex.test(whereClause)) {
+          equalityCols.push(col);
+          continue;
+        }
+
+        // 2. Check Range/Inequality in WHERE (e.g. col > x, BETWEEN, LIKE)
+        const rangeRegex = new RegExp(`\\b${col}\\s*(>|<|>=|<=|BETWEEN|LIKE|IN)\\s*`, 'i');
+        if (whereClause && rangeRegex.test(whereClause)) {
+          rangeCols.push(col);
+          continue;
+        }
+
+        // 3. Check Order By clause
+        if (orderClause && colRegex.test(orderClause)) {
+          orderCols.push(col);
+          continue;
+        }
+
+        // 4. Fallback: mentioned anywhere in query
+        if (colRegex.test(query)) {
+          rangeCols.push(col);
         }
       }
 
-      if (matchedCols.length > 0) {
-        const colList = matchedCols.slice(0, 2);
-        const idxName = `idx_${tableName}_${colList.join('_')}`.toLowerCase();
-        const formattedCols = colList.map(formatSqlIdentifier).join(', ');
+      // Order according to SQLite B-Tree best practices:
+      // Equality columns FIRST -> Range columns SECOND -> Sort columns THIRD
+      const orderedCols = Array.from(new Set([...equalityCols, ...rangeCols, ...orderCols])).slice(0, 3);
+
+      if (orderedCols.length > 0) {
+        const idxName = `idx_${tableName}_${orderedCols.join('_')}`.toLowerCase();
+        const formattedCols = orderedCols.map(formatSqlIdentifier).join(', ');
         const createSql = `CREATE INDEX IF NOT EXISTS ${formatSqlIdentifier(idxName)} ON ${formatSqlIdentifier(tableName)} (${formattedCols});`;
+
+        const rowCount = tableMeta.rowCount || 1000;
+        const estScanMs = Math.max(12, Math.round(rowCount * 0.04));
 
         recs.push({
           tableName,
-          columns: colList,
+          columns: orderedCols,
           suggestedName: idxName,
           createSql,
-          reason: `Query filters or sorts on unindexed column(s) "${colList.join(', ')}" resulting in a linear table scan.`,
-          estimatedSpeedup: `~10x to 25x faster on mobile devices (${tableMeta.rowCount} rows)`,
+          reason: `SQLite executes a linear full scan over ~${rowCount.toLocaleString()} rows. Indexing (${orderedCols.join(', ')}) converts this into a direct O(log N) B-Tree seek.`,
+          estimatedSpeedup: `~15x–50x speedup`,
+          beforeEstimate: `~${estScanMs}ms (Linear Scan)`,
+          afterEstimate: `< 1.5ms (B-Tree Seek)`,
         });
       }
     }
@@ -84,11 +129,20 @@ export function IndexAdvisor() {
     try {
       const ok = await applyIndex(rec.createSql);
       if (ok) {
-        setSuccessMessage(`Successfully created and synced index "${rec.suggestedName}" to device.`);
+        setSuccessMessage(`Successfully applied index "${rec.suggestedName}" to device database.`);
+        // Reload schema and re-run explain to update query plan
+        await loadExtendedSchema();
+        await runExplain(query);
       }
     } finally {
       setApplyingIndex(null);
     }
+  };
+
+  const handleCopy = (sql: string, idxName: string) => {
+    navigator.clipboard.writeText(sql);
+    setCopiedIndex(idxName);
+    setTimeout(() => setCopiedIndex(null), 1800);
   };
 
   const existingIndexes = useMemo(() => {
@@ -123,31 +177,34 @@ export function IndexAdvisor() {
           </div>
         )}
 
-        {/* Advisor Section */}
+        {/* Advisor Header */}
         <div>
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-2 mb-1.5">
             <Sparkles className="size-4 text-primary" />
-            <h3 className="font-semibold text-sm text-foreground">Optimization Advisor</h3>
+            <h3 className="font-semibold text-sm text-foreground">Mobile Index Advisor</h3>
+            <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
+              Heuristic Engine
+            </Badge>
           </div>
           <p className="text-xs text-muted-foreground">
-            Targeted composite indexes recommended based on real-time execution plan analysis.
+            Targeted composite index recommendations calculated from real-time SQLite planner bottlenecks.
           </p>
         </div>
 
         {recommendations.length === 0 ? (
           <div className="p-8 rounded-xl border border-border/80 bg-card/40 text-center select-none">
             <CheckCircle2 className="size-8 text-emerald-400/60 mx-auto mb-2" />
-            <p className="text-xs font-semibold text-foreground">No Performance Bottlenecks Detected</p>
+            <p className="text-xs font-semibold text-foreground">No Index Bottlenecks Detected</p>
             <p className="text-[11px] text-muted-foreground mt-1 max-w-md mx-auto font-sans">
-              The current query already makes optimal use of SQLite indexes or scans small tables. If you add heavy WHERE or ORDER BY conditions, the advisor will suggest targeted indexes here.
+              The active query already makes optimal use of existing SQLite indexes or scans small tables. If you compose complex WHERE or ORDER BY filters that trigger linear table scans, recommended composite indexes will appear here.
             </p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {recommendations.map((rec) => (
               <div
                 key={rec.suggestedName}
-                className="p-4 rounded-xl border border-primary/30 bg-primary/5 shadow-md flex flex-col gap-2.5"
+                className="p-4 rounded-xl border border-primary/40 bg-primary/5 shadow-md flex flex-col gap-3"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -157,26 +214,61 @@ export function IndexAdvisor() {
                     </span>
                   </div>
 
-                  <Badge variant="outline" className="text-[10px] px-2 border-primary/40 text-primary">
+                  <Badge variant="outline" className="text-[10px] px-2 border-emerald-500/40 text-emerald-400 bg-emerald-500/10 font-medium">
                     {rec.estimatedSpeedup}
                   </Badge>
                 </div>
 
                 <p className="text-xs text-muted-foreground font-sans">{rec.reason}</p>
 
-                <div className="p-2.5 rounded bg-black/40 border border-border/60 font-mono text-xs text-foreground select-text">
+                {/* Before vs After Performance Impact */}
+                <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+                  <div className="p-2 rounded-lg bg-red-500/10 border border-red-500/30 flex items-center justify-between">
+                    <span className="text-muted-foreground text-[11px]">Before Index:</span>
+                    <span className="text-red-400 font-semibold">{rec.beforeEstimate}</span>
+                  </div>
+                  <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between">
+                    <span className="text-muted-foreground text-[11px]">After Index:</span>
+                    <span className="text-emerald-400 font-semibold">{rec.afterEstimate}</span>
+                  </div>
+                </div>
+
+                {/* Generated DDL Statement */}
+                <div className="p-2.5 rounded-lg bg-black/50 border border-border/70 font-mono text-xs text-foreground select-text overflow-x-auto">
                   {rec.createSql}
                 </div>
 
-                <div className="flex items-center justify-end pt-1">
+                {/* Actions: Copy & Apply */}
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleCopy(rec.createSql, rec.suggestedName)}
+                    className="h-7 text-xs gap-1.5"
+                    title="Copy CREATE INDEX SQL to clipboard for migrations"
+                  >
+                    {copiedIndex === rec.suggestedName ? (
+                      <>
+                        <Check className="size-3 text-emerald-400" />
+                        <span>Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="size-3" />
+                        <span>Copy Migration DDL</span>
+                      </>
+                    )}
+                  </Button>
+
                   <Button
                     size="sm"
                     onClick={() => handleApply(rec)}
                     disabled={applyingIndex === rec.suggestedName}
                     className="h-7 text-xs gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground font-medium"
+                    title="Execute CREATE INDEX on device and refresh database metadata"
                   >
                     <Plus className="size-3" />
-                    <span>{applyingIndex === rec.suggestedName ? 'Applying...' : '1-Click Apply Index'}</span>
+                    <span>{applyingIndex === rec.suggestedName ? 'Applying to Device...' : '1-Click Apply Index'}</span>
                   </Button>
                 </div>
               </div>
@@ -188,7 +280,7 @@ export function IndexAdvisor() {
         <div className="pt-3 border-t border-border/60">
           <div className="flex items-center gap-2 mb-2">
             <Layers className="size-3.5 text-muted-foreground" />
-            <h4 className="font-semibold text-xs text-foreground">Existing Mobile Indexes</h4>
+            <h4 className="font-semibold text-xs text-foreground">Existing Device Indexes</h4>
             <span className="text-[10px] text-muted-foreground">({existingIndexes.length})</span>
           </div>
 
@@ -221,3 +313,4 @@ export function IndexAdvisor() {
     </div>
   );
 }
+

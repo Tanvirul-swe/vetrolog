@@ -38,6 +38,10 @@ import { AiSettingsDialog } from './components/AiSettingsDialog';
 import { usePlaygroundStore, PlaygroundTab } from '@/stores/usePlaygroundStore';
 import { useDatabaseStore } from '@/stores/useDatabaseStore';
 
+// Feature flags: Visual Plan and Index Advisor temporarily hidden per user request
+const SHOW_VISUAL_PLAN = false;
+const SHOW_INDEX_ADVISOR = false;
+
 export function SqlPlayground() {
   const activeTab = usePlaygroundStore((s) => s.activeTab);
   const setActiveTab = usePlaygroundStore((s) => s.setActiveTab);
@@ -58,6 +62,13 @@ export function SqlPlayground() {
 
   const selectedDbId = useDatabaseStore((s) => s.selectedDatabaseId);
   const selectedTable = useDatabaseStore((s) => s.selectedTableName);
+
+  // Fallback to 'results' if current active tab is one of the hidden tabs
+  useEffect(() => {
+    if ((!SHOW_VISUAL_PLAN && activeTab === 'plan') || (!SHOW_INDEX_ADVISOR && activeTab === 'advisor')) {
+      setActiveTab('results');
+    }
+  }, [activeTab, setActiveTab]);
 
   const activeQueryTab = useMemo(() => {
     return tabs.find((t) => t.id === activeTabId) || tabs[0];
@@ -343,7 +354,9 @@ export function SqlPlayground() {
           onRunDryRun={(sql) => runDryRun(sql)}
           onRunExplain={(sql) => {
             runExplain(sql);
-            setActiveTab('plan');
+            if (SHOW_VISUAL_PLAN) {
+              setActiveTab('plan');
+            }
           }}
         />
       </div>
@@ -392,20 +405,24 @@ export function SqlPlayground() {
                   )}
                 </TabsTrigger>
 
-                <TabsTrigger value="plan" className="h-6 text-[11px] px-2.5 gap-1.5 shrink-0">
-                  <Layers className="size-3 text-emerald-400" />
-                  <span><span className="hidden sm:inline">Visual </span>Plan</span>
-                </TabsTrigger>
+                {SHOW_VISUAL_PLAN && (
+                  <TabsTrigger value="plan" className="h-6 text-[11px] px-2.5 gap-1.5 shrink-0">
+                    <Layers className="size-3 text-emerald-400" />
+                    <span><span className="hidden sm:inline">Visual </span>Plan</span>
+                  </TabsTrigger>
+                )}
 
                 <TabsTrigger value="profiler" className="h-6 text-[11px] px-2.5 gap-1.5 shrink-0">
                   <Gauge className="size-3 text-amber-400" />
                   <span>Profiler<span className="hidden md:inline"> & FPS</span></span>
                 </TabsTrigger>
 
-                <TabsTrigger value="advisor" className="h-6 text-[11px] px-2.5 gap-1.5 shrink-0">
-                  <Sparkles className="size-3 text-primary" />
-                  <span><span className="hidden sm:inline">Index </span>Advisor</span>
-                </TabsTrigger>
+                {SHOW_INDEX_ADVISOR && (
+                  <TabsTrigger value="advisor" className="h-6 text-[11px] px-2.5 gap-1.5 shrink-0">
+                    <Sparkles className="size-3 text-primary" />
+                    <span><span className="hidden sm:inline">Index </span>Advisor</span>
+                  </TabsTrigger>
+                )}
 
                 <TabsTrigger value="history" className="h-6 text-[11px] px-2.5 gap-1.5 shrink-0">
                   <History className="size-3 text-muted-foreground" />
@@ -746,20 +763,24 @@ export function SqlPlayground() {
             )}
           </TabsContent>
 
-          {/* Tab 2: Visual Query Plan */}
-          <TabsContent value="plan" className="flex-1 min-h-0 overflow-hidden flex flex-col m-0 p-0">
-            <VisualQueryPlan />
-          </TabsContent>
+          {/* Tab 2: Visual Query Plan (hidden for now) */}
+          {SHOW_VISUAL_PLAN && (
+            <TabsContent value="plan" className="flex-1 min-h-0 overflow-hidden flex flex-col m-0 p-0">
+              <VisualQueryPlan />
+            </TabsContent>
+          )}
 
           {/* Tab 3: Performance Profiler & FPS Gauge */}
           <TabsContent value="profiler" className="flex-1 min-h-0 overflow-hidden flex flex-col m-0 p-0">
             <PerformanceProfiler />
           </TabsContent>
 
-          {/* Tab 4: Smart Index Advisor */}
-          <TabsContent value="advisor" className="flex-1 min-h-0 overflow-hidden flex flex-col m-0 p-0">
-            <IndexAdvisor />
-          </TabsContent>
+          {/* Tab 4: Smart Index Advisor (hidden for now) */}
+          {SHOW_INDEX_ADVISOR && (
+            <TabsContent value="advisor" className="flex-1 min-h-0 overflow-hidden flex flex-col m-0 p-0">
+              <IndexAdvisor />
+            </TabsContent>
+          )}
 
           {/* Tab 5: Execution History */}
           <TabsContent value="history" className="flex-1 min-h-0 overflow-hidden flex flex-col m-0 p-0">

@@ -66,6 +66,9 @@ const SQL_KEYWORDS = [
   'MAX',
 ];
 
+// Feature flag: Visual Plan temporarily hidden per user request
+const SHOW_VISUAL_PLAN = false;
+
 interface SqlEditorProps {
   onRunExecute: (overrideSql?: string) => void;
   onRunDryRun: (overrideSql?: string) => void;
@@ -533,8 +536,8 @@ export function SqlEditor({
       return;
     }
 
-    // 12. Explain Plan: ⌘E or Ctrl+E
-    if (isMod && e.key.toLowerCase() === 'e' && !e.shiftKey && !e.altKey) {
+    // 12. Explain Plan: ⌘E or Ctrl+E (when Visual Plan is enabled)
+    if (SHOW_VISUAL_PLAN && isMod && e.key.toLowerCase() === 'e' && !e.shiftKey && !e.altKey) {
       e.preventDefault();
       onRunExplain(getExecutableQuery());
       return;
@@ -609,17 +612,19 @@ export function SqlEditor({
             <span>{isSimulating ? 'Simulating...' : 'Dry Run'}</span>
           </Button>
 
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={handleExplain}
-            disabled={!selectedDbId || !query.trim() || isExplaining || isExecuting}
-            className="h-7 text-xs gap-1.5 text-muted-foreground hover:text-foreground shrink-0"
-            title="Inspect visual execution plan tree"
-          >
-            <Search className="size-3" />
-            <span>Explain<span className="hidden md:inline"> Plan</span></span>
-          </Button>
+          {SHOW_VISUAL_PLAN && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={handleExplain}
+              disabled={!selectedDbId || !query.trim() || isExplaining || isExecuting}
+              className="h-7 text-xs gap-1.5 text-muted-foreground hover:text-foreground shrink-0"
+              title="Inspect visual execution plan tree"
+            >
+              <Search className="size-3" />
+              <span>Explain<span className="hidden md:inline"> Plan</span></span>
+            </Button>
+          )}
         </div>
 
         {/* Quick SQL Snippets & Tools */}

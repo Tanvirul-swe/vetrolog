@@ -13,12 +13,17 @@ interface ShortcutItem {
   category: string;
 }
 
+// Feature flag: Visual Plan temporarily hidden per user request
+const SHOW_VISUAL_PLAN = false;
+
 const SHORTCUTS: ShortcutItem[] = [
   // Execution
   { keys: ['⌘', '↵'], description: 'Execute query or selection', category: 'Execution' },
   { keys: ['Ctrl', '↵'], description: 'Execute query or selection (Win/Linux)', category: 'Execution' },
   { keys: ['⌘', '⇧', '↵'], description: 'Dry Run rollback transaction', category: 'Execution' },
-  { keys: ['⌘', 'E'], description: 'Explain visual query plan', category: 'Execution' },
+  ...(SHOW_VISUAL_PLAN
+    ? [{ keys: ['⌘', 'E'], description: 'Explain visual query plan', category: 'Execution' }]
+    : []),
 
   // Editing
   { keys: ['⌘', '/'], description: 'Toggle line or block comment (-- )', category: 'Editing' },

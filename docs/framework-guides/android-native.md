@@ -38,11 +38,15 @@ VetroLog not only discovers SQLite databases, but also parses XML `shared_prefs/
 5. Select your device from the header and choose your application package (e.g. `com.example.androidapp (Active)`).
 6. Your Room database and its entities will immediately load in the sidebar.
 
+![VetroLog Inspecting Native Android Room Database](../.gitbook/assets/images/live_inspector_hero.png)
+
 ---
 
 ## 🔄 Room LiveData & Kotlin Flow Reactivity
 
 Android Room uses invalidation trackers to observe table mutations. When you use reactive queries in your DAO:
+
+![Android Room DataGrid View](../.gitbook/assets/images/datagrid_view.png)
 
 ```kotlin
 @Dao

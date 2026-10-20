@@ -15,7 +15,7 @@ Every modern mobile OS targets **60 frames per second (FPS)** or higher:
 
 ---
 
-![Performance Profiler & 60 FPS Frame Budget](.gitbook/assets/images/performance_profiler_fps.png)
+![Performance Profiler & 60 FPS Frame Budget](../.gitbook/assets/images/performance_profiler_fps.png)
 
 ---
 
@@ -39,7 +39,7 @@ The **Dry Run** simulator lets you test mutating queries safely before committin
 
 ---
 
-![Safe Dry Run Modal](.gitbook/assets/images/dry_run_modal.png)
+![Safe Dry Run Modal](../.gitbook/assets/images/dry_run_modal.png)
 
 ---
 

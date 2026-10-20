@@ -19,6 +19,14 @@ graph TD
     B -->|No Debug Apps| G[Launch Debug App Prompt & Rescan Button]
 ```
 
+---
+
+## 🎬 Discovery in Action
+
+![VetroLog Device & App Discovery Demo](../.gitbook/assets/demos/quickstart_tour.webp)
+
+---
+
 ### 1. Device Detection (`scanning_devices`)
 * VetroLog queries `adb devices -l` every 3 seconds in the background.
 * Detects physical phones over USB, wireless ADB (`ip:5555`), and local emulators (`emulator-5554`).

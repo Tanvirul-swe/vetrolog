@@ -38,6 +38,8 @@ npx expo run:android
 4. In the top bar, select your connected device and choose your React Native package name (e.g. `com.myawesomeapp (Active)`).
 5. All SQLite tables created by your React Native components will load in the sidebar.
 
+![VetroLog Inspecting React Native SQLite Database](../.gitbook/assets/images/live_inspector_hero.png)
+
 ---
 
 ## ⚡ Working with WatermelonDB

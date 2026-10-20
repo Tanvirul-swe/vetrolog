@@ -43,6 +43,8 @@ Each node in the query plan tree is highlighted with a clear status indicator:
 1. Enter your SQL query in the **SQL Playground**.
 2. Click the **Explain Plan** button (or switch to the **Visual Plan** tab in the bottom panel).
 3. VetroLog renders the step-by-step operator hierarchy.
+
+![Visual Query Plan & SQL Console](../.gitbook/assets/images/sql_playground_editor.png)
 4. If a `SCAN` node is detected, click on the **[1-Click Index Advisor](index-advisor.md)** to instantly generate the missing index!
 
 ---

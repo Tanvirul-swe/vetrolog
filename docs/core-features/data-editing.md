@@ -17,6 +17,8 @@ This makes debugging edge cases, testing form validation, and resetting test use
    * **NULL**: Emptying the field or typing `NULL` sets the cell to SQL NULL.
 4. Press **Enter** to save (or press **Escape** to cancel).
 
+![VetroLog In-Place Table Editing](../.gitbook/assets/images/datagrid_view.png)
+
 ### Optimistic UI & Safe Write-Back
 * **Immediate Feedback**: The cell updates optimistically on your screen with a subtle green pulse.
 * **Under the Hood**: VetroLog detects the table's Primary Key (`PK`) and executes a targeted SQL update:

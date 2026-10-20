@@ -12,6 +12,8 @@ Mobile database debugging has historically been painful. Traditional inspection 
 
 VetroLog was built to eliminate these hurdles. It operates on three core principles:
 
+![VetroLog Zero-Config Mobile Database Inspector](../.gitbook/assets/images/live_inspector_hero.png)
+
 ```mermaid
 graph LR
     A[Mobile App: Flutter / Android / React Native] -->|Standard Debug Build| B(Phone Sandbox)

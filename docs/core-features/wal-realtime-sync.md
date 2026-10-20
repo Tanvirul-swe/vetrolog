@@ -44,6 +44,8 @@ sequenceDiagram
     VetroLog-->>UI: Increment table badge & refresh table smoothly
 ```
 
+![Real-Time WAL Live Sync in VetroLog](../.gitbook/assets/images/datagrid_view.png)
+
 1. **Lightweight Timestamp Monitoring**: VetroLog checks the modification timestamp and byte size of the `.db-wal` file.
 2. **Zero Mobile CPU Impact**: The check is extremely lightweight, requiring zero CPU overhead or battery drain on the mobile device.
 3. **Automatic Seamless Refresh**: When you trigger an action in your mobile app (e.g. submitting a form, checking off a todo item, adding an item to cart), VetroLog detects the WAL change and updates the active table view **instantly without requiring a manual page refresh**.

@@ -4,7 +4,7 @@ The **Live Table Inspector** is VetroLog's primary viewing workspace, designed f
 
 ---
 
-![VetroLog Live DataGrid Table View](.gitbook/assets/images/datagrid_view.png)
+![VetroLog Live DataGrid Table View](../.gitbook/assets/images/datagrid_view.png)
 
 ---
 

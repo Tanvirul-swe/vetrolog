@@ -2,6 +2,8 @@
 
 Pre-compiled official binaries for macOS, Windows, and Linux are available from the official **[GitHub Releases](https://github.com/Tanvirul-swe/vetrolog/releases/latest)** page.
 
+![VetroLog Desktop Application Interface](../.gitbook/assets/images/live_inspector_hero.png)
+
 ---
 
 ## 🍎 macOS (Apple Silicon M1/M2/M3/M4 & Intel)

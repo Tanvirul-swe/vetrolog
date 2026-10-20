@@ -4,6 +4,8 @@ Writing and testing queries in VetroLog is only half the battle. You still need 
 
 The **Code Generator** exports your active SQL query directly into production-ready code snippets across 5 mobile frameworks and languages.
 
+![VetroLog Multi-Platform Code Export](../.gitbook/assets/images/sql_playground_editor.png)
+
 ---
 
 ## 📱 Supported Frameworks & Languages

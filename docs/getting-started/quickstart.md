@@ -58,12 +58,12 @@ VetroLog accesses database files through Android's secure `run-as` utility, whic
    * **Device Selector**: Automatically selects your connected device (e.g. `📱 motorola_edge_50`).
    * **App Package Selector**: Automatically highlights debuggable apps on your phone (e.g. `📦 aunkur (Active)`).
 
-![VetroLog Device & App Discovery](.gitbook/assets/demos/quickstart_tour.webp)
+![VetroLog Device & App Discovery](../.gitbook/assets/demos/quickstart_tour.webp)
 
 3. In the left sidebar, click on any database to expand its tables.
 4. Click on any table (such as `general_info_table`) to view live records in the DataGrid:
 
-![VetroLog DataGrid View](.gitbook/assets/images/datagrid_view.png)
+![VetroLog DataGrid View](../.gitbook/assets/images/datagrid_view.png)
 
 {% hint style="success" %}
 **Congratulations!** You are now inspecting a live mobile database with zero SDK code.

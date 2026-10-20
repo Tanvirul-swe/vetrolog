@@ -44,6 +44,8 @@ When a missing index is detected:
    * The sidebar schema tree automatically updates to reflect the new index.
    * Re-running the query now converts the high-cost `SCAN` node into an optimal `SEARCH ... USING INDEX` node!
 
+![VetroLog Index Advisor Recommendations](../.gitbook/assets/images/sql_playground_editor.png)
+
 ---
 
 ## 💡 Best Practices for Mobile SQLite Indexing

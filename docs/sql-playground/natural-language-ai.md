@@ -4,7 +4,13 @@ Write complex SQLite queries in plain English without memorizing syntax or colum
 
 ---
 
-![Natural Language AI Settings in VetroLog](.gitbook/assets/images/gemini_ai_settings.png)
+![Natural Language AI Settings in VetroLog](../.gitbook/assets/images/gemini_ai_settings.png)
+
+---
+
+## 🎬 AI Generation & Safe Dry-Run Demo
+
+![Natural Language AI to SQL in Action](../.gitbook/assets/demos/ai_and_dryrun_demo.webp)
 
 ---
 

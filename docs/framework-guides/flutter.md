@@ -43,6 +43,8 @@ To inspect your Flutter database:
 4. In the top bar, select your device and pick your app package name (e.g. `com.example.my_flutter_app (Active)`).
 5. All SQLite databases created by `sqflite` or `drift` will appear in the sidebar immediately.
 
+![VetroLog Inspecting Flutter SQLite Database](../.gitbook/assets/images/live_inspector_hero.png)
+
 ---
 
 ## 🔄 Reactive UI Updates with Drift & StreamBuilder
@@ -55,6 +57,8 @@ When you edit a cell or delete a row in VetroLog:
 1. VetroLog writes the mutation directly to the phone's SQLite database.
 2. The file system notifies the SQLite file watcher.
 3. Your Flutter UI updates **instantly on the phone screen without restarting the app!**
+
+![Live Table Inspection of Flutter Database](../.gitbook/assets/images/datagrid_view.png)
 
 ---
 

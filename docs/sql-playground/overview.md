@@ -4,7 +4,13 @@ The **SQL Playground** is a full-featured, developer-centric SQL environment tai
 
 ---
 
-![VetroLog SQL Playground Editor](.gitbook/assets/images/sql_playground_editor.png)
+![VetroLog SQL Playground Editor](../.gitbook/assets/images/sql_playground_editor.png)
+
+---
+
+## 🎬 Interactive SQL Playground Tour
+
+![VetroLog SQL Playground Execution](../.gitbook/assets/demos/sql_playground_demo.webp)
 
 ---
 

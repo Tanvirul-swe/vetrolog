@@ -4,6 +4,8 @@ While VetroLog defaults to a native desktop window (via Wails v2), it also inclu
 
 This allows you to inspect mobile databases directly in **Google Chrome, Safari, Firefox, or Edge**, or run VetroLog on a remote headless machine, Docker container, or CI/CD test environment.
 
+![VetroLog Running in Web Server Mode (Chrome / Safari)](../.gitbook/assets/images/live_inspector_hero.png)
+
 ---
 
 ## 🌐 Launching Web Server Mode

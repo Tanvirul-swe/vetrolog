@@ -27,19 +27,19 @@
 
 ---
 
-## 📚 Documentation Suite (GitBook)
+## 📚 Documentation Portal
 
-Explore our comprehensive documentation:
+Visit our complete documentation site: **[https://tanvirul-swe.github.io/vetrolog/](https://tanvirul-swe.github.io/vetrolog/)**
 
 | Document | Description |
 | :--- | :--- |
-| **[📖 GitBook Documentation](docs/README.md)** | Complete GitBook portal covering all features, guides, and tutorials. |
-| **[⚡ 3-Minute Quick Start](docs/getting-started/quickstart.md)** | Step-by-step tutorial on enabling USB debugging and exploring tables. |
-| **[🧠 Intelligent SQL Playground](docs/sql-playground/overview.md)** | Multi-tab console, visual explain plans, Gemini 2.5 AI, and 1-click index advisor. |
-| **[💻 Multi-Platform Installation](docs/getting-started/installation.md)** | Setup guides for macOS (Universal DMG), Windows (Installer/Portable), Linux, and Web mode. |
-| **[📱 Framework Guides](docs/framework-guides/flutter.md)** | Integration guides for Flutter (Drift/sqflite), Android (Room), and React Native. |
+| **[📖 Official Documentation](https://tanvirul-swe.github.io/vetrolog/)** | Full documentation site with live search, guides, and tutorials. |
+| **[⚡ 3-Minute Quick Start](https://tanvirul-swe.github.io/vetrolog/getting-started/quickstart/)** | Step-by-step tutorial on connecting USB debugging and inspecting tables. |
+| **[🧠 Intelligent SQL Playground](https://tanvirul-swe.github.io/vetrolog/sql-playground/overview/)** | Multi-tab console, visual explain plans, Gemini 2.5 AI, and 1-click index advisor. |
+| **[💻 Multi-Platform Installation](https://tanvirul-swe.github.io/vetrolog/getting-started/installation/)** | Direct download & setup guides for macOS (Universal DMG), Windows, and Linux. |
+| **[📱 Framework Guides](https://tanvirul-swe.github.io/vetrolog/framework-guides/flutter/)** | Integration guides for Flutter (Drift/sqflite), Android (Room), and React Native. |
 | **[🤝 Contributing Guidelines](CONTRIBUTING.md)** | Codebase directory map, local dev setup, quality checks, and PR standards. |
-| **[🚀 Deployment & CI/CD](docs/deployment-and-modes/ci-cd-releases.md)** | Release tagging workflow, GitHub Actions matrix packaging, and in-app updater mechanics. |
+| **[🚀 Deployment & CI/CD](https://tanvirul-swe.github.io/vetrolog/deployment-and-modes/ci-cd-releases/)** | Release tagging workflow, GitHub Actions matrix packaging, and in-app updater mechanics. |
 
 ---
 

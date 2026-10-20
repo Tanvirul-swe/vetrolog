@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-export const CURRENT_VERSION = 'v1.1.1';
+export const CURRENT_VERSION = 'v1.2.0';
 
 interface UpdateInfo {
   hasUpdate: boolean;

@@ -1,9 +1,18 @@
 $schema: https://api.gitbook.com/gitbook-docs.yaml
 site:
+  title: vetrolog
   structure:
     - type: space
-      key: documentation
-      title: VetroLog Documentation
-      path: docs
+      key: space-1
+      title: Documentation
+      path: documentation
+      default: true
       content:
         directory: ./docs
+    - type: space
+      key: space-2
+      title: Imported content
+      path: imported-content
+      draft: true
+      content:
+        directory: ./imported-content

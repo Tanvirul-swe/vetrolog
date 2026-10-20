@@ -25,12 +25,31 @@ function buildSchemaPrompt(tables: ExtendedTableSchema[]): string {
 }
 
 /**
+ * Fetches the list of models that support generateContent for the given Gemini API key.
+ */
+export async function fetchAvailableGeminiModels(apiKey: string): Promise<string[]> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `Failed to fetch models: HTTP ${res.status}`);
+  }
+  const data = await res.json();
+  const rawList: Array<{ name: string; supportedGenerationMethods?: string[] }> = data.models || [];
+
+  return rawList
+    .filter((m) => m.supportedGenerationMethods?.includes('generateContent'))
+    .map((m) => m.name.replace(/^models\//, ''));
+}
+
+/**
  * Invokes the configured AI provider to translate natural language into SQLite.
  */
 export async function generateSqlWithAI(
   prompt: string,
   tables: ExtendedTableSchema[],
-  config: AIConfig
+  config: AIConfig,
+  onModelAutoMigrated?: (newModel: string) => void
 ): Promise<AIQueryResponse> {
   const schemaContext = buildSchemaPrompt(tables);
   const systemInstruction = `You are an expert SQLite database engineer for mobile applications.
@@ -48,30 +67,83 @@ Rules:
       if (!config.geminiApiKey) {
         return { sql: '', error: 'Gemini API Key is missing. Please configure it in Settings.' };
       }
-      const model = config.modelName || 'gemini-1.5-flash';
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${config.geminiApiKey}`;
 
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [{ text: `${systemInstruction}\n\nUser Request: ${prompt}` }],
-            },
-          ],
-        }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error?.message || `Gemini API returned status ${res.status}`);
+      // Automatically upgrade legacy deprecated model gemini-1.5-flash to gemini-2.5-flash
+      let targetModel = config.modelName?.trim() || 'gemini-2.5-flash';
+      if (targetModel === 'gemini-1.5-flash') {
+        targetModel = 'gemini-2.5-flash';
       }
 
-      const data = await res.json();
-      let rawSql = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      rawSql = sanitizeSqlOutput(rawSql);
-      return { sql: rawSql };
+      const executeGemini = async (model: string) => {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${config.geminiApiKey}`;
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [{ text: `${systemInstruction}\n\nUser Request: ${prompt}` }],
+              },
+            ],
+          }),
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          const errMsg = err.error?.message || `Gemini API returned status ${res.status}`;
+          const isNotFound =
+            res.status === 404 ||
+            errMsg.toLowerCase().includes('not found') ||
+            errMsg.toLowerCase().includes('not supported for generatecontent');
+          return { ok: false, status: res.status, error: errMsg, isNotFound };
+        }
+
+        const data = await res.json();
+        let rawSql = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        rawSql = sanitizeSqlOutput(rawSql);
+        return { ok: true, sql: rawSql };
+      };
+
+      let result = await executeGemini(targetModel);
+
+      // If the target model was not found, auto-discover supported models from the user's project/key
+      if (!result.ok && result.isNotFound) {
+        try {
+          const availableModels = await fetchAvailableGeminiModels(config.geminiApiKey);
+          const priority = [
+            'gemini-2.5-flash',
+            'gemini-2.0-flash',
+            'gemini-2.0-flash-001',
+            'gemini-1.5-flash-latest',
+            'gemini-1.5-flash-8b',
+            'gemini-2.5-pro',
+            'gemini-1.5-pro-latest',
+          ];
+
+          const fallback =
+            priority.find((p) => availableModels.includes(p)) ||
+            availableModels.find((m) => m.includes('flash')) ||
+            availableModels[0];
+
+          if (fallback && fallback !== targetModel) {
+            result = await executeGemini(fallback);
+            if (result.ok && result.sql) {
+              if (onModelAutoMigrated) {
+                onModelAutoMigrated(fallback);
+              }
+              return { sql: result.sql, explanation: `Auto-switched to active model ${fallback}` };
+            }
+          }
+        } catch {
+          // If model listing fails, fall through to reporting original error
+        }
+      }
+
+      if (!result.ok) {
+        throw new Error(result.error);
+      }
+
+      return { sql: result.sql || '' };
     }
 
     // 2. OpenAI API

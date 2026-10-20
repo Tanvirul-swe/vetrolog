@@ -117,7 +117,7 @@ interface PlaygroundState {
 
 const DEFAULT_AI_CONFIG: AIConfig = {
   provider: 'offline',
-  modelName: 'gemini-1.5-flash',
+  modelName: 'gemini-2.5-flash',
   ollamaBaseUrl: 'http://localhost:11434',
 };
 
@@ -127,7 +127,13 @@ const DEFAULT_INITIAL_QUERY = "SELECT * FROM sqlite_master WHERE type = 'table';
 function loadStoredAiConfig(): AIConfig {
   try {
     const raw = localStorage.getItem('vetrolog_ai_config');
-    if (raw) return { ...DEFAULT_AI_CONFIG, ...JSON.parse(raw) };
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed.modelName === 'gemini-1.5-flash') {
+        parsed.modelName = 'gemini-2.5-flash';
+      }
+      return { ...DEFAULT_AI_CONFIG, ...parsed };
+    }
   } catch {
     // Ignore storage parse issues
   }

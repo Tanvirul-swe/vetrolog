@@ -33,12 +33,16 @@ export function NaturalLanguageBar() {
         setQuery(result.sql);
         setFeedback({ message: `Offline engine: ${result.explanation}` });
       } else {
-        const result = await generateSqlWithAI(prompt, tables, aiConfig);
+        const setAiConfig = usePlaygroundStore.getState().setAiConfig;
+        const result = await generateSqlWithAI(prompt, tables, aiConfig, (migratedModel) => {
+          setAiConfig({ modelName: migratedModel });
+        });
         if (result.error) {
           setFeedback({ message: result.error, isError: true });
         } else if (result.sql) {
           setQuery(result.sql);
-          setFeedback({ message: `AI Generated: ${result.sql}` });
+          const prefix = result.explanation ? `${result.explanation} • ` : '';
+          setFeedback({ message: `${prefix}AI Generated: ${result.sql}` });
         }
       }
     } catch (err: any) {

@@ -15,4 +15,4 @@ site:
       path: imported-content
       draft: true
       content:
-        directory: ./imported-content
+        directory: null

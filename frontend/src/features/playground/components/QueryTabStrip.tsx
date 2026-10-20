@@ -14,10 +14,12 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { usePlaygroundStore, QueryTab } from '@/stores/usePlaygroundStore';
+import { useDatabaseStore } from '@/stores/useDatabaseStore';
 
 export function QueryTabStrip() {
   const tabs = usePlaygroundStore((s) => s.tabs);
   const activeTabId = usePlaygroundStore((s) => s.activeTabId);
+  const databases = useDatabaseStore((s) => s.databases);
   const addTab = usePlaygroundStore((s) => s.addTab);
   const closeTab = usePlaygroundStore((s) => s.closeTab);
   const closeOtherTabs = usePlaygroundStore((s) => s.closeOtherTabs);
@@ -156,6 +158,8 @@ export function QueryTabStrip() {
         {tabs.map((tab) => {
           const isActive = tab.id === activeTabId;
           const isEditing = tab.id === editingTabId;
+          const tabDb = databases.find((d) => d.id === tab.databaseId);
+          const tooltip = `${tab.title}${tabDb ? ` [${tabDb.name}]` : ''} (Double-click to rename, middle-click to close)`;
 
           return (
             <div
@@ -170,12 +174,12 @@ export function QueryTabStrip() {
                   closeTab(tab.id);
                 }
               }}
-              className={`group relative flex items-center gap-1.5 h-7 px-2.5 rounded-t-md text-xs font-mono transition-all cursor-pointer select-none max-w-[200px] min-w-[110px] shrink-0 border ${
+              className={`group relative flex items-center gap-1.5 h-7 px-2.5 rounded-t-md text-xs font-mono transition-all cursor-pointer select-none max-w-[210px] min-w-[110px] shrink-0 border ${
                 isActive
                   ? 'bg-card text-foreground border-border/80 shadow-xs font-medium border-b-transparent -mb-[1px] z-10'
                   : 'bg-muted/30 text-muted-foreground hover:bg-muted/60 hover:text-foreground border-transparent'
               }`}
-              title={`${tab.title} (Double-click to rename, middle-click to close)`}
+              title={tooltip}
             >
               {/* Tab Status Icon */}
               {tab.isExecuting ? (
@@ -214,6 +218,16 @@ export function QueryTabStrip() {
                   className="truncate text-[11px] flex-1"
                 >
                   {tab.title}
+                </span>
+              )}
+
+              {/* Target Database Badge if multiple databases exist */}
+              {!isEditing && databases.length > 1 && tabDb && (
+                <span
+                  className="text-[9px] px-1 py-0 rounded bg-muted/60 text-muted-foreground/75 font-mono truncate max-w-[50px] shrink-0"
+                  title={`Bound Database: ${tabDb.name}`}
+                >
+                  {tabDb.name}
                 </span>
               )}
 

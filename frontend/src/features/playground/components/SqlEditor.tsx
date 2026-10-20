@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Play,
   ShieldAlert,
@@ -9,8 +10,12 @@ import {
   Keyboard,
   ChevronDown,
   Code2,
+  Database,
+  Check,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { formatBytes } from '@/lib/formatters';
 import { AutocompletePopup, AutocompleteItem } from './AutocompletePopup';
 import { ShortcutsModal } from './ShortcutsModal';
 import { predictJoins } from '../services/joinPredictor';
@@ -25,6 +30,7 @@ import {
 } from '../services/editorShortcuts';
 import { usePlaygroundStore } from '@/stores/usePlaygroundStore';
 import { useDatabaseStore } from '@/stores/useDatabaseStore';
+import { useAdbStore } from '@/stores/useAdbStore';
 
 const SQL_KEYWORDS = [
   'SELECT',
@@ -89,25 +95,112 @@ export function SqlEditor({
   const isExplaining = usePlaygroundStore((s) => s.isExplaining);
   const cancelExecution = usePlaygroundStore((s) => s.cancelExecution);
   const formatSql = usePlaygroundStore((s) => s.formatSql);
+  const updateActiveTabState = usePlaygroundStore((s) => s.updateActiveTabState);
+  const loadExtendedSchema = usePlaygroundStore((s) => s.loadExtendedSchema);
 
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [isSnippetsMenuOpen, setIsSnippetsMenuOpen] = useState(false);
   const snippetsMenuRef = useRef<HTMLDivElement>(null);
 
-  // Close snippets menu when clicking outside
+  const [isDbMenuOpen, setIsDbMenuOpen] = useState(false);
+  const [menuCoords, setMenuCoords] = useState<{ top: number; left: number; width: number } | null>(null);
+  const dbButtonRef = useRef<HTMLButtonElement>(null);
+  const dbMenuRef = useRef<HTMLDivElement>(null);
+
+  const databases = useDatabaseStore((s) => s.databases);
+  const selectedDbId = useDatabaseStore((s) => s.selectedDatabaseId);
+  const selectDatabase = useDatabaseStore((s) => s.selectDatabase);
+  const setSelectedDbRemotePath = useAdbStore((s) => s.setSelectedDbRemotePath);
+
+  const handleToggleDbMenu = () => {
+    if (isDbMenuOpen) {
+      setIsDbMenuOpen(false);
+    } else if (dbButtonRef.current) {
+      const rect = dbButtonRef.current.getBoundingClientRect();
+      const menuWidth = 320;
+      let left = rect.left;
+      if (left + menuWidth > window.innerWidth - 16) {
+        left = Math.max(16, window.innerWidth - menuWidth - 16);
+      }
+
+      const menuHeight = Math.min(420, Math.max(140, databases.length * 64 + 52));
+      let top = rect.bottom + 6;
+      if (top + menuHeight > window.innerHeight - 16 && rect.top > menuHeight) {
+        top = rect.top - menuHeight - 6;
+      }
+
+      setMenuCoords({ top, left, width: Math.max(rect.width, menuWidth) });
+      setIsDbMenuOpen(true);
+    }
+  };
+
+  // Close menus when clicking outside
   useEffect(() => {
-    if (!isSnippetsMenuOpen) return;
+    if (!isDbMenuOpen && !isSnippetsMenuOpen) return;
     const handleClickOutside = (e: MouseEvent) => {
       if (snippetsMenuRef.current && !snippetsMenuRef.current.contains(e.target as Node)) {
         setIsSnippetsMenuOpen(false);
       }
+      if (
+        isDbMenuOpen &&
+        dbMenuRef.current &&
+        !dbMenuRef.current.contains(e.target as Node) &&
+        dbButtonRef.current &&
+        !dbButtonRef.current.contains(e.target as Node)
+      ) {
+        setIsDbMenuOpen(false);
+      }
     };
     window.addEventListener('mousedown', handleClickOutside);
     return () => window.removeEventListener('mousedown', handleClickOutside);
-  }, [isSnippetsMenuOpen]);
+  }, [isDbMenuOpen, isSnippetsMenuOpen]);
 
-  const databases = useDatabaseStore((s) => s.databases);
-  const selectedDbId = useDatabaseStore((s) => s.selectedDatabaseId);
+  // Close floating dropdown on window resize or outer scroll (ignoring scrolls inside the dropdown itself)
+  useEffect(() => {
+    if (!isDbMenuOpen) return;
+
+    const handleScroll = (e: Event) => {
+      // If the scroll happened inside the dropdown menu itself, allow smooth scrolling!
+      if (dbMenuRef.current && e.target instanceof Node && dbMenuRef.current.contains(e.target)) {
+        return;
+      }
+      setIsDbMenuOpen(false);
+    };
+
+    const handleResize = () => {
+      setIsDbMenuOpen(false);
+    };
+
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('scroll', handleScroll, true);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('scroll', handleScroll, true);
+    };
+  }, [isDbMenuOpen]);
+
+  const handleSelectDatabase = (dbId: string) => {
+    setIsDbMenuOpen(false);
+    if (dbId === selectedDbId) return;
+
+    const targetDb = databases.find((d) => d.id === dbId);
+    if (!targetDb) return;
+
+    // 1. Switch active database in database store
+    selectDatabase(dbId);
+
+    // 2. Sync ADB remote path
+    if (targetDb.path) {
+      setSelectedDbRemotePath(targetDb.path);
+    }
+
+    // 3. Bind active tab to this database
+    updateActiveTabState({ databaseId: dbId });
+
+    // 4. Reload extended schema for autocomplete and highlighter
+    loadExtendedSchema();
+  };
+
   const activeDb = useMemo(() => databases.find((d) => d.id === selectedDbId), [databases, selectedDbId]);
 
   // Combine extendedSchema with activeDb.tables to guarantee all tables are always available
@@ -624,6 +717,138 @@ export function SqlEditor({
               <Search className="size-3" />
               <span>Explain<span className="hidden md:inline"> Plan</span></span>
             </Button>
+          )}
+
+          {/* Divider */}
+          <div className="h-4 w-[1px] bg-border/60 mx-1 shrink-0" />
+
+          {/* Target Database Selector Button */}
+          <div className="shrink-0">
+            <button
+              ref={dbButtonRef}
+              type="button"
+              onClick={handleToggleDbMenu}
+              className={`h-7 px-2.5 rounded-md border text-xs font-mono flex items-center gap-1.5 transition-all text-foreground shrink-0 cursor-pointer ${
+                isDbMenuOpen
+                  ? 'border-primary/60 bg-primary/10 shadow-xs'
+                  : 'border-border/60 bg-muted/30 hover:bg-muted/60'
+              }`}
+              title={
+                activeDb
+                  ? `Active Database: ${activeDb.name} (${activeDb.type}) - Click to switch target database`
+                  : 'No database selected - Click to select a target database'
+              }
+            >
+              <Database className={`size-3 shrink-0 ${activeDb ? 'text-sky-400' : 'text-amber-400'}`} />
+              <span className="font-semibold max-w-[130px] truncate">
+                {activeDb?.name || 'Select Database'}
+              </span>
+              {activeDb ? (
+                <Badge
+                  variant="outline"
+                  className="text-[9px] font-sans px-1 py-0 h-4 border-sky-500/30 text-sky-400 bg-sky-500/10 uppercase"
+                >
+                  {activeDb.type === 'shared_preferences' ? 'Prefs' : activeDb.type}
+                </Badge>
+              ) : (
+                <Badge
+                  variant="outline"
+                  className="text-[9px] font-sans px-1 py-0 h-4 border-amber-500/30 text-amber-400 bg-amber-500/10"
+                >
+                  None
+                </Badge>
+              )}
+              <ChevronDown
+                className={`size-3 text-muted-foreground ml-0.5 transition-transform duration-150 ${
+                  isDbMenuOpen ? 'rotate-180' : ''
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* Floating Dropdown Over the Entire Screen (Portal) */}
+          {isDbMenuOpen && menuCoords && typeof document !== 'undefined' && createPortal(
+            <div
+              ref={dbMenuRef}
+              style={{
+                position: 'fixed',
+                top: `${menuCoords.top}px`,
+                left: `${menuCoords.left}px`,
+                width: `${menuCoords.width}px`,
+                maxHeight: 'min(440px, calc(100vh - 70px))',
+              }}
+              className="z-[9999] rounded-xl border border-border/80 bg-card/95 backdrop-blur-xl shadow-2xl shadow-black/60 py-1.5 text-xs select-none flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-100"
+            >
+              <div className="px-3 py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold border-b border-border/40 flex items-center justify-between shrink-0 bg-muted/20">
+                <span className="flex items-center gap-1.5">
+                  <Database className="size-3 text-sky-400" />
+                  <span>Select Target Database</span>
+                </span>
+                <span className="text-muted-foreground/70 font-mono text-[9px] bg-muted/60 px-1.5 py-0.2 rounded">
+                  {databases.length} {databases.length === 1 ? 'database' : 'databases'}
+                </span>
+              </div>
+
+              <div
+                onWheel={(e) => e.stopPropagation()}
+                className="overflow-y-auto flex-1 p-1.5 space-y-1 overscroll-contain"
+              >
+                {databases.length === 0 ? (
+                  <div className="px-3 py-6 text-xs text-muted-foreground italic text-center">
+                    No databases discovered in this app
+                  </div>
+                ) : (
+                  databases.map((db) => {
+                    const isSelected = db.id === selectedDbId;
+                    return (
+                      <button
+                        key={db.id}
+                        type="button"
+                        onClick={() => handleSelectDatabase(db.id)}
+                        className={`w-full px-2.5 py-2 rounded-lg text-left flex items-center justify-between gap-2.5 transition-colors cursor-pointer ${
+                          isSelected
+                            ? 'bg-primary/15 text-primary font-medium border border-primary/30 shadow-xs'
+                            : 'hover:bg-muted/60 text-foreground border border-transparent'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          <div
+                            className={`p-1.5 rounded-md shrink-0 ${
+                              isSelected ? 'bg-primary/20 text-primary' : 'bg-muted/60 text-muted-foreground'
+                            }`}
+                          >
+                            <Database className="size-3.5" />
+                          </div>
+                          <div className="min-w-0 truncate flex-1">
+                            <div className="text-xs truncate font-mono font-medium">{db.name}</div>
+                            <div className="text-[10px] text-muted-foreground font-sans flex items-center gap-1.5 mt-0.5">
+                              <span className="uppercase font-semibold text-[9px] px-1 py-0 rounded bg-muted/80 text-muted-foreground/90">
+                                {db.type === 'shared_preferences' ? 'Prefs' : db.type}
+                              </span>
+                              <span>•</span>
+                              <span>{db.tables.length} tables</span>
+                              {db.sizeBytes > 0 && (
+                                <>
+                                  <span>•</span>
+                                  <span>{formatBytes(db.sizeBytes)}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {isSelected && (
+                          <div className="size-5 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                            <Check className="size-3 text-primary" />
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>,
+            document.body
           )}
         </div>
 

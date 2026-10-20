@@ -48,6 +48,7 @@ interface AdbState {
   executeQuery: (query: string) => Promise<any>;
   updateRow: (tableName: string, pk: Record<string, any>, newValues: Record<string, any>) => Promise<boolean>;
   deleteRow: (tableName: string, pk: Record<string, any>) => Promise<boolean>;
+  setSelectedDbRemotePath: (path: string | null) => void;
 }
 
 let isPollingInProgress = false;
@@ -60,6 +61,7 @@ export const useAdbStore = create<AdbState>((set, get) => ({
   apps: [],
   selectedPackageName: null,
   selectedDbRemotePath: null,
+  setSelectedDbRemotePath: (path: string | null) => set({ selectedDbRemotePath: path }),
 
   isLoadingDevices: false,
   isLoadingApps: false,

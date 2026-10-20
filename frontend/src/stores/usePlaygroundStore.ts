@@ -41,6 +41,7 @@ export interface QueryTab {
   title: string;
   query: string;
   createdAt: number;
+  databaseId?: string;
   isExecuting?: boolean;
   result?: QueryResultData | null;
   queryPlan?: QueryPlanResult | null;
@@ -59,7 +60,7 @@ interface PlaygroundState {
   // Tabs State
   tabs: QueryTab[];
   activeTabId: string;
-  addTab: (initialQuery?: string, title?: string) => string;
+  addTab: (initialQuery?: string, title?: string, databaseId?: string) => string;
   closeTab: (tabId: string) => void;
   closeOtherTabs: (tabId: string) => void;
   closeTabsToTheRight: (tabId: string) => void;
@@ -144,6 +145,7 @@ function loadStoredTabs(): { tabs: QueryTab[]; activeTabId: string } {
           title: t.title || `Query ${idx + 1}`,
           query: typeof t.query === 'string' ? t.query : DEFAULT_INITIAL_QUERY,
           createdAt: t.createdAt || Date.now(),
+          databaseId: t.databaseId || undefined,
           result: null,
           queryPlan: null,
           filterText: '',
@@ -183,6 +185,7 @@ function saveTabsToStorage(tabs: QueryTab[], activeTabId: string) {
       title: t.title,
       query: t.query,
       createdAt: t.createdAt,
+      databaseId: t.databaseId,
     }));
     localStorage.setItem(
       TABS_STORAGE_KEY,
@@ -233,15 +236,17 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
   tabs: initialTabsState.tabs,
   activeTabId: initialTabsState.activeTabId,
 
-  addTab: (initialQuery, title) => {
+  addTab: (initialQuery, title, databaseId) => {
     const state = get();
     const newId = `tab_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const nextNumber = state.tabs.length + 1;
+    const currentDbId = databaseId || useDatabaseStore.getState().selectedDatabaseId || undefined;
     const newTab: QueryTab = {
       id: newId,
       title: title || `Query ${nextNumber}`,
       query: initialQuery !== undefined ? initialQuery : DEFAULT_INITIAL_QUERY,
       createdAt: Date.now(),
+      databaseId: currentDbId,
       filterText: '',
       sortCol: null,
       sortAsc: true,
@@ -387,12 +392,25 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
     const targetTab = state.tabs.find((t) => t.id === tabId);
     if (!targetTab) return;
 
+    // If tab has a bound database, sync selectedDatabaseId to it
+    if (targetTab.databaseId) {
+      const currentSelected = useDatabaseStore.getState().selectedDatabaseId;
+      if (currentSelected !== targetTab.databaseId) {
+        useDatabaseStore.getState().selectDatabase(targetTab.databaseId);
+        const db = useDatabaseStore.getState().databases.find((d) => d.id === targetTab.databaseId);
+        if (db?.path) {
+          useAdbStore.getState().setSelectedDbRemotePath(db.path);
+        }
+      }
+    }
+
     set({
       activeTabId: tabId,
       query: targetTab.query,
       queryPlan: targetTab.queryPlan || null,
     });
     saveTabsToStorage(state.tabs, tabId);
+    get().loadExtendedSchema();
   },
 
   updateActiveTabState: (updates) => {
@@ -408,6 +426,7 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
     const state = get();
     const formattedTable = formatSqlIdentifier(tableName);
     const targetSql = `SELECT * FROM ${formattedTable} LIMIT 50;`;
+    const currentDbId = useDatabaseStore.getState().selectedDatabaseId || undefined;
 
     // 1. Check if a tab is already open for this specific table
     const existingTab = state.tabs.find(
@@ -443,6 +462,7 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
               ...t,
               title: tableName,
               query: targetSql,
+              databaseId: currentDbId,
             }
           : t
       );
@@ -463,6 +483,7 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
       title: tableName,
       query: targetSql,
       createdAt: Date.now(),
+      databaseId: currentDbId,
       filterText: '',
       sortCol: null,
       sortAsc: true,

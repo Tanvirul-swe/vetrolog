@@ -1,0 +1,187 @@
+---
+title: "Installation & Setup Guide"
+description: "Download and set up VetroLog on macOS, Windows, and Linux."
+---
+
+import { LinkButton, Badge, Tabs, TabItem, Steps, Card, CardGrid } from '@astrojs/starlight/components';
+
+VetroLog is available as a free, pre-compiled standalone application for **macOS**, **Windows**, and **Linux**. No complex installation scripts or cloud logins are required.
+
+![VetroLog Desktop Application Interface](/vetrolog/assets/images/live_inspector_hero.png)
+
+---
+
+## ⚡ Direct Download by Platform
+
+Select your operating system below to start downloading immediately:
+
+<Tabs>
+  <TabItem label="macOS" icon="apple">
+    <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; margin: 1rem 0;">
+      <LinkButton href="https://github.com/Tanvirul-swe/vetrolog/releases/latest/download/VetroLog-macOS-Universal.dmg" variant="primary" icon="download">
+        Download macOS DMG (Universal)
+      </LinkButton>
+      <LinkButton href="https://github.com/Tanvirul-swe/vetrolog/releases/latest/download/VetroLog-macOS-Universal.zip" variant="secondary" icon="document">
+        Download .zip Archive
+      </LinkButton>
+    </div>
+
+    <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+      <Badge text="Apple Silicon (M1/M2/M3/M4)" variant="tip" />
+      <Badge text="Intel Mac (x86_64)" variant="note" />
+      <Badge text="Universal 64-bit" variant="default" />
+    </div>
+
+    <Steps>
+    1. **Download the installer**: Click the **Download macOS DMG** button above.
+    2. **Mount the disk image**: Double-click the downloaded `VetroLog-macOS-Universal.dmg` file.
+    3. **Install to Applications**: Drag the **VetroLog.app** icon into your **Applications** folder.
+    4. **Launch VetroLog**: Open VetroLog from your Applications folder, Launchpad, or Spotlight (`Cmd + Space` &rarr; `VetroLog`).
+    </Steps>
+
+    :::caution[macOS Gatekeeper First-Launch Prompt]
+    Because VetroLog is open-source and distributed directly without Apple's paid Developer notarization program, macOS may display a Gatekeeper dialog (*"VetroLog cannot be opened because the developer cannot be verified"*).
+
+    **To open with 1 click:**
+    - Right-click (or Control-click) `VetroLog.app` in `/Applications` and select **Open**, then click **Open** in the dialog.
+    - Or run this command in your Terminal:
+      ```bash
+      xattr -d com.apple.quarantine /Applications/VetroLog.app
+      ```
+    :::
+  </TabItem>
+
+  <TabItem label="Windows" icon="windows">
+    <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; margin: 1rem 0;">
+      <LinkButton href="https://github.com/Tanvirul-swe/vetrolog/releases/latest/download/VetroLog-amd64-installer.exe" variant="primary" icon="download">
+        Download Windows Setup (.exe)
+      </LinkButton>
+      <LinkButton href="https://github.com/Tanvirul-swe/vetrolog/releases/latest/download/VetroLog-Windows-x64-Portable.zip" variant="secondary" icon="document">
+        Download Portable ZIP (.zip)
+      </LinkButton>
+    </div>
+
+    <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+      <Badge text="Windows 10 / 11 64-bit" variant="tip" />
+      <Badge text="NSIS Setup Wizard" variant="note" />
+    </div>
+
+    ### Method A: Guided Installer (Recommended)
+    <Steps>
+    1. **Download Installer**: Click the **Download Windows Setup** button above (`VetroLog-amd64-installer.exe`).
+    2. **Run Installer**: Double-click the executable and follow the setup wizard.
+    3. **Start Inspecting**: VetroLog automatically creates Desktop and Start Menu shortcuts.
+    </Steps>
+
+    ### Method B: Portable Zero-Install ZIP
+    <Steps>
+    1. Download `VetroLog-Windows-x64-Portable.zip`.
+    2. Extract the archive into any folder (e.g. `C:\Tools\VetroLog`).
+    3. Double-click `vetrolog.exe` to run immediately without admin privileges.
+    </Steps>
+  </TabItem>
+
+  <TabItem label="Linux" icon="linux">
+    <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; margin: 1rem 0;">
+      <LinkButton href="https://github.com/Tanvirul-swe/vetrolog/releases/latest/download/VetroLog-Linux-amd64.deb" variant="primary" icon="download">
+        Download Debian / Ubuntu (.deb)
+      </LinkButton>
+      <LinkButton href="https://github.com/Tanvirul-swe/vetrolog/releases/latest/download/VetroLog-Linux-x64.tar.gz" variant="secondary" icon="document">
+        Download Tarball (.tar.gz)
+      </LinkButton>
+    </div>
+
+    <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+      <Badge text="Debian / Ubuntu / Mint" variant="tip" />
+      <Badge text="Arch / Fedora / Generic" variant="note" />
+    </div>
+
+    ### Method A: Debian / Ubuntu Package (`.deb`)
+    <Steps>
+    1. **Download Package**: Click **Download Debian / Ubuntu (.deb)** above.
+    2. **Install via Terminal**:
+       ```bash
+       sudo dpkg -i VetroLog-Linux-amd64.deb
+       # If any GTK/WebKit dependencies are missing, auto-resolve with:
+       sudo apt-get install -f
+       ```
+    3. **Launch**: Open from your application drawer or run `vetrolog` in your terminal.
+    </Steps>
+
+    ### Method B: Standalone Tarball (All Linux Distributions)
+    <Steps>
+    1. Download and extract `VetroLog-Linux-x64.tar.gz`:
+       ```bash
+       tar -xvf VetroLog-Linux-x64.tar.gz
+       cd VetroLog-Linux-x64
+       ./vetrolog
+       ```
+    </Steps>
+
+    :::note[System Dependencies for Linux]
+    VetroLog utilizes the native GTK3 and WebKit engine. Ensure your distribution has the runtime libraries:
+    - **Debian / Ubuntu**: `sudo apt install libgtk-3-0 libwebkit2gtk-4.0-37` (or `libwebkit2gtk-4.1-0`)
+    - **Fedora**: `sudo dnf install gtk3 webkit2gtk4.1`
+    - **Arch**: `sudo pacman -S gtk3 webkit2gtk-4.1`
+    :::
+  </TabItem>
+</Tabs>
+
+---
+
+## 🌐 Headless Web Server Mode (Docker & Remote Machines)
+
+If you are developing inside a headless Linux VM, remote server, or Docker container where no desktop display is available, VetroLog includes a built-in headless web server mode:
+
+```bash
+# Launch VetroLog as a local web server (default: http://localhost:8787)
+./vetrolog --web
+
+# Or specify a custom port
+./vetrolog --web --port 9090
+
+# Or prevent auto-opening the browser on startup
+./vetrolog --web --no-browser
+```
+
+Simply open **`http://localhost:8787`** in your favorite browser (Google Chrome, Safari, Firefox, Edge).
+
+---
+
+## 🛠️ Building from Source
+
+If you want to contribute or build VetroLog from the source code:
+
+### Prerequisites
+- **Go 1.22+**: [golang.org](https://go.dev/)
+- **Node.js 20+** & **npm**: [nodejs.org](https://nodejs.org/)
+- **Wails v2 CLI**:
+  ```bash
+  go install github.com/wailsapp/wails/v2/cmd/wails@latest
+  ```
+
+### Build Instructions
+```bash
+# 1. Clone the repository
+git clone https://github.com/Tanvirul-swe/vetrolog.git
+cd vetrolog
+
+# 2. Install frontend dependencies
+cd frontend && npm install && cd ..
+
+# 3. Run in live hot-reload development mode
+wails dev
+
+# 4. Or compile a production release binary
+wails build
+```
+
+The compiled native executable will be located in the `build/bin/` folder.
+
+---
+
+## 🚀 Next Steps
+
+Once VetroLog is installed and open:
+* Follow the **[3-Minute Quickstart Tutorial](/vetrolog/getting-started/quickstart/)** to inspect your first database.
+* Learn about **[Automatic ADB Discovery](/vetrolog/core-features/adb-discovery/)** for connected phones and emulators.

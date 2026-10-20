@@ -1,0 +1,129 @@
+---
+title: VetroLog
+description: Zero-config desktop database inspector for mobile developers.
+template: splash
+hero:
+  tagline: High-performance desktop SQLite database inspector for mobile developers (Flutter, Android, React Native). Zero SDK code, live WAL synchronization, visual query planner, and natural language AI.
+  image:
+    file: ../../assets/logo.png
+  actions:
+    - text: Download VetroLog
+      link: '#download-vetrolog-for-your-platform'
+      icon: download
+      variant: primary
+    - text: 3-Minute Quick Start
+      link: /vetrolog/getting-started/quickstart/
+      icon: right-arrow
+      variant: secondary
+    - text: View on GitHub
+      link: https://github.com/Tanvirul-swe/vetrolog
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid, LinkButton, Badge, Tabs, TabItem } from '@astrojs/starlight/components';
+
+## 📥 Download VetroLog for Your Platform
+
+Choose the pre-compiled installer for your operating system. Free, open-source, and updated with every release.
+
+<Tabs>
+  <TabItem label="macOS" icon="apple">
+    <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; margin: 1.25rem 0 1rem 0;">
+      <LinkButton href="https://github.com/Tanvirul-swe/vetrolog/releases/latest/download/VetroLog-macOS-Universal.dmg" variant="primary" icon="download">
+        Download DMG Installer (.dmg)
+      </LinkButton>
+      <LinkButton href="https://github.com/Tanvirul-swe/vetrolog/releases/latest/download/VetroLog-macOS-Universal.zip" variant="secondary" icon="document">
+        Download .zip Archive
+      </LinkButton>
+    </div>
+    
+    <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
+      <Badge text="Apple Silicon (M1/M2/M3/M4)" variant="tip" />
+      <Badge text="Intel Mac (x86_64)" variant="note" />
+      <Badge text="macOS 11+" variant="default" />
+    </div>
+
+    Universal binary runs natively at maximum performance on both Apple Silicon and Intel Macs.
+    
+    👉 *See the **[macOS Installation Guide](/vetrolog/getting-started/installation/#-macos-apple-silicon-m1m2m3m4--intel)** for Gatekeeper first-launch tips.*
+  </TabItem>
+
+  <TabItem label="Windows" icon="windows">
+    <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; margin: 1.25rem 0 1rem 0;">
+      <LinkButton href="https://github.com/Tanvirul-swe/vetrolog/releases/latest/download/VetroLog-amd64-installer.exe" variant="primary" icon="download">
+        Download Windows Setup (.exe)
+      </LinkButton>
+      <LinkButton href="https://github.com/Tanvirul-swe/vetrolog/releases/latest/download/VetroLog-Windows-x64-Portable.zip" variant="secondary" icon="document">
+        Download Portable (.zip)
+      </LinkButton>
+    </div>
+
+    <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
+      <Badge text="Windows 10 / 11 64-bit" variant="tip" />
+      <Badge text="x86_64" variant="note" />
+    </div>
+
+    Includes automated NSIS setup wizard with desktop shortcuts, Start Menu integration, and clean uninstaller support.
+  </TabItem>
+
+  <TabItem label="Linux" icon="linux">
+    <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; margin: 1.25rem 0 1rem 0;">
+      <LinkButton href="https://github.com/Tanvirul-swe/vetrolog/releases/latest/download/VetroLog-Linux-amd64.deb" variant="primary" icon="download">
+        Download Debian / Ubuntu (.deb)
+      </LinkButton>
+      <LinkButton href="https://github.com/Tanvirul-swe/vetrolog/releases/latest/download/VetroLog-Linux-x64.tar.gz" variant="secondary" icon="document">
+        Download Tarball (.tar.gz)
+      </LinkButton>
+    </div>
+
+    <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
+      <Badge text="Ubuntu / Debian / Mint" variant="tip" />
+      <Badge text="Arch / Fedora / Generic" variant="note" />
+      <Badge text="amd64" variant="default" />
+    </div>
+
+    GTK3 + WebKit2GTK desktop build. Install with `sudo dpkg -i VetroLog-Linux-amd64.deb` or extract the standalone tarball.
+  </TabItem>
+</Tabs>
+
+---
+
+## ⚡ Why Mobile Developers Choose VetroLog
+
+<CardGrid stagger>
+  <Card title="Zero SDK Boilerplate" icon="rocket">
+    No SDK installation or network listeners required. VetroLog securely accesses app databases directly via Android Debug Bridge (`run-as`).
+  </Card>
+  <Card title="Real-Time WAL Auto-Sync" icon="laptop">
+    Monitors SQLite Write-Ahead Logging (`-wal`) and Shared Memory (`-shm`) files live. Table data updates instantaneously on desktop when writes occur.
+  </Card>
+  <Card title="Intelligent SQL Console" icon="pencil">
+    Multi-tab query editor with dot-notation column autocomplete, schema awareness, and execution timing.
+  </Card>
+  <Card title="Visual Query Plan & 60 FPS Profiler" icon="star">
+    Evaluates `EXPLAIN QUERY PLAN` visually with high-cost table scan alerts, and benchmarks latency against the mobile 16.6ms UI frame budget.
+  </Card>
+  <Card title="Natural Language AI" icon="sun">
+    Translates plain English into optimized SQLite queries using Google Gemini 2.5 Flash, OpenAI, or local Ollama models.
+  </Card>
+  <Card title="Multi-Platform & Web Mode" icon="setting">
+    Native desktop application on macOS, Windows, and Linux, plus standalone headless Web Server mode (`./vetrolog --web`).
+  </Card>
+</CardGrid>
+
+---
+
+## 🎬 Live Database Inspection Preview
+
+![VetroLog Live Database Inspector](/vetrolog/assets/images/live_inspector_hero.png)
+
+---
+
+## 🧭 Explore the Documentation
+
+* **[What is VetroLog?](/vetrolog/getting-started/introduction/)**: Architecture and comparison against legacy tools.
+* **[Installation Guide](/vetrolog/getting-started/installation/)**: Download DMG for macOS, Windows installer, or Linux binaries with step-by-step setup.
+* **[Quickstart Tutorial](/vetrolog/getting-started/quickstart/)**: 3-minute hands-on walkthrough connecting your first Android or emulator database.
+* **[Core Inspection Engine](/vetrolog/core-features/adb-discovery/)**: Deep dive into ADB discovery, live DataGrid, and WAL synchronization.
+* **[Framework Guides](/vetrolog/framework-guides/flutter/)**: Best practices for Flutter (sqflite & Drift), Android Room, and React Native.

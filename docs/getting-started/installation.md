@@ -10,8 +10,11 @@ Pre-compiled official binaries for macOS, Windows, and Linux are available from 
 
 VetroLog delivers a **Universal Binary** supporting both ARM64 (Apple Silicon) and x86_64 (Intel) Macs.
 
+- 📥 **[Download VetroLog-macOS-Universal.dmg (Direct Download)](https://github.com/Tanvirul-swe/vetrolog/releases/latest/download/VetroLog-macOS-Universal.dmg)**
+- 📦 **[Download VetroLog-macOS-Universal.zip Archive](https://github.com/Tanvirul-swe/vetrolog/releases/latest/download/VetroLog-macOS-Universal.zip)**
+
 ### Drag-and-Drop DMG Installation
-1. Download **`VetroLog-macOS-Universal.dmg`** from GitHub Releases.
+1. Download **`VetroLog-macOS-Universal.dmg`** using the direct link above.
 2. Double-click the DMG and drag **VetroLog.app** into your **Applications** folder.
 3. Launch VetroLog from Launchpad or Spotlight.
 
@@ -31,8 +34,11 @@ Because VetroLog is open-source and not notarized through Apple's paid Developer
 
 ## 🪟 Windows (Windows 10 / 11 64-bit)
 
+- 📥 **[Download VetroLog-amd64-installer.exe (Setup Wizard)](https://github.com/Tanvirul-swe/vetrolog/releases/latest/download/VetroLog-amd64-installer.exe)**
+- 📦 **[Download VetroLog-Windows-x64-Portable.zip (Zero-Install)](https://github.com/Tanvirul-swe/vetrolog/releases/latest/download/VetroLog-Windows-x64-Portable.zip)**
+
 ### Option A: Guided Setup Wizard (Recommended)
-1. Download **`vetrolog-amd64-installer.exe`**.
+1. Download **`VetroLog-amd64-installer.exe`**.
 2. Run the installer and follow the on-screen prompts.
 3. The wizard creates Desktop shortcuts, Start Menu entries, and uninstaller support.
 
@@ -44,6 +50,9 @@ Because VetroLog is open-source and not notarized through Apple's paid Developer
 ---
 
 ## 🐧 Linux (Ubuntu, Debian, Fedora, Arch)
+
+- 📥 **[Download VetroLog-Linux-amd64.deb (Debian / Ubuntu Package)](https://github.com/Tanvirul-swe/vetrolog/releases/latest/download/VetroLog-Linux-amd64.deb)**
+- 📦 **[Download VetroLog-Linux-x64.tar.gz (Universal Tarball)](https://github.com/Tanvirul-swe/vetrolog/releases/latest/download/VetroLog-Linux-x64.tar.gz)**
 
 ### Option A: Debian / Ubuntu Package (`.deb`)
 1. Download **`VetroLog-Linux-amd64.deb`**.

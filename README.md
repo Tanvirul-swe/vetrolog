@@ -27,17 +27,19 @@
 
 ---
 
-## 📚 Documentation Suite
+## 📚 Documentation Suite (GitBook)
 
 Explore our comprehensive documentation:
 
 | Document | Description |
 | :--- | :--- |
-| **[📖 User Manual & ADB Setup](docs/USER_GUIDE.md)** | Step-by-step tutorial on enabling USB debugging, exploring tables, live updates, and SQL runner. |
-| **[🧠 Architecture & Internals](docs/ARCHITECTURE.md)** | Deep dive in plain English explaining zero-code inspection, `run-as`, WAL/SHM sync, and `apiBridge`. |
-| **[💻 Multi-Platform Installation](docs/INSTALLATION.md)** | Setup guides for macOS (including Gatekeeper bypass), Windows, Linux, and Web mode. |
+| **[📖 GitBook Documentation](docs/README.md)** | Complete GitBook portal covering all features, guides, and tutorials. |
+| **[⚡ 3-Minute Quick Start](docs/getting-started/quickstart.md)** | Step-by-step tutorial on enabling USB debugging and exploring tables. |
+| **[🧠 Intelligent SQL Playground](docs/sql-playground/overview.md)** | Multi-tab console, visual explain plans, Gemini 2.5 AI, and 1-click index advisor. |
+| **[💻 Multi-Platform Installation](docs/getting-started/installation.md)** | Setup guides for macOS (Universal DMG), Windows (Installer/Portable), Linux, and Web mode. |
+| **[📱 Framework Guides](docs/framework-guides/flutter.md)** | Integration guides for Flutter (Drift/sqflite), Android (Room), and React Native. |
 | **[🤝 Contributing Guidelines](CONTRIBUTING.md)** | Codebase directory map, local dev setup, quality checks, and PR standards. |
-| **[🚀 Deployment & CI/CD](docs/DEPLOYMENT.md)** | Release tagging workflow, GitHub Actions matrix packaging, and in-app updater mechanics. |
+| **[🚀 Deployment & CI/CD](docs/deployment-and-modes/ci-cd-releases.md)** | Release tagging workflow, GitHub Actions matrix packaging, and in-app updater mechanics. |
 
 ---
 

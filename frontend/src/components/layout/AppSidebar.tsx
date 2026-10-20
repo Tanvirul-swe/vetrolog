@@ -1,7 +1,8 @@
-import { FolderTree, Database } from 'lucide-react';
+import { FolderTree, Database, Loader2 } from 'lucide-react';
 import { DatabaseTree } from '@/features/databases/components/DatabaseTree';
 import { useDatabaseStore } from '@/stores/useDatabaseStore';
 import { usePlaygroundStore } from '@/stores/usePlaygroundStore';
+import { useAdbStore } from '@/stores/useAdbStore';
 
 interface AppSidebarProps {
   onRefresh?: () => void;
@@ -15,6 +16,12 @@ export function AppSidebar(_props: AppSidebarProps) {
   const selectTable = useDatabaseStore((s) => s.selectTable);
   const activeWorkspaceView = usePlaygroundStore((s) => s.activeWorkspaceView);
   const openTableInPlayground = usePlaygroundStore((s) => s.openTableInPlayground);
+
+  const isInitialLoading = useAdbStore((s) => s.isInitialLoading);
+  const isLoadingDevices = useAdbStore((s) => s.isLoadingDevices);
+  const isLoadingApps = useAdbStore((s) => s.isLoadingApps);
+  const isLoadingDatabases = useAdbStore((s) => s.isLoadingDatabases);
+  const isBusy = isInitialLoading || isLoadingDevices || isLoadingApps || isLoadingDatabases;
 
   const handleSelectTable = (tableName: string) => {
     selectTable(tableName);
@@ -31,9 +38,16 @@ export function AppSidebar(_props: AppSidebarProps) {
           <FolderTree className="size-3.5 text-primary" />
           <span className="uppercase tracking-wider text-[11px] font-bold text-foreground/80">Databases</span>
         </div>
-        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted/80 text-muted-foreground">
-          {databases.length} {databases.length === 1 ? 'store' : 'stores'}
-        </span>
+        {isBusy && databases.length === 0 ? (
+          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary flex items-center gap-1 border border-primary/20">
+            <Loader2 className="size-2.5 animate-spin" />
+            <span>scanning</span>
+          </span>
+        ) : (
+          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted/80 text-muted-foreground">
+            {databases.length} {databases.length === 1 ? 'store' : 'stores'}
+          </span>
+        )}
       </div>
 
       {/* Database Tree with scrollable list */}

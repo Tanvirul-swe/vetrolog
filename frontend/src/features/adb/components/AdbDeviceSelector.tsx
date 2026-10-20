@@ -10,6 +10,8 @@ export function AdbDeviceSelector() {
   const selectedPackageName = useAdbStore((s) => s.selectedPackageName);
   const isLoadingDevices = useAdbStore((s) => s.isLoadingDevices);
   const isLoadingApps = useAdbStore((s) => s.isLoadingApps);
+  const isLoadingDatabases = useAdbStore((s) => s.isLoadingDatabases);
+  const isInitialLoading = useAdbStore((s) => s.isInitialLoading);
   const fetchDevices = useAdbStore((s) => s.fetchDevices);
   const selectDevice = useAdbStore((s) => s.selectDevice);
   const selectApp = useAdbStore((s) => s.selectApp);
@@ -27,6 +29,7 @@ export function AdbDeviceSelector() {
   }, [startPolling, stopPolling]);
 
   const hasDevice = devices.length > 0 && selectedDeviceId;
+  const isBusy = isLoadingDevices || isLoadingApps || isLoadingDatabases;
 
   return (
     <div className="flex items-center gap-2 bg-card/80 border border-border/80 px-2 py-1 rounded-lg shadow-xs text-xs">
@@ -42,7 +45,7 @@ export function AdbDeviceSelector() {
             title="Click to scan for connected Android USB devices"
           >
             <span className="size-1.5 rounded-full bg-muted-foreground/50 animate-pulse" />
-            <span>{isLoadingDevices ? 'Scanning USB...' : 'No ADB Device'}</span>
+            <span>{isLoadingDevices || isInitialLoading ? 'Scanning USB...' : 'No ADB Device'}</span>
           </button>
         ) : (
           <select
@@ -77,7 +80,7 @@ export function AdbDeviceSelector() {
           <select
             value={selectedPackageName || ''}
             onChange={(e) => selectApp(e.target.value)}
-            disabled={isLoadingApps}
+            disabled={isLoadingApps || isLoadingDatabases}
             className="bg-transparent font-mono text-[11px] text-primary focus:outline-none cursor-pointer max-w-[160px] truncate"
             title="Select debuggable app package"
           >
@@ -100,11 +103,11 @@ export function AdbDeviceSelector() {
         variant="ghost"
         size="icon-sm"
         onClick={() => refreshDatabases()}
-        disabled={isLoadingDevices || isLoadingApps}
+        disabled={isBusy}
         title="Sync / refresh device databases"
         className="h-6 w-6 text-muted-foreground hover:text-foreground"
       >
-        <RefreshCw className={`size-3 ${isLoadingDevices || isLoadingApps ? 'animate-spin' : ''}`} />
+        <RefreshCw className={`size-3 ${isBusy ? 'animate-spin text-primary' : ''}`} />
       </Button>
     </div>
   );

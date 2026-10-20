@@ -1,6 +1,7 @@
-import { Activity, Wifi, Database, Layers } from 'lucide-react';
+import { Activity, Wifi, Database, Layers, Loader2 } from 'lucide-react';
 import { useConnectionStore } from '@/stores/useConnectionStore';
 import { useDatabaseStore } from '@/stores/useDatabaseStore';
+import { useAdbStore } from '@/stores/useAdbStore';
 
 export function AppStatusBar() {
   const isConnected = useConnectionStore((s) => s.isConnected);
@@ -12,6 +13,20 @@ export function AppStatusBar() {
   const selectedTable = useDatabaseStore((s) => s.selectedTableName);
   const totalRows = useDatabaseStore((s) => s.totalRows);
   const mutations = useDatabaseStore((s) => s.mutations);
+
+  const isInitialLoading = useAdbStore((s) => s.isInitialLoading);
+  const isLoadingDevices = useAdbStore((s) => s.isLoadingDevices);
+  const isLoadingApps = useAdbStore((s) => s.isLoadingApps);
+  const isLoadingDatabases = useAdbStore((s) => s.isLoadingDatabases);
+  const discoveryStage = useAdbStore((s) => s.discoveryStage);
+  const discoveryMessage = useAdbStore((s) => s.discoveryMessage);
+
+  const isConnecting =
+    isInitialLoading ||
+    isLoadingDevices ||
+    isLoadingApps ||
+    isLoadingDatabases ||
+    discoveryStage === 'loading_schema';
 
   const activeDb = databases.find((d) => d.id === selectedDbId);
 
@@ -47,9 +62,20 @@ export function AppStatusBar() {
           <Activity className="size-3 text-sky-400" />
           <span>mutations: <strong className="text-foreground">{mutations.length}</strong></span>
         </div>
-        <div className="flex items-center gap-1 border-l border-border/60 pl-3">
-          <span className="size-1.5 rounded-full bg-emerald-400" />
-          <span className="text-emerald-400 font-sans text-[10px]">Ready</span>
+        <div className="flex items-center gap-1.5 border-l border-border/60 pl-3">
+          {isConnecting ? (
+            <>
+              <Loader2 className="size-3 text-sky-400 animate-spin" />
+              <span className="text-sky-400 font-sans text-[10px] truncate max-w-[200px]">
+                {discoveryMessage || 'Discovering...'}
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="size-1.5 rounded-full bg-emerald-400" />
+              <span className="text-emerald-400 font-sans text-[10px]">Ready</span>
+            </>
+          )}
         </div>
       </div>
     </footer>

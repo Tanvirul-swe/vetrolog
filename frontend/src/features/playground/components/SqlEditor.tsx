@@ -12,6 +12,7 @@ import {
   Code2,
   Database,
   Check,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -111,6 +112,9 @@ export function SqlEditor({
   const selectedDbId = useDatabaseStore((s) => s.selectedDatabaseId);
   const selectDatabase = useDatabaseStore((s) => s.selectDatabase);
   const setSelectedDbRemotePath = useAdbStore((s) => s.setSelectedDbRemotePath);
+  const isLoadingDatabases = useAdbStore((s) => s.isLoadingDatabases);
+  const isLoadingApps = useAdbStore((s) => s.isLoadingApps);
+  const isInitialLoading = useAdbStore((s) => s.isInitialLoading);
 
   const handleToggleDbMenu = () => {
     if (isDbMenuOpen) {
@@ -793,7 +797,12 @@ export function SqlEditor({
                 onWheel={(e) => e.stopPropagation()}
                 className="overflow-y-auto flex-1 p-1.5 space-y-1 overscroll-contain"
               >
-                {databases.length === 0 ? (
+                {isLoadingDatabases || isLoadingApps || isInitialLoading ? (
+                  <div className="px-3 py-6 text-xs text-muted-foreground flex flex-col items-center justify-center gap-2">
+                    <Loader2 className="size-4 text-primary animate-spin" />
+                    <span>Discovering databases...</span>
+                  </div>
+                ) : databases.length === 0 ? (
                   <div className="px-3 py-6 text-xs text-muted-foreground italic text-center">
                     No databases discovered in this app
                   </div>

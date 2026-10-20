@@ -5,7 +5,13 @@ import * as AppBindings from '../../wailsjs/go/app/App';
  * or inside a standard web browser (Chrome, Safari, Edge, Firefox).
  */
 export const isWailsApp = (): boolean => {
-  return typeof window !== 'undefined' && 'go' in window && Boolean((window as any).go?.app?.App);
+  if (typeof window === 'undefined') return false;
+  const win = window as any;
+  return Boolean(
+    win?.runtime ||
+    (win?.go && (win?.go?.app?.App || win?.go?.app)) ||
+    win?.wails
+  );
 };
 
 export interface AdbDevice {
@@ -35,47 +41,79 @@ export const apiBridge = {
 
   listDevices: async (): Promise<AdbDevice[]> => {
     if (isWailsApp()) {
-      return (await AppBindings.AdbListDevices()) as AdbDevice[];
+      try {
+        return (await AppBindings.AdbListDevices()) as AdbDevice[];
+      } catch {
+        return [];
+      }
     }
-    const res = await fetch('/api/adb/devices', { signal: AbortSignal.timeout(10000) });
-    if (!res.ok) return [];
-    return (await res.json()) as AdbDevice[];
+    try {
+      const res = await fetch('/api/adb/devices', { signal: AbortSignal.timeout(5000) });
+      if (!res.ok) return [];
+      return (await res.json()) as AdbDevice[];
+    } catch {
+      return [];
+    }
   },
 
   listApps: async (deviceId: string): Promise<AdbApp[]> => {
     if (isWailsApp()) {
-      return (await AppBindings.AdbListApps(deviceId)) as AdbApp[];
+      try {
+        return (await AppBindings.AdbListApps(deviceId)) as AdbApp[];
+      } catch {
+        return [];
+      }
     }
-    const res = await fetch(`/api/adb/apps?deviceId=${encodeURIComponent(deviceId)}`, {
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!res.ok) return [];
-    return (await res.json()) as AdbApp[];
+    try {
+      const res = await fetch(`/api/adb/apps?deviceId=${encodeURIComponent(deviceId)}`, {
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) return [];
+      return (await res.json()) as AdbApp[];
+    } catch {
+      return [];
+    }
   },
 
   isAppRunning: async (deviceId: string, packageName: string): Promise<boolean> => {
     if (isWailsApp()) {
-      return await AppBindings.AdbIsAppRunning(deviceId, packageName);
+      try {
+        return await AppBindings.AdbIsAppRunning(deviceId, packageName);
+      } catch {
+        return false;
+      }
     }
-    const res = await fetch(
-      `/api/adb/is-running?deviceId=${encodeURIComponent(deviceId)}&packageName=${encodeURIComponent(packageName)}`,
-      { signal: AbortSignal.timeout(8000) }
-    );
-    if (!res.ok) return false;
-    const data = await res.json();
-    return Boolean(data.isRunning);
+    try {
+      const res = await fetch(
+        `/api/adb/is-running?deviceId=${encodeURIComponent(deviceId)}&packageName=${encodeURIComponent(packageName)}`,
+        { signal: AbortSignal.timeout(5000) }
+      );
+      if (!res.ok) return false;
+      const data = await res.json();
+      return Boolean(data.isRunning);
+    } catch {
+      return false;
+    }
   },
 
   discoverDatabases: async (deviceId: string, packageName: string): Promise<any[]> => {
     if (isWailsApp()) {
-      return await AppBindings.AdbDiscoverDatabases(deviceId, packageName);
+      try {
+        return await AppBindings.AdbDiscoverDatabases(deviceId, packageName);
+      } catch {
+        return [];
+      }
     }
-    const res = await fetch(
-      `/api/adb/databases?deviceId=${encodeURIComponent(deviceId)}&packageName=${encodeURIComponent(packageName)}`,
-      { signal: AbortSignal.timeout(15000) }
-    );
-    if (!res.ok) return [];
-    return await res.json();
+    try {
+      const res = await fetch(
+        `/api/adb/databases?deviceId=${encodeURIComponent(deviceId)}&packageName=${encodeURIComponent(packageName)}`,
+        { signal: AbortSignal.timeout(10000) }
+      );
+      if (!res.ok) return [];
+      return await res.json();
+    } catch {
+      return [];
+    }
   },
 
   getTableData: async (
@@ -87,31 +125,36 @@ export const apiBridge = {
     pageSize = 50
   ): Promise<any> => {
     if (isWailsApp()) {
-      return await AppBindings.AdbGetTableData(
+      try {
+        return await AppBindings.AdbGetTableData(
+          deviceId,
+          packageName,
+          remotePath,
+          tableName,
+          page,
+          pageSize
+        );
+      } catch {
+        return null;
+      }
+    }
+    try {
+      const params = new URLSearchParams({
         deviceId,
         packageName,
         remotePath,
-        tableName,
-        page,
-        pageSize
-      );
+        table: tableName,
+        page: String(page),
+        pageSize: String(pageSize),
+      });
+      const res = await fetch(`/api/adb/table-data?${params.toString()}`, {
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
     }
-    const params = new URLSearchParams({
-      deviceId,
-      packageName,
-      remotePath,
-      table: tableName,
-      page: String(page),
-      pageSize: String(pageSize),
-    });
-    const res = await fetch(`/api/adb/table-data?${params.toString()}`, {
-      signal: AbortSignal.timeout(30000),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: 'Failed to fetch table data' }));
-      throw new Error(err.error || 'Failed to fetch table data');
-    }
-    return await res.json();
   },
 
   executeQuery: async (

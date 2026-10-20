@@ -1,9 +1,25 @@
 import { useState, useMemo } from 'react';
-import { ArrowUpDown, ArrowUp, ArrowDown, Database, Key } from 'lucide-react';
+import {
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Database,
+  Key,
+  Smartphone,
+  Layers,
+  HardDrive,
+  Activity,
+  Loader2,
+  CheckCircle2,
+  RefreshCw,
+  Sparkles,
+} from 'lucide-react';
 import { CellRenderer } from './CellRenderer';
 import { GridToolbar } from './GridToolbar';
 import { RowDetailSheet } from './RowDetailSheet';
+import { Button } from '@/components/ui/button';
 import { useDatabaseStore } from '@/stores/useDatabaseStore';
+import { useAdbStore } from '@/stores/useAdbStore';
 
 interface DataGridProps {
   onRefresh?: () => void;
@@ -16,11 +32,27 @@ type SortDirection = 'asc' | 'desc' | null;
 
 export function DataGrid({ onRefresh, onRequestPage, onUpdateRow, onDeleteRow }: DataGridProps) {
   const selectedTable = useDatabaseStore((s) => s.selectedTableName);
+  const databases = useDatabaseStore((s) => s.databases);
   const columns = useDatabaseStore((s) => s.columns);
   const rows = useDatabaseStore((s) => s.rows);
   const filterTerm = useDatabaseStore((s) => s.filterTerm);
   const selectedRow = useDatabaseStore((s) => s.selectedRow);
   const setSelectedRow = useDatabaseStore((s) => s.setSelectedRow);
+  const isLoadingTable = useDatabaseStore((s) => s.isLoadingTable);
+
+  const isInitialLoading = useAdbStore((s) => s.isInitialLoading);
+  const discoveryStage = useAdbStore((s) => s.discoveryStage);
+  const discoveryMessage = useAdbStore((s) => s.discoveryMessage);
+  const isLoadingDevices = useAdbStore((s) => s.isLoadingDevices);
+  const isLoadingApps = useAdbStore((s) => s.isLoadingApps);
+  const isLoadingDatabases = useAdbStore((s) => s.isLoadingDatabases);
+  const devices = useAdbStore((s) => s.devices);
+  const selectedDeviceId = useAdbStore((s) => s.selectedDeviceId);
+  const apps = useAdbStore((s) => s.apps);
+  const selectedPackageName = useAdbStore((s) => s.selectedPackageName);
+  const fetchDevices = useAdbStore((s) => s.fetchDevices);
+  const selectDevice = useAdbStore((s) => s.selectDevice);
+  const refreshDatabases = useAdbStore((s) => s.refreshDatabases);
 
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortDirection>(null);
@@ -90,11 +122,267 @@ export function DataGrid({ onRefresh, onRequestPage, onUpdateRow, onDeleteRow }:
     return [];
   }, [columns, rows]);
 
+  const selectedDevice = devices.find((d) => d.id === selectedDeviceId);
+  const selectedApp = apps.find((a) => a.packageName === selectedPackageName);
+
+  const isConnecting =
+    isInitialLoading ||
+    isLoadingDevices ||
+    isLoadingApps ||
+    isLoadingDatabases ||
+    isLoadingTable ||
+    discoveryStage === 'loading_schema';
+
+  const progressPercent = useMemo(() => {
+    switch (discoveryStage) {
+      case 'scanning_devices':
+        return 25;
+      case 'scanning_apps':
+        return 50;
+      case 'discovering_databases':
+        return 75;
+      case 'loading_schema':
+        return 90;
+      case 'ready':
+        return 100;
+      default:
+        return isInitialLoading ? 35 : 10;
+    }
+  }, [discoveryStage, isInitialLoading]);
+
   if (!selectedTable) {
+    if (isConnecting) {
+      return (
+        <div className="flex-1 flex flex-col items-center justify-start sm:justify-center p-4 sm:p-6 select-none bg-background/50 relative overflow-y-auto">
+          {/* Subtle Ambient Glow */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 size-96 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
+
+          {/* Connection Progress Dashboard Card */}
+          <div className="relative max-w-lg w-full bg-card/75 backdrop-blur-md border border-border/80 rounded-2xl p-5 shadow-xl space-y-4 text-center my-auto">
+            {/* Pulsing Concentric Rings Icon */}
+            <div className="relative inline-flex items-center justify-center">
+              <span className="absolute size-16 rounded-full bg-primary/15 animate-ping duration-1000" />
+              <span className="absolute size-12 rounded-full bg-primary/20" />
+              <div className="relative size-10 rounded-xl bg-primary/10 border border-primary/30 flex items-center justify-center text-primary shadow-xs">
+                <Database className="size-5 animate-pulse" />
+              </div>
+            </div>
+
+            {/* Main Stage Heading & Live Message */}
+            <div>
+              <h2 className="text-sm sm:text-base font-semibold text-foreground tracking-tight">
+                {discoveryStage === 'scanning_devices' && 'Detecting Android Device...'}
+                {discoveryStage === 'scanning_apps' && 'Scanning Running Debug Apps...'}
+                {discoveryStage === 'discovering_databases' && 'Extracting Mobile Databases...'}
+                {(discoveryStage === 'loading_schema' || isLoadingTable) && 'Loading Tables & Schema...'}
+                {!['scanning_devices', 'scanning_apps', 'discovering_databases', 'loading_schema'].includes(
+                  discoveryStage
+                ) && 'Connecting to Mobile Database...'}
+              </h2>
+              <div className="flex items-center justify-center gap-1.5 mt-1.5 text-xs text-muted-foreground">
+                <span className="size-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                <span className="font-mono text-[11px] truncate max-w-sm">
+                  {discoveryMessage || 'Probing device ADB pipeline...'}
+                </span>
+              </div>
+            </div>
+
+            {/* Dynamic Progress Bar */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-[10px] font-mono text-muted-foreground px-0.5">
+                <span className="flex items-center gap-1">
+                  <Loader2 className="size-2.5 animate-spin text-primary" />
+                  <span>Pipeline Auto-Discovery</span>
+                </span>
+                <span className="text-foreground font-semibold">{progressPercent}%</span>
+              </div>
+              <div className="h-1.5 w-full bg-muted/60 rounded-full overflow-hidden border border-border/40">
+                <div
+                  className="h-full bg-gradient-to-r from-sky-500 via-primary to-emerald-400 transition-all duration-700 ease-out rounded-full"
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
+            </div>
+
+            {/* 4 Connected Pipeline Step Cards */}
+            <div className="grid grid-cols-2 gap-2 text-left">
+              {/* Step 1: Device */}
+              <div className="p-2 rounded-lg border border-border/60 bg-muted/20 flex items-start gap-2">
+                <Smartphone className="size-3.5 text-sky-400 mt-0.5 shrink-0" />
+                <div className="min-w-0">
+                  <div className="text-[10px] font-semibold text-foreground truncate flex items-center gap-1">
+                    <span>1. Device</span>
+                    {selectedDeviceId && <CheckCircle2 className="size-2.5 text-emerald-400 shrink-0" />}
+                  </div>
+                  <div className="text-[9px] text-muted-foreground truncate font-mono">
+                    {selectedDevice ? selectedDevice.model : isLoadingDevices ? 'Scanning...' : 'Pending'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 2: Debug App */}
+              <div className="p-2 rounded-lg border border-border/60 bg-muted/20 flex items-start gap-2">
+                <Layers className="size-3.5 text-amber-400 mt-0.5 shrink-0" />
+                <div className="min-w-0">
+                  <div className="text-[10px] font-semibold text-foreground truncate flex items-center gap-1">
+                    <span>2. Debug App</span>
+                    {selectedPackageName && <CheckCircle2 className="size-2.5 text-emerald-400 shrink-0" />}
+                  </div>
+                  <div className="text-[9px] text-muted-foreground truncate font-mono">
+                    {selectedApp ? selectedApp.displayName : isLoadingApps ? 'Scanning...' : 'Pending'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 3: Databases */}
+              <div className="p-2 rounded-lg border border-border/60 bg-muted/20 flex items-start gap-2">
+                <HardDrive className="size-3.5 text-purple-400 mt-0.5 shrink-0" />
+                <div className="min-w-0">
+                  <div className="text-[10px] font-semibold text-foreground truncate flex items-center gap-1">
+                    <span>3. Databases</span>
+                    {databases.length > 0 && <CheckCircle2 className="size-2.5 text-emerald-400 shrink-0" />}
+                  </div>
+                  <div className="text-[9px] text-muted-foreground truncate font-mono">
+                    {isLoadingDatabases
+                      ? 'Extracting...'
+                      : databases.length > 0
+                        ? `${databases.length} store${databases.length > 1 ? 's' : ''}`
+                        : 'Pending'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 4: Tables & Schema */}
+              <div className="p-2 rounded-lg border border-border/60 bg-muted/20 flex items-start gap-2">
+                <Activity className="size-3.5 text-emerald-400 mt-0.5 shrink-0" />
+                <div className="min-w-0">
+                  <div className="text-[10px] font-semibold text-foreground truncate">4. Schema</div>
+                  <div className="text-[9px] text-muted-foreground truncate font-mono">
+                    {discoveryStage === 'loading_schema' || isLoadingTable ? 'Syncing...' : 'Ready'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Contextual Info */}
+            <div className="pt-1.5 border-t border-border/40 flex items-center justify-center gap-1.5 text-[10px] text-muted-foreground/80">
+              <Sparkles className="size-3 text-primary shrink-0" />
+              <span>VetroLog discovers SQLite, Hive, & SharedPreferences directly via ADB without SDK code.</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (discoveryStage === 'no_devices' || (!selectedDeviceId && devices.length === 0)) {
+      return (
+        <div className="flex-1 flex flex-col items-center justify-center p-3 select-none bg-background/50 relative overflow-y-auto">
+          <div className="max-w-sm w-full bg-card/75 backdrop-blur-md border border-border/80 rounded-xl p-4 shadow-xl space-y-3 text-center">
+            <div className="size-8 rounded-lg bg-muted/80 border border-border flex items-center justify-center text-muted-foreground mx-auto">
+              <Smartphone className="size-4" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-foreground text-xs sm:text-sm">No Android Device Detected</h3>
+              <p className="text-[10.5px] text-muted-foreground mt-0.5 leading-snug">
+                Connect an Android device via USB or start an emulator to begin inspecting.
+              </p>
+            </div>
+            <div className="space-y-1 text-left bg-muted/20 rounded-md p-2 text-[10.5px] text-muted-foreground border border-border/60">
+              <div className="flex items-start gap-1.5">
+                <span className="font-bold text-foreground">1.</span>
+                <span>Plug phone via USB cable or launch an Android emulator.</span>
+              </div>
+              <div className="flex items-start gap-1.5">
+                <span className="font-bold text-foreground">2.</span>
+                <span>Ensure <strong>Developer Options</strong> & <strong>USB Debugging</strong> are on.</span>
+              </div>
+              <div className="flex items-start gap-1.5">
+                <span className="font-bold text-foreground">3.</span>
+                <span>Accept <strong>&quot;Allow USB debugging&quot;</strong> prompt on screen.</span>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => fetchDevices()}
+              className="w-full gap-1.5 border-border/80 hover:bg-muted h-7 text-xs"
+            >
+              <RefreshCw className="size-3" />
+              <span>Scan for Connected Devices</span>
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
+    if (discoveryStage === 'no_apps' || (selectedDeviceId && apps.length === 0)) {
+      return (
+        <div className="flex-1 flex flex-col items-center justify-center p-3 select-none bg-background/50 relative overflow-y-auto">
+          <div className="max-w-sm w-full bg-card/75 backdrop-blur-md border border-border/80 rounded-xl p-4 shadow-xl space-y-3 text-center">
+            <div className="size-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mx-auto">
+              <Layers className="size-4" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-foreground text-xs sm:text-sm">Waiting for Debuggable App</h3>
+              <p className="text-[10.5px] text-muted-foreground mt-0.5 leading-snug">
+                Connected to {selectedDevice?.model || 'device'}. No debuggable apps found running.
+              </p>
+            </div>
+            <div className="space-y-1 text-left bg-muted/20 rounded-md p-2 text-[10.5px] text-muted-foreground border border-border/60">
+              <div className="flex items-start gap-1.5">
+                <span className="font-bold text-foreground">1.</span>
+                <span>Launch your Flutter or Android app in <strong>debug</strong> mode on the device.</span>
+              </div>
+              <div className="flex items-start gap-1.5">
+                <span className="font-bold text-foreground">2.</span>
+                <span>VetroLog will automatically detect running packages and extract database files.</span>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => selectedDeviceId && selectDevice(selectedDeviceId)}
+              className="w-full gap-1.5 border-border/80 hover:bg-muted h-7 text-xs"
+            >
+              <RefreshCw className="size-3" />
+              <span>Rescan Running Apps</span>
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
+    if (databases.length === 0) {
+      return (
+        <div className="flex-1 flex flex-col items-center justify-center p-3 select-none bg-background/50 relative overflow-y-auto">
+          <div className="max-w-sm w-full bg-card/75 backdrop-blur-md border border-border/80 rounded-xl p-4 shadow-xl space-y-3 text-center">
+            <div className="size-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary mx-auto">
+              <Database className="size-4" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-foreground text-xs sm:text-sm">No Databases Found</h3>
+              <p className="text-[10.5px] text-muted-foreground mt-0.5 leading-snug">
+                No SQLite (*.db), Hive (*.hive), or SharedPreferences files found in app sandbox yet.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refreshDatabases()}
+              className="w-full gap-1.5 border-border/80 hover:bg-muted h-7 text-xs"
+            >
+              <RefreshCw className="size-3" />
+              <span>Refresh App Databases</span>
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
     return (
-      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center select-none bg-background">
-        <div className="size-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary mb-3">
-          <Database className="size-6" />
+      <div className="flex-1 flex flex-col items-center justify-center p-6 text-center select-none bg-background">
+        <div className="size-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary mb-2.5">
+          <Database className="size-5" />
         </div>
         <h3 className="font-semibold text-foreground text-sm">No Table Selected</h3>
         <p className="text-xs text-muted-foreground mt-1 max-w-sm">

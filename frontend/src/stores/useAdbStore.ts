@@ -22,6 +22,16 @@ export interface AdbApp {
   pid?: string;
 }
 
+export type DiscoveryStage =
+  | 'idle'
+  | 'scanning_devices'
+  | 'scanning_apps'
+  | 'discovering_databases'
+  | 'loading_schema'
+  | 'ready'
+  | 'no_devices'
+  | 'no_apps';
+
 interface AdbState {
   devices: AdbDevice[];
   selectedDeviceId: string | null;
@@ -32,6 +42,9 @@ interface AdbState {
   isLoadingDevices: boolean;
   isLoadingApps: boolean;
   isLoadingDatabases: boolean;
+  isInitialLoading: boolean;
+  discoveryStage: DiscoveryStage;
+  discoveryMessage: string;
   isAdbMode: boolean;
   isLiveSync: boolean;
 
@@ -63,9 +76,12 @@ export const useAdbStore = create<AdbState>((set, get) => ({
   selectedDbRemotePath: null,
   setSelectedDbRemotePath: (path: string | null) => set({ selectedDbRemotePath: path }),
 
-  isLoadingDevices: false,
+  isLoadingDevices: true,
   isLoadingApps: false,
   isLoadingDatabases: false,
+  isInitialLoading: true,
+  discoveryStage: 'scanning_devices',
+  discoveryMessage: 'Detecting connected Android devices via ADB...',
   isAdbMode: false,
   isLiveSync: true,
 
@@ -115,6 +131,14 @@ export const useAdbStore = create<AdbState>((set, get) => ({
     isPollingInProgress = true;
 
     try {
+      if (get().isInitialLoading && get().devices.length === 0) {
+        set({
+          isLoadingDevices: true,
+          discoveryStage: 'scanning_devices',
+          discoveryMessage: 'Probing connected USB and emulator devices...',
+        });
+      }
+
       // 1. Fetch current devices attached
       const devs = await apiBridge.listDevices();
       const currentSelectedDevId = get().selectedDeviceId;
@@ -122,7 +146,7 @@ export const useAdbStore = create<AdbState>((set, get) => ({
       // Case A: No ADB devices attached
       if (!devs || devs.length === 0) {
         consecutiveDeadChecks = 0;
-        if (get().devices.length > 0 || currentSelectedDevId !== null) {
+        if (get().devices.length > 0 || currentSelectedDevId !== null || get().isInitialLoading) {
           set({
             devices: [],
             selectedDeviceId: null,
@@ -130,6 +154,10 @@ export const useAdbStore = create<AdbState>((set, get) => ({
             selectedPackageName: null,
             selectedDbRemotePath: null,
             isAdbMode: false,
+            isLoadingDevices: false,
+            isInitialLoading: false,
+            discoveryStage: 'no_devices',
+            discoveryMessage: 'No Android devices detected via ADB',
           });
           useDatabaseStore.getState().resetState();
         }
@@ -140,14 +168,20 @@ export const useAdbStore = create<AdbState>((set, get) => ({
       const devIds = devs.map((d) => d.id).join(',');
       const prevDevIds = get().devices.map((d) => d.id).join(',');
       if (devIds !== prevDevIds) {
-        set({ devices: devs });
+        set({ devices: devs, isLoadingDevices: false });
       }
 
       // Ensure active device is valid
       let activeDevId = currentSelectedDevId;
       if (!activeDevId || !devs.some((d) => d.id === activeDevId)) {
         activeDevId = devs[0].id;
-        set({ selectedDeviceId: activeDevId });
+        const devName = devs[0].model || devs[0].id;
+        set({
+          selectedDeviceId: activeDevId,
+          isLoadingDevices: false,
+          discoveryStage: 'scanning_apps',
+          discoveryMessage: `Connected to ${devName}. Scanning debug apps...`,
+        });
         await get().selectDevice(activeDevId);
         return;
       }
@@ -166,6 +200,8 @@ export const useAdbStore = create<AdbState>((set, get) => ({
               selectedPackageName: null,
               selectedDbRemotePath: null,
               apps: [],
+              discoveryStage: 'no_apps',
+              discoveryMessage: 'Debug app was closed or detached',
             });
             useDatabaseStore.getState().resetState();
             consecutiveDeadChecks = 0;
@@ -178,14 +214,27 @@ export const useAdbStore = create<AdbState>((set, get) => ({
 
       // 3. If no app is selected yet, scan for running debug apps to connect
       if (!get().selectedPackageName) {
+        set({
+          isLoadingApps: true,
+          discoveryStage: 'scanning_apps',
+          discoveryMessage: 'Scanning running debuggable packages on device...',
+        });
         const latestApps = await apiBridge.listApps(activeDevId);
         const appsList = latestApps || [];
-        set({ apps: appsList });
+        set({ apps: appsList, isLoadingApps: false });
 
         if (appsList.length > 0) {
           const targetApp = appsList.find((a) => a.displayName?.includes('(Active)')) || appsList.find((a) => a.isRunning) || appsList[0];
           if (targetApp && targetApp.isRunning !== false) {
             await get().selectApp(targetApp.packageName);
+          }
+        } else {
+          if (get().isInitialLoading) {
+            set({
+              isInitialLoading: false,
+              discoveryStage: 'no_apps',
+              discoveryMessage: 'No debuggable apps currently running on device',
+            });
           }
         }
         return;
@@ -210,7 +259,11 @@ export const useAdbStore = create<AdbState>((set, get) => ({
   },
 
   fetchDevices: async () => {
-    set({ isLoadingDevices: true });
+    set({
+      isLoadingDevices: true,
+      discoveryStage: 'scanning_devices',
+      discoveryMessage: 'Probing connected Android devices via ADB...',
+    });
     try {
       const devices = await apiBridge.listDevices();
       set({ devices: devices || [], isLoadingDevices: false });
@@ -218,44 +271,83 @@ export const useAdbStore = create<AdbState>((set, get) => ({
       const currentSelected = get().selectedDeviceId;
       if (!currentSelected && devices && devices.length > 0) {
         // Auto-select first device
-        get().selectDevice(devices[0].id);
+        await get().selectDevice(devices[0].id);
+      } else if (!devices || devices.length === 0) {
+        set({
+          isInitialLoading: false,
+          discoveryStage: 'no_devices',
+          discoveryMessage: 'No ADB devices detected',
+        });
       }
     } catch {
-      set({ isLoadingDevices: false });
+      set({
+        isLoadingDevices: false,
+        isInitialLoading: false,
+        discoveryStage: 'no_devices',
+        discoveryMessage: 'Failed to scan ADB devices',
+      });
     }
   },
 
   selectDevice: async (deviceId: string) => {
+    const dev = get().devices.find((d) => d.id === deviceId);
+    const devLabel = dev?.model || deviceId;
     set({
       selectedDeviceId: deviceId,
       apps: [],
       selectedPackageName: null,
       isLoadingApps: true,
       isAdbMode: true,
+      discoveryStage: 'scanning_apps',
+      discoveryMessage: `Connected to ${devLabel}. Scanning running debug apps...`,
     });
 
     try {
       const apps = await apiBridge.listApps(deviceId);
-      set({ apps: apps || [], isLoadingApps: false });
+      const appsList = apps || [];
+      set({ apps: appsList, isLoadingApps: false });
 
-      if (apps && apps.length > 0) {
-        get().selectApp(apps[0].packageName);
+      if (appsList && appsList.length > 0) {
+        const targetApp = appsList.find((a) => a.displayName?.includes('(Active)')) || appsList.find((a) => a.isRunning) || appsList[0];
+        if (targetApp) {
+          await get().selectApp(targetApp.packageName);
+        }
+      } else {
+        set({
+          isInitialLoading: false,
+          discoveryStage: 'no_apps',
+          discoveryMessage: 'No debuggable apps found running on device',
+        });
       }
     } catch {
-      set({ isLoadingApps: false });
+      set({
+        isLoadingApps: false,
+        isInitialLoading: false,
+        discoveryStage: 'no_apps',
+        discoveryMessage: 'Failed to inspect apps on device',
+      });
     }
   },
 
   selectApp: async (packageName: string) => {
+    const app = get().apps.find((a) => a.packageName === packageName);
+    const appLabel = app?.displayName || packageName;
     set({
       selectedPackageName: packageName,
       isLoadingDatabases: true,
       isAdbMode: true,
+      discoveryStage: 'discovering_databases',
+      discoveryMessage: `Extracting SQLite, Hive & Prefs from ${appLabel}...`,
     });
 
     const deviceId = get().selectedDeviceId;
     if (!deviceId) {
-      set({ isLoadingDatabases: false });
+      set({
+        isLoadingDatabases: false,
+        isInitialLoading: false,
+        discoveryStage: 'no_devices',
+        discoveryMessage: 'No device selected',
+      });
       return;
     }
 
@@ -270,45 +362,61 @@ export const useAdbStore = create<AdbState>((set, get) => ({
           name: db.name,
           type: db.type as any,
           path: db.path,
-            sizeBytes: db.sizeBytes || 0,
-            updatedAt: db.updatedAt || Date.now(),
-            tables: (db.tables || []).map((t: any) => ({
-              name: t.name,
-              type: t.type || 'table',
-              rowCount: t.rowCount || 0,
-              columns: (t.columns || []).map((c: any) => ({
-                name: c.name,
-                type: c.type || 'TEXT',
-                isPrimaryKey: c.isPrimaryKey,
-                isNullable: c.isNullable,
-              })),
+          sizeBytes: db.sizeBytes || 0,
+          updatedAt: db.updatedAt || Date.now(),
+          tables: (db.tables || []).map((t: any) => ({
+            name: t.name,
+            type: t.type || 'table',
+            rowCount: t.rowCount || 0,
+            columns: (t.columns || []).map((c: any) => ({
+              name: c.name,
+              type: c.type || 'TEXT',
+              isPrimaryKey: c.isPrimaryKey,
+              isNullable: c.isNullable,
             })),
-          }));
+          })),
+        }));
 
-          useDatabaseStore.getState().setDatabases(formattedDbs);
+        useDatabaseStore.getState().setDatabases(formattedDbs);
 
-          // Select first DB and table (preserving active table selection if it exists)
-          const firstDb = formattedDbs[0];
-          set({ selectedDbRemotePath: firstDb.path });
+        // Select first DB and table (preserving active table selection if it exists)
+        const firstDb = formattedDbs[0];
+        set({
+          selectedDbRemotePath: firstDb.path,
+          discoveryStage: 'loading_schema',
+          discoveryMessage: `Discovered ${formattedDbs.length} database(s). Loading schema & tables...`,
+        });
 
-          const currentTable = useDatabaseStore.getState().selectedTableName;
-          const tableToLoad =
-            currentTable && firstDb.tables.some((t: any) => t.name === currentTable)
-              ? currentTable
-              : firstDb.tables.length > 0
-                ? firstDb.tables[0].name
-                : null;
+        const currentTable = useDatabaseStore.getState().selectedTableName;
+        const tableToLoad =
+          currentTable && firstDb.tables.some((t: any) => t.name === currentTable)
+            ? currentTable
+            : firstDb.tables.length > 0
+              ? firstDb.tables[0].name
+              : null;
 
-          if (tableToLoad) {
-            get().loadTableData(tableToLoad, 1, 50);
-          }
+        if (tableToLoad) {
+          await get().loadTableData(tableToLoad, 1, 50);
         } else {
-          useDatabaseStore.getState().setDatabases([]);
+          set({ isInitialLoading: false, discoveryStage: 'ready', discoveryMessage: 'Ready' });
         }
-      } catch {
-        set({ isLoadingDatabases: false });
+      } else {
+        useDatabaseStore.getState().setDatabases([]);
+        set({
+          isInitialLoading: false,
+          discoveryStage: 'ready',
+          discoveryMessage: 'No database files found in app sandbox',
+        });
       }
-    },
+    } catch {
+      set({
+        isLoadingDatabases: false,
+        isInitialLoading: false,
+        discoveryStage: 'ready',
+        discoveryMessage: 'Database discovery completed',
+      });
+    }
+  },
 
   refreshDatabases: async () => {
     const pkg = get().selectedPackageName;
@@ -375,6 +483,11 @@ export const useAdbStore = create<AdbState>((set, get) => ({
       }
     } catch (e) {
       console.error('Error fetching ADB table data:', e);
+      useDatabaseStore.setState({ isLoadingTable: false });
+    } finally {
+      if (get().isInitialLoading || get().discoveryStage === 'loading_schema') {
+        set({ isInitialLoading: false, discoveryStage: 'ready', discoveryMessage: 'Ready' });
+      }
     }
   },
 

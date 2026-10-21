@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
-import { ArrowUpRight, Sparkles, Download, RefreshCw, AlertCircle } from 'lucide-react';
+import { Sparkles, Download, RefreshCw, AlertCircle } from 'lucide-react';
 import { useUpdaterStore, CURRENT_APP_VERSION } from './useUpdaterStore';
-import { BrowserOpenURL } from '@/../wailsjs/runtime/runtime';
 
 export function UpdateBadge() {
   const status = useUpdaterStore((s) => s.status);

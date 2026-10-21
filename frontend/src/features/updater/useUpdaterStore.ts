@@ -129,7 +129,6 @@ export const useUpdaterStore = create<UpdaterStoreState>((set, get) => ({
   },
 
   closeModal: () => {
-    const { isCountdownActive } = get();
     set({
       isModalOpen: false,
       isCountdownActive: false,
@@ -287,7 +286,9 @@ export const useUpdaterStore = create<UpdaterStoreState>((set, get) => ({
       try {
         unsubProgress();
         unsubReady();
-      } catch {}
+      } catch {
+        /* ignore listener cleanup errors */
+      }
     };
   },
 }));

@@ -41,7 +41,7 @@ interface UpdaterStoreState {
   initEventListeners: () => () => void;
 }
 
-export const CURRENT_APP_VERSION = 'v1.2.0';
+export const CURRENT_APP_VERSION = 'v1.3.0';
 
 export const useUpdaterStore = create<UpdaterStoreState>((set, get) => ({
   status: 'idle',

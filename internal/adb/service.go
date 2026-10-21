@@ -202,6 +202,12 @@ func (s *Service) ensureDatabaseSynced(deviceID, packageName, remotePath string,
 	localFi, localErr := os.Stat(localPath)
 	localExists := localErr == nil && localFi.Size() > 0
 
+	// If local file already exists on disk with matching remote size and entry is unhydrated,
+	// hydrate entry from disk to avoid a redundant multi-hundred MB download on cold start.
+	if localExists && mainFound && localFi.Size() == mainStat.size && entry.mainStat.size == 0 {
+		entry.mainStat = mainStat
+	}
+
 	needFullPull := !localExists || (mainFound && (mainStat.size != entry.mainStat.size || mainStat.mtime != entry.mainStat.mtime))
 
 	if needFullPull {

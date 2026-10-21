@@ -107,21 +107,26 @@ func (c *Client) ExecOutCat(deviceID, packageName, remotePath, localDestPath str
 		return err
 	}
 
-	destFile, err := os.Create(localDestPath)
+	tmpPath := fmt.Sprintf("%s.downloading.%d", localDestPath, time.Now().UnixNano())
+	destFile, err := os.Create(tmpPath)
 	if err != nil {
 		return err
 	}
-	defer destFile.Close()
 
 	cmd := exec.Command(c.adbPath, "-s", deviceID, "exec-out", "run-as", packageName, "cat", remotePath)
 	cmd.Stdout = destFile
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("exec-out failed: %v, stderr: %s", err, strings.TrimSpace(stderr.String()))
+	runErr := cmd.Run()
+	_ = destFile.Close()
+
+	if runErr != nil {
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("exec-out failed: %v, stderr: %s", runErr, strings.TrimSpace(stderr.String()))
 	}
-	return nil
+
+	return os.Rename(tmpPath, localDestPath)
 }
 
 // PushToSandbox writes a local file into the app sandbox.

@@ -12,6 +12,7 @@ func (a *App) Startup(ctx context.Context) {
 	a.mu.Lock()
 	a.ctx = ctx
 	a.broadcaster.SetContext(ctx)
+	a.updater.SetContext(ctx)
 	a.mu.Unlock()
 
 	log.Printf("[VetroLog] Starting WebSocket server on port %d...", a.config.WSPort)
@@ -38,6 +39,9 @@ func (a *App) BeforeClose(ctx context.Context) (prevent bool) {
 // Shutdown is called during application teardown
 func (a *App) Shutdown(ctx context.Context) {
 	log.Printf("[VetroLog] Shutting down server and mDNS...")
+	if a.updater != nil {
+		_ = a.updater.CancelUpdate()
+	}
 	if a.mdns != nil {
 		a.mdns.Stop()
 	}

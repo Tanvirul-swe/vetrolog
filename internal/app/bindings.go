@@ -11,6 +11,7 @@ import (
 	"vetrolog/internal/adb"
 	"vetrolog/internal/discovery"
 	"vetrolog/internal/models"
+	"vetrolog/internal/updater"
 )
 
 // GetConnectionState returns current desktop server and mobile connection status
@@ -220,5 +221,25 @@ func (a *App) SaveExportFile(defaultFilename string, filePattern string, content
 	}
 
 	return savePath, nil
+}
+
+// CheckForUpdate checks GitHub Releases API for any newer version than current
+func (a *App) CheckForUpdate() (*updater.UpdateInfo, error) {
+	return a.updater.CheckForUpdate()
+}
+
+// StartDownloadUpdate begins downloading the update artifact in the background
+func (a *App) StartDownloadUpdate(assetURL, version string) error {
+	return a.updater.StartDownloadUpdate(assetURL, version)
+}
+
+// ApplyUpdateAndRestart applies the downloaded update and restarts VetroLog
+func (a *App) ApplyUpdateAndRestart(version string) error {
+	return a.updater.ApplyUpdateAndRestart(version)
+}
+
+// CancelUpdate stops any active update download
+func (a *App) CancelUpdate() error {
+	return a.updater.CancelUpdate()
 }
 

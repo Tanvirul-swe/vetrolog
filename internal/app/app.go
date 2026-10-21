@@ -8,6 +8,7 @@ import (
 	"vetrolog/internal/config"
 	"vetrolog/internal/discovery"
 	"vetrolog/internal/server"
+	"vetrolog/internal/updater"
 )
 
 // App manages the backend subsystems, Wails runtime context, and exported methods
@@ -19,6 +20,7 @@ type App struct {
 	batcher     *broadcaster.MutationBatcher
 	server      *server.Server
 	mdns        *discovery.MDNSService
+	updater     *updater.Service
 }
 
 // NewApp creates a new App struct with initialized subsystems
@@ -27,11 +29,13 @@ func NewApp() *App {
 	b := broadcaster.NewBroadcaster()
 	batcher := broadcaster.NewMutationBatcher(b, cfg.BatchFlushWindow, cfg.MaxBatchSize)
 	srv := server.NewServer(cfg, b, batcher)
+	upd := updater.NewService()
 
 	return &App{
 		config:      cfg,
 		broadcaster: b,
 		batcher:     batcher,
 		server:      srv,
+		updater:     upd,
 	}
 }

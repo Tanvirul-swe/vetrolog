@@ -50,6 +50,18 @@ export function AdbUpdateRow(arg1, arg2, arg3, arg4, arg5, arg6) {
   return window['go']['app']['App']['AdbUpdateRow'](arg1, arg2, arg3, arg4, arg5, arg6);
 }
 
+export function ApplyUpdateAndRestart(arg1) {
+  return window['go']['app']['App']['ApplyUpdateAndRestart'](arg1);
+}
+
+export function CancelUpdate() {
+  return window['go']['app']['App']['CancelUpdate']();
+}
+
+export function CheckForUpdate() {
+  return window['go']['app']['App']['CheckForUpdate']();
+}
+
 export function DeleteRow(arg1, arg2, arg3) {
   return window['go']['app']['App']['DeleteRow'](arg1, arg2, arg3);
 }
@@ -76,6 +88,10 @@ export function RequestTableData(arg1, arg2, arg3, arg4) {
 
 export function SaveExportFile(arg1, arg2, arg3) {
   return window['go']['app']['App']['SaveExportFile'](arg1, arg2, arg3);
+}
+
+export function StartDownloadUpdate(arg1, arg2) {
+  return window['go']['app']['App']['StartDownloadUpdate'](arg1, arg2);
 }
 
 export function UpdateRow(arg1, arg2, arg3, arg4) {

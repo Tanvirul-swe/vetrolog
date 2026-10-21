@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"vetrolog/internal/adb"
+	"vetrolog/internal/version"
 )
 
 // Server handles the HTTP REST API and serves the embedded React frontend
@@ -79,7 +80,7 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/status", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]interface{}{
 			"status":  "ok",
-			"version": "1.1.1",
+			"version": version.CurrentVersion,
 			"time":    time.Now().Unix(),
 		})
 	})

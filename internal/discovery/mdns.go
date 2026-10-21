@@ -1,11 +1,14 @@
 package discovery
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"os"
 
 	"github.com/grandcat/zeroconf"
+
+	"vetrolog/internal/version"
 )
 
 // MDNSService advertises the VetroLog WebSocket server on the local Wi-Fi network
@@ -20,7 +23,7 @@ func NewMDNSService(port int) *MDNSService {
 		hostname = "vetrolog-host"
 	}
 
-	txt := []string{"version=1.1.1", "app=vetrolog"}
+	txt := []string{fmt.Sprintf("version=%s", version.CurrentVersion), "app=vetrolog"}
 
 	// Register _vetrolog._tcp.local.
 	server, err := zeroconf.Register(

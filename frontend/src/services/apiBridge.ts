@@ -334,4 +334,86 @@ export const apiBridge = {
     const data = await res.json();
     return Boolean(data.success);
   },
+
+  checkForUpdate: async (): Promise<UpdateInfoBridge | null> => {
+    if (isWailsApp()) {
+      try {
+        return (await AppBindings.CheckForUpdate()) as UpdateInfoBridge;
+      } catch (err) {
+        console.error('CheckForUpdate failed:', err);
+        return null;
+      }
+    }
+    try {
+      const res = await fetch('https://api.github.com/repos/Tanvirul-swe/vetrolog/releases/latest');
+      if (!res.ok) return null;
+      const data = await res.json();
+      return {
+        currentVersion: 'v1.2.0',
+        latestVersion: data.tag_name,
+        releaseName: data.name,
+        releaseNotes: data.body,
+        releaseUrl: data.html_url,
+        assetUrl: data.assets?.[0]?.browser_download_url || '',
+        assetName: data.assets?.[0]?.name || '',
+        assetSize: data.assets?.[0]?.size || 0,
+        publishedAt: data.published_at,
+        hasUpdate: Boolean(data.tag_name && data.tag_name !== 'v1.2.0'),
+      };
+    } catch {
+      return null;
+    }
+  },
+
+  startDownloadUpdate: async (assetUrl: string, version: string): Promise<boolean> => {
+    if (isWailsApp()) {
+      try {
+        await AppBindings.StartDownloadUpdate(assetUrl, version);
+        return true;
+      } catch (err) {
+        console.error('StartDownloadUpdate failed:', err);
+        return false;
+      }
+    }
+    return false;
+  },
+
+  applyUpdateAndRestart: async (version: string): Promise<boolean> => {
+    if (isWailsApp()) {
+      try {
+        await AppBindings.ApplyUpdateAndRestart(version);
+        return true;
+      } catch (err) {
+        console.error('ApplyUpdateAndRestart failed:', err);
+        return false;
+      }
+    }
+    return false;
+  },
+
+  cancelUpdate: async (): Promise<boolean> => {
+    if (isWailsApp()) {
+      try {
+        await AppBindings.CancelUpdate();
+        return true;
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  },
 };
+
+export interface UpdateInfoBridge {
+  currentVersion: string;
+  latestVersion: string;
+  releaseName: string;
+  releaseNotes: string;
+  releaseUrl: string;
+  assetUrl: string;
+  assetName: string;
+  assetSize: number;
+  publishedAt: string;
+  hasUpdate: boolean;
+}
+

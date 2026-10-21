@@ -10,6 +10,7 @@ import { usePlaygroundStore } from '@/stores/usePlaygroundStore';
 import { QRPairingModal } from '@/features/connection/components/QRPairingModal';
 import { AdbDeviceSelector } from '@/features/adb/components/AdbDeviceSelector';
 import { UpdateBadge } from '@/features/updater/UpdateBadge';
+import { UpdateProgressModal } from '@/features/updater/UpdateProgressModal';
 import { isWailsApp } from '@/services/apiBridge';
 import logoIcon from '@/assets/images/vetrolog-icon.png';
 
@@ -187,6 +188,8 @@ export function AppHeader({ searchInputRef, onRefresh }: AppHeaderProps) {
         onClose={() => setIsPairingOpen(false)}
       />
     )}
+
+    <UpdateProgressModal />
   </>
   );
 }

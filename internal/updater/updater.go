@@ -15,7 +15,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
@@ -554,7 +553,7 @@ func (s *Service) applyMacOSUpdate(newAppPath, zipPath string) error {
 		currentAppPath, newAppPath, currentAppPath, currentAppPath, currentAppPath)
 
 	cmd := exec.Command("sh", "-c", script)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	detachProcess(cmd)
 
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to initiate macOS app replacement helper: %w", err)
@@ -573,6 +572,7 @@ func (s *Service) applyWindowsUpdate(downloadPath string) error {
 	if strings.HasSuffix(strings.ToLower(downloadPath), ".exe") {
 		// Silent installer execution
 		cmd := exec.Command("cmd.exe", "/C", "start", "", downloadPath, "/SILENT")
+		detachProcess(cmd)
 		if err := cmd.Start(); err != nil {
 			return fmt.Errorf("failed to launch installer: %w", err)
 		}
@@ -594,6 +594,7 @@ func (s *Service) applyLinuxUpdate(downloadPath string) error {
 		// Use pkexec or gdebi to install
 		script := fmt.Sprintf(`pkexec dpkg -i '%s' && /usr/bin/vetrolog &`, downloadPath)
 		cmd := exec.Command("sh", "-c", script)
+		detachProcess(cmd)
 		if err := cmd.Start(); err != nil {
 			return fmt.Errorf("failed to launch deb package installer: %w", err)
 		}

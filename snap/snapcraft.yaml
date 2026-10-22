@@ -1,17 +1,30 @@
 name: vetrolog
+title: VetroLog
 base: core22
 version: '1.3.0'
-summary: Real-time Mobile SQLite Database Inspector
+summary: Real-time desktop SQLite database inspector for mobile developers
 description: |
-  High-performance desktop SQLite database inspector for mobile developers
-  building applications with Flutter, Android (Room/SQLite), and React Native.
+  **VetroLog** is a high-performance desktop SQLite database inspector purpose-built for mobile engineers building applications with **Flutter, Android (Room), and React Native**.
 
-  Features:
-  - Zero mobile SDK integration required: connects directly to emulators and USB devices over ADB
-  - Live SQLite WAL synchronization and background change replication
-  - Multi-tab SQL Playground with visual query execution plan graph
-  - Gemini 2.5 Flash AI natural language query generator & 1-click index advisor
-  - In-place reactive table data editing
+  ### 🌟 Key Highlights
+
+  - **⚡ Zero SDK Setup**: Connects directly to running physical devices and emulators over ADB without modifying a single line of your mobile codebase.
+  - **🔄 Real-Time WAL Synchronization**: Instantly captures live inserts, updates, and deletes with SQLite Write-Ahead Logging (`-wal`) and Shared Memory (`-shm`) sync.
+  - **🧠 Intelligent SQL Playground**: Multi-tab query console featuring visual `EXPLAIN QUERY PLAN` execution trees, syntax highlighting, and 1-click Index Advisor recommendations.
+  - **✏️ Bidirectional In-Place Editing**: Double-click any cell in the DataGrid to modify values with optimistic UI feedback and live device write-back.
+  - **🤖 AI-Powered Assistant**: Natural language SQL query generation with offline support or BYOK Gemini 2.5 Flash / OpenAI.
+  - **🌐 Local Web Server Mode**: Run as a desktop application or start headless in your browser with `vetrolog --web`.
+
+  ### 📱 Framework Compatibility
+  - **Flutter**: Drift, sqflite, floor
+  - **Android Native**: Room, SQLiteOpenHelper, SQLDelight
+  - **React Native**: react-native-sqlite-storage, op-sqlite
+
+license: MIT
+website: https://vetro.hifzio.com/
+source-code: https://github.com/Tanvirul-swe/vetrolog
+issues: https://github.com/Tanvirul-swe/vetrolog/issues
+contact: mailto:tanvirul.islam.swe@gmail.com
 
 grade: stable
 confinement: strict

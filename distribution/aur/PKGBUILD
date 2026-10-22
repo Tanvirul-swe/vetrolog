@@ -1,0 +1,24 @@
+# Maintainer: Md. Tanvirul Islam <tanvirul.islam.swe@gmail.com>
+pkgname=vetrolog-bin
+pkgver=1.3.0
+pkgrel=1
+pkgdesc="High-performance desktop SQLite database inspector for mobile developers (Flutter, Android, React Native)"
+arch=('x86_64')
+url="https://vetro.hifzio.com"
+license=('MIT')
+depends=('gtk3' 'webkit2gtk')
+optdepends=('android-tools: For ADB device connectivity')
+provides=('vetrolog')
+conflicts=('vetrolog')
+source_x86_64=("https://github.com/Tanvirul-swe/vetrolog/releases/download/v${pkgver}/VetroLog-Linux-x64.tar.gz"
+               "vetrolog.desktop::https://raw.githubusercontent.com/Tanvirul-swe/vetrolog/main/distribution/flathub/com.hifzio.vetrolog.desktop"
+               "vetrolog.png::https://raw.githubusercontent.com/Tanvirul-swe/vetrolog/main/build/appicon.png")
+sha256sums_x86_64=('e00b74efa8fde3fb88a61c638205d715b3d3a4f8bdedc27de183fc1daccee478'
+                   'SKIP'
+                   'SKIP')
+
+package() {
+    install -Dm755 "${srcdir}/vetrolog" "${pkgdir}/usr/bin/vetrolog"
+    install -Dm644 "${srcdir}/vetrolog.desktop" "${pkgdir}/usr/share/applications/vetrolog.desktop"
+    install -Dm644 "${srcdir}/vetrolog.png" "${pkgdir}/usr/share/icons/hicolor/512x512/apps/vetrolog.png"
+}

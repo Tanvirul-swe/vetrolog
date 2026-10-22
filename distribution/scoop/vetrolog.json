@@ -1,0 +1,27 @@
+{
+  "version": "1.3.0",
+  "description": "Real-time Mobile SQLite Database Inspector for Flutter, Android & React Native",
+  "homepage": "https://vetro.hifzio.com",
+  "license": "MIT",
+  "architecture": {
+    "64bit": {
+      "url": "https://github.com/Tanvirul-swe/vetrolog/releases/download/v1.3.0/VetroLog-Windows-x64-Portable.zip",
+      "hash": "e3385cf987abdbc59d98b6082d25868e2ef2a22f23b09e4c7e33f6176d748e22",
+      "bin": "vetrolog.exe",
+      "shortcuts": [
+        [
+          "vetrolog.exe",
+          "VetroLog"
+        ]
+      ]
+    }
+  },
+  "checkver": "github",
+  "autoupdate": {
+    "architecture": {
+      "64bit": {
+        "url": "https://github.com/Tanvirul-swe/vetrolog/releases/download/v$version/VetroLog-Windows-x64-Portable.zip"
+      }
+    }
+  }
+}

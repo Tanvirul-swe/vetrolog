@@ -1,7 +1,7 @@
 # Binaries & build artifacts
 build/bin/
-vetrolog
-vetrolog.exe
+/vetrolog
+/vetrolog.exe
 *.exe
 *.dll
 *.so

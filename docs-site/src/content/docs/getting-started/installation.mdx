@@ -17,11 +17,29 @@ Select your operating system below to start downloading immediately:
 
 <Tabs>
   <TabItem label="macOS" icon="apple">
+    ### 🍺 Method A: Homebrew Cask (Recommended)
+
+    Install VetroLog directly using the official tap:
+
+    ```bash
+    brew install tanvirul-swe/tap/vetrolog
+    ```
+
+    Or add the tap first and install:
+    ```bash
+    brew tap tanvirul-swe/tap
+    brew install --cask vetrolog
+    ```
+
+    ---
+
+    ### 📦 Method B: Direct DMG Download
+
     <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; margin: 1rem 0;">
-      <LinkButton href="https://github.com/Tanvirul-swe/releases/latest/download/VetroLog-macOS-Universal.dmg" variant="primary" icon="download">
+      <LinkButton href="https://github.com/Tanvirul-swe/vetrolog/releases/latest/download/VetroLog-macOS-Universal.dmg" variant="primary" icon="download">
         Download macOS DMG (Universal)
       </LinkButton>
-      <LinkButton href="https://github.com/Tanvirul-swe/releases/latest/download/VetroLog-macOS-Universal.zip" variant="secondary" icon="document">
+      <LinkButton href="https://github.com/Tanvirul-swe/vetrolog/releases/latest/download/VetroLog-macOS-Universal.zip" variant="secondary" icon="document">
         Download .zip Archive
       </LinkButton>
     </div>
@@ -52,28 +70,34 @@ Select your operating system below to start downloading immediately:
   </TabItem>
 
   <TabItem label="Windows" icon="windows">
+    ### 🪟 Method A: WinGet (Official Windows Package Manager)
+
+    Built into Windows 10 and Windows 11 by default:
+
+    ```powershell
+    winget install Hifzio.VetroLog
+    ```
+
+    ---
+
+    ### 🍨 Method B: Scoop
+
+    Popular with command-line developers and power users:
+
+    ```powershell
+    scoop install https://raw.githubusercontent.com/Tanvirul-swe/vetrolog/main/distribution/scoop/vetrolog.json
+    ```
+
+    ---
+
+    ### 📦 Method C: Portable Zero-Install ZIP
+
     <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; margin: 1rem 0;">
-      <LinkButton href="https://github.com/Tanvirul-swe/releases/latest/download/VetroLog-amd64-installer.exe" variant="primary" icon="download">
-        Download Windows Setup (.exe)
-      </LinkButton>
-      <LinkButton href="https://github.com/Tanvirul-swe/releases/latest/download/VetroLog-Windows-x64-Portable.zip" variant="secondary" icon="document">
+      <LinkButton href="https://github.com/Tanvirul-swe/vetrolog/releases/latest/download/VetroLog-Windows-x64-Portable.zip" variant="primary" icon="download">
         Download Portable ZIP (.zip)
       </LinkButton>
     </div>
 
-    <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
-      <Badge text="Windows 10 / 11 64-bit" variant="tip" />
-      <Badge text="NSIS Setup Wizard" variant="note" />
-    </div>
-
-    ### Method A: Guided Installer (Recommended)
-    <Steps>
-    1. **Download Installer**: Click the **Download Windows Setup** button above (`VetroLog-amd64-installer.exe`).
-    2. **Run Installer**: Double-click the executable and follow the setup wizard.
-    3. **Start Inspecting**: VetroLog automatically creates Desktop and Start Menu shortcuts.
-    </Steps>
-
-    ### Method B: Portable Zero-Install ZIP
     <Steps>
     1. Download `VetroLog-Windows-x64-Portable.zip`.
     2. Extract the archive into any folder (e.g. `C:\Tools\VetroLog`).
@@ -82,33 +106,51 @@ Select your operating system below to start downloading immediately:
   </TabItem>
 
   <TabItem label="Linux" icon="linux">
+    ### 🛍️ Method A: Snap Store / Ubuntu App Center
+
+    Available on Ubuntu, Debian, Fedora, and openSUSE:
+
+    ```bash
+    sudo snap install vetrolog
+    ```
+
+    ---
+
+    ### 🏹 Method B: Arch User Repository (AUR)
+
+    For Arch Linux, Manjaro, and EndeavourOS:
+
+    ```bash
+    yay -S vetrolog-bin
+    ```
+
+    ---
+
+    ### 📦 Method C: Debian / Ubuntu Package (`.deb`)
+
     <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; margin: 1rem 0;">
-      <LinkButton href="https://github.com/Tanvirul-swe/releases/latest/download/VetroLog-Linux-amd64.deb" variant="primary" icon="download">
+      <LinkButton href="https://github.com/Tanvirul-swe/vetrolog/releases/latest/download/VetroLog-Linux-amd64.deb" variant="primary" icon="download">
         Download Debian / Ubuntu (.deb)
       </LinkButton>
-      <LinkButton href="https://github.com/Tanvirul-swe/releases/latest/download/VetroLog-Linux-x64.tar.gz" variant="secondary" icon="document">
+      <LinkButton href="https://github.com/Tanvirul-swe/vetrolog/releases/latest/download/VetroLog-Linux-x64.tar.gz" variant="secondary" icon="document">
         Download Tarball (.tar.gz)
       </LinkButton>
     </div>
 
-    <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
-      <Badge text="Debian / Ubuntu / Mint" variant="tip" />
-      <Badge text="Arch / Fedora / Generic" variant="note" />
-    </div>
-
-    ### Method A: Debian / Ubuntu Package (`.deb`)
     <Steps>
     1. **Download Package**: Click **Download Debian / Ubuntu (.deb)** above.
     2. **Install via Terminal**:
        ```bash
        sudo dpkg -i VetroLog-Linux-amd64.deb
-       # If any GTK/WebKit dependencies are missing, auto-resolve with:
+       # If any dependencies are missing, auto-resolve with:
        sudo apt-get install -f
        ```
     3. **Launch**: Open from your application drawer or run `vetrolog` in your terminal.
     </Steps>
 
-    ### Method B: Standalone Tarball (All Linux Distributions)
+    ---
+
+    ### 📦 Method D: Standalone Tarball (All Linux Distributions)
     <Steps>
     1. Download and extract `VetroLog-Linux-x64.tar.gz`:
        ```bash

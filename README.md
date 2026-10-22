@@ -43,28 +43,49 @@ Visit our complete documentation site: **[https://vetro.hifzio.com/](https://vet
 
 ---
 
-## 📥 Download & Installation
+## 📥 Download & Package Managers
 
-Get the latest installer for your operating system from **[GitHub Releases](https://github.com/Tanvirul-swe/vetrolog/releases/latest)**:
+Install VetroLog using your favorite package manager or download direct pre-compiled release binaries from **[GitHub Releases](https://github.com/Tanvirul-swe/vetrolog/releases/latest)**:
 
 ### 🍎 macOS (Apple Silicon M1/M2/M3/M4 & Intel)
-1. Download **`VetroLog-macOS-Universal.dmg`** (or `.zip`).
-2. Open the DMG and drag **VetroLog** into your `Applications` folder.
-3. *First time opening:* If macOS Gatekeeper shows an untrusted developer prompt, right-click `VetroLog.app` and choose **Open**, or run:
-   ```bash
-   xattr -d com.apple.quarantine /Applications/VetroLog.app
-   ```
+* **Homebrew Cask (Recommended)**:
+  ```bash
+  brew install tanvirul-swe/tap/vetrolog
+  ```
+* **Direct DMG Download**:
+  1. Download **`VetroLog-macOS-Universal.dmg`** (or `.zip`).
+  2. Open the DMG and drag **VetroLog** into `/Applications`.
+  3. *First time opening:* If macOS Gatekeeper shows an unverified developer prompt, right-click `VetroLog.app` and choose **Open**, or run:
+     ```bash
+     xattr -d com.apple.quarantine /Applications/VetroLog.app
+     ```
 
 ### 🪟 Windows (Windows 10 / 11 64-bit)
-- **Setup Wizard**: Download and run **`vetrolog-amd64-installer.exe`** for a full guided installation with Desktop & Start Menu shortcuts.
-- **Portable**: Download **`VetroLog-Windows-x64-Portable.zip`**, extract anywhere, and launch `vetrolog.exe`.
+* **WinGet (Official Windows Package Manager)**:
+  ```powershell
+  winget install Hifzio.VetroLog
+  ```
+* **Scoop**:
+  ```powershell
+  scoop install https://raw.githubusercontent.com/Tanvirul-swe/vetrolog/main/distribution/scoop/vetrolog.json
+  ```
+* **Portable ZIP**: Download **`VetroLog-Windows-x64-Portable.zip`**, extract anywhere, and launch `vetrolog.exe`.
 
 ### 🐧 Linux (Ubuntu, Debian, Fedora, Arch)
-- **Debian / Ubuntu**: Download and install **`VetroLog-Linux-amd64.deb`**:
+* **Snap Store (Ubuntu / Debian / Fedora)**:
+  ```bash
+  sudo snap install vetrolog
+  ```
+* **Arch User Repository (AUR)**:
+  ```bash
+  yay -S vetrolog-bin
+  ```
+* **Debian / Ubuntu (.deb)**:
   ```bash
   sudo dpkg -i VetroLog-Linux-amd64.deb
+  sudo apt-get install -f
   ```
-- **Tarball (All Distros)**: Download **`VetroLog-Linux-x64.tar.gz`**, extract, and run `./vetrolog`.
+* **Tarball (All Distros)**: Download **`VetroLog-Linux-x64.tar.gz`**, extract, and run `./vetrolog`.
 
 ---
 

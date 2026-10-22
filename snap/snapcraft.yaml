@@ -1,0 +1,36 @@
+name: vetrolog
+base: core22
+version: '1.3.0'
+summary: Real-time Mobile SQLite Database Inspector
+description: |
+  High-performance desktop SQLite database inspector for mobile developers
+  building applications with Flutter, Android (Room/SQLite), and React Native.
+  
+  Features:
+  - Zero mobile SDK integration required: connects directly to emulators and USB devices over ADB
+  - Live SQLite WAL synchronization and background change replication
+  - Multi-tab SQL Playground with visual query execution plan graph
+  - Gemini 2.5 Flash AI natural language query generator & 1-click index advisor
+  - In-place reactive table data editing
+
+grade: stable
+confinement: strict
+
+apps:
+  vetrolog:
+    command: vetrolog
+    extensions: [gnome]
+    plugs:
+      - network
+      - network-bind
+      - home
+      - removable-media
+      - adb-support
+
+parts:
+  vetrolog:
+    plugin: dump
+    source: https://github.com/Tanvirul-swe/vetrolog/releases/download/v1.3.0/VetroLog-Linux-x64.tar.gz
+    source-checksum: sha256/e00b74efa8fde3fb88a61c638205d715b3d3a4f8bdedc27de183fc1daccee478
+    organize:
+      vetrolog: bin/vetrolog

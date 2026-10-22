@@ -5,7 +5,7 @@ summary: Real-time Mobile SQLite Database Inspector
 description: |
   High-performance desktop SQLite database inspector for mobile developers
   building applications with Flutter, Android (Room/SQLite), and React Native.
-  
+
   Features:
   - Zero mobile SDK integration required: connects directly to emulators and USB devices over ADB
   - Live SQLite WAL synchronization and background change replication
@@ -18,8 +18,9 @@ confinement: strict
 
 apps:
   vetrolog:
-    command: vetrolog
+    command: bin/vetrolog
     extensions: [gnome]
+    desktop: usr/share/applications/vetrolog.desktop
     plugs:
       - network
       - network-bind
@@ -34,3 +35,10 @@ parts:
     source-checksum: sha256/e00b74efa8fde3fb88a61c638205d715b3d3a4f8bdedc27de183fc1daccee478
     organize:
       vetrolog: bin/vetrolog
+  metadata:
+    plugin: nil
+    override-build: |
+      mkdir -p $CRAFT_PART_INSTALL/usr/share/applications
+      mkdir -p $CRAFT_PART_INSTALL/usr/share/icons/hicolor/512x512/apps
+      cp $CRAFT_PROJECT_DIR/distribution/desktop/vetrolog.desktop $CRAFT_PART_INSTALL/usr/share/applications/vetrolog.desktop
+      cp $CRAFT_PROJECT_DIR/build/appicon.png $CRAFT_PART_INSTALL/usr/share/icons/hicolor/512x512/apps/vetrolog.png

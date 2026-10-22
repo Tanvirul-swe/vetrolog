@@ -41,13 +41,13 @@ function processMarkdownFile(filePath) {
   content = content.replace(/\{%\s*hint style="danger"\s*%\}/g, ':::danger');
   content = content.replace(/\{%\s*endhint\s*%\}/g, ':::');
 
-  // Convert image paths to /vetrolog/assets/...
-  content = content.replace(/\.\.\/\.gitbook\/assets\//g, '/vetrolog/assets/');
-  content = content.replace(/\.gitbook\/assets\//g, '/vetrolog/assets/');
-  content = content.replace(/\.\.\/assets\//g, '/vetrolog/assets/');
+  // Convert image paths to /assets/...
+  content = content.replace(/\.\.\/\.gitbook\/assets\//g, '/assets/');
+  content = content.replace(/\.gitbook\/assets\//g, '/assets/');
+  content = content.replace(/\.\.\/assets\//g, '/assets/');
 
   // Convert intra-doc links (.md -> clean URL with trailing slash)
-  // e.g. [Quick Start](getting-started/quickstart.md) -> [Quick Start](/vetrolog/getting-started/quickstart/)
+  // e.g. [Quick Start](getting-started/quickstart.md) -> [Quick Start](/getting-started/quickstart/)
   content = content.replace(/\]\((?!https?:\/\/)([^)#]+)\.md(#?[^)]*)\)/g, (match, p1, p2) => {
     let target = p1;
     if (target.startsWith('../')) {
@@ -58,9 +58,9 @@ function processMarkdownFile(filePath) {
     // If target is just a relative file without folder prefix, resolve based on relative path if needed
     if (!target.startsWith('/')) {
       // Keep simple relative link or absolute base
-      return `](/vetrolog/${target}/${p2})`;
+      return `](/${target}/${p2})`;
     }
-    return `](/vetrolog${target}/${p2})`;
+    return `](${target}/${p2})`;
   });
 
   fs.writeFileSync(filePath, content, 'utf8');

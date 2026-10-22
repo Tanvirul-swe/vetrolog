@@ -14,7 +14,7 @@ Mobile database debugging has historically been painful. Traditional inspection 
 
 VetroLog was built to eliminate these hurdles. It operates on three core principles:
 
-![VetroLog Zero-Config Mobile Database Inspector](/vetrolog/assets/images/live_inspector_hero.png)
+![VetroLog Zero-Config Mobile Database Inspector](/assets/images/live_inspector_hero.png)
 
 ```mermaid
 graph LR
@@ -52,5 +52,5 @@ SQLite modern mobile applications use WAL mode (`-wal` and `-shm` files). When y
 
 ## Next Steps
 
-* Ready to install VetroLog? Check out the **[Installation Guide](/vetrolog/installation/)**.
-* Have VetroLog installed already? Jump directly to the **[3-Minute Quick Start](/vetrolog/quickstart/)**.
+* Ready to install VetroLog? Check out the **[Installation Guide](/installation/)**.
+* Have VetroLog installed already? Jump directly to the **[3-Minute Quick Start](/quickstart/)**.

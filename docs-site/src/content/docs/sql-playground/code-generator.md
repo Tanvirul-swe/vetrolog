@@ -6,7 +6,7 @@ Writing and testing queries in VetroLog is only half the battle. You still need 
 
 The **Code Generator** exports your active SQL query directly into production-ready code snippets across 5 mobile frameworks and languages.
 
-![VetroLog Multi-Platform Code Export](/vetrolog/assets/images/sql_playground_editor.png)
+![VetroLog Multi-Platform Code Export](/assets/images/sql_playground_editor.png)
 
 ---
 
@@ -109,4 +109,4 @@ func GetActiveFarmers(ctx context.Context, db *sqlx.DB) ([]FarmerResult, error) 
 
 ## Next Steps
 
-* Read dedicated framework guides in **[Flutter Integration](/vetrolog/framework-guides/flutter/)** or **[Android Integration](/vetrolog/framework-guides/android-native/)**.
+* Read dedicated framework guides in **[Flutter Integration](/framework-guides/flutter/)** or **[Android Integration](/framework-guides/android-native/)**.

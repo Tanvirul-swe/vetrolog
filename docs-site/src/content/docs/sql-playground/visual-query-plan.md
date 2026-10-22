@@ -46,12 +46,12 @@ Each node in the query plan tree is highlighted with a clear status indicator:
 2. Click the **Explain Plan** button (or switch to the **Visual Plan** tab in the bottom panel).
 3. VetroLog renders the step-by-step operator hierarchy.
 
-![Visual Query Plan & SQL Console](/vetrolog/assets/images/sql_playground_editor.png)
-4. If a `SCAN` node is detected, click on the **[1-Click Index Advisor](/vetrolog/index-advisor/)** to instantly generate the missing index!
+![Visual Query Plan & SQL Console](/assets/images/sql_playground_editor.png)
+4. If a `SCAN` node is detected, click on the **[1-Click Index Advisor](/index-advisor/)** to instantly generate the missing index!
 
 ---
 
 ## Next Steps
 
-* Use the **[1-Click Index Advisor](/vetrolog/index-advisor/)** to fix slow `SCAN` queries with optimal indexes.
-* Check query latency against the 60 FPS mobile budget in the **[Performance Profiler](/vetrolog/profiler-and-dryrun/)**.
+* Use the **[1-Click Index Advisor](/index-advisor/)** to fix slow `SCAN` queries with optimal indexes.
+* Check query latency against the 60 FPS mobile budget in the **[Performance Profiler](/profiler-and-dryrun/)**.

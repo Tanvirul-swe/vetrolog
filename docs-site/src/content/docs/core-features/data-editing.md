@@ -19,7 +19,7 @@ This makes debugging edge cases, testing form validation, and resetting test use
    * **NULL**: Emptying the field or typing `NULL` sets the cell to SQL NULL.
 4. Press **Enter** to save (or press **Escape** to cancel).
 
-![VetroLog In-Place Table Editing](/vetrolog/assets/images/datagrid_view.png)
+![VetroLog In-Place Table Editing](/assets/images/datagrid_view.png)
 
 ### Optimistic UI & Safe Write-Back
 * **Immediate Feedback**: The cell updates optimistically on your screen with a subtle green pulse.
@@ -50,4 +50,4 @@ This makes debugging edge cases, testing form validation, and resetting test use
 To prevent accidental bulk updates or deletions, VetroLog strictly requires tables to have a Primary Key (`PK`) or `rowid` before allowing single-row in-place edits and deletions.
 :::
 
-If a table lacks an explicit primary key, you can still execute precise queries using the **[SQL Playground](/vetrolog/sql-playground/overview/)** or test modifications safely using the **[Safe Dry-Run Simulator](/vetrolog/sql-playground/profiler-and-dryrun/)**.
+If a table lacks an explicit primary key, you can still execute precise queries using the **[SQL Playground](/sql-playground/overview/)** or test modifications safely using the **[Safe Dry-Run Simulator](/sql-playground/profiler-and-dryrun/)**.

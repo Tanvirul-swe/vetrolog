@@ -70,4 +70,4 @@ export ADB_PATH="/opt/custom-android/platform-tools/adb"
 
 ## Next Steps
 
-* Learn how GitHub Actions builds binaries in **[CI/CD & Releases](/vetrolog/ci-cd-releases/)**.
+* Learn how GitHub Actions builds binaries in **[CI/CD & Releases](/ci-cd-releases/)**.

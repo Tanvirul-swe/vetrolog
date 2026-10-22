@@ -46,7 +46,7 @@ sequenceDiagram
     VetroLog-->>UI: Increment table badge & refresh table smoothly
 ```
 
-![Real-Time WAL Live Sync in VetroLog](/vetrolog/assets/images/datagrid_view.png)
+![Real-Time WAL Live Sync in VetroLog](/assets/images/datagrid_view.png)
 
 1. **Lightweight Timestamp Monitoring**: VetroLog checks the modification timestamp and byte size of the `.db-wal` file.
 2. **Zero Mobile CPU Impact**: The check is extremely lightweight, requiring zero CPU overhead or battery drain on the mobile device.
@@ -65,5 +65,5 @@ In the DataGrid toolbar, you will find the **Live Updates** switch:
 
 ## Next Steps
 
-* Discover how to edit and write data back to your phone in **[Bidirectional Data Editing](/vetrolog/data-editing/)**.
-* Learn how to query your data in the **[SQL Playground](/vetrolog/sql-playground/overview/)**.
+* Discover how to edit and write data back to your phone in **[Bidirectional Data Editing](/data-editing/)**.
+* Learn how to query your data in the **[SQL Playground](/sql-playground/overview/)**.

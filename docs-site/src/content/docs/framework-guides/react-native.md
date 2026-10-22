@@ -40,7 +40,7 @@ npx expo run:android
 4. In the top bar, select your connected device and choose your React Native package name (e.g. `com.myawesomeapp (Active)`).
 5. All SQLite tables created by your React Native components will load in the sidebar.
 
-![VetroLog Inspecting React Native SQLite Database](/vetrolog/assets/images/live_inspector_hero.png)
+![VetroLog Inspecting React Native SQLite Database](/assets/images/live_inspector_hero.png)
 
 ---
 
@@ -55,5 +55,5 @@ npx expo run:android
 
 ## Next Steps
 
-* Master multi-tab query execution in the **[SQL Playground Overview](/vetrolog/sql-playground/overview/)**.
-* Learn how **[1-Click Index Advisor](/vetrolog/sql-playground/index-advisor/)** speeds up slow list views.
+* Master multi-tab query execution in the **[SQL Playground Overview](/sql-playground/overview/)**.
+* Learn how **[1-Click Index Advisor](/sql-playground/index-advisor/)** speeds up slow list views.

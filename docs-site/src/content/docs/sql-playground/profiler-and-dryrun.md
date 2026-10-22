@@ -17,7 +17,7 @@ Every modern mobile OS targets **60 frames per second (FPS)** or higher:
 
 ---
 
-![Performance Profiler & 60 FPS Frame Budget](/vetrolog/assets/images/performance_profiler_fps.png)
+![Performance Profiler & 60 FPS Frame Budget](/assets/images/performance_profiler_fps.png)
 
 ---
 
@@ -41,7 +41,7 @@ The **Dry Run** simulator lets you test mutating queries safely before committin
 
 ---
 
-![Safe Dry Run Modal](/vetrolog/assets/images/dry_run_modal.png)
+![Safe Dry Run Modal](/assets/images/dry_run_modal.png)
 
 ---
 
@@ -69,4 +69,4 @@ When you click **Dry Run**:
 
 ## Next Steps
 
-* Export your tested queries into production code with the **[Multi-Platform Code Generator](/vetrolog/code-generator/)**.
+* Export your tested queries into production code with the **[Multi-Platform Code Generator](/code-generator/)**.

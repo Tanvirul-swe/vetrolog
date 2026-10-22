@@ -6,13 +6,13 @@ Write complex SQLite queries in plain English without memorizing syntax or colum
 
 ---
 
-![Natural Language AI Settings in VetroLog](/vetrolog/assets/images/gemini_ai_settings.png)
+![Natural Language AI Settings in VetroLog](/assets/images/gemini_ai_settings.png)
 
 ---
 
 ## 🎬 AI Generation & Safe Dry-Run Demo
 
-![Natural Language AI to SQL in Action](/vetrolog/assets/demos/ai_and_dryrun_demo.webp)
+![Natural Language AI to SQL in Action](/assets/demos/ai_and_dryrun_demo.webp)
 
 ---
 
@@ -70,5 +70,5 @@ Click the **Gear icon (⚙️)** in the natural language bar to open **AI Settin
 
 ## Next Steps
 
-* Optimize your generated queries using the **[1-Click Index Advisor](/vetrolog/index-advisor/)**.
-* Check frame budgets in the **[Performance Profiler & Safe Dry-Run](/vetrolog/profiler-and-dryrun/)**.
+* Optimize your generated queries using the **[1-Click Index Advisor](/index-advisor/)**.
+* Check frame budgets in the **[Performance Profiler & Safe Dry-Run](/profiler-and-dryrun/)**.

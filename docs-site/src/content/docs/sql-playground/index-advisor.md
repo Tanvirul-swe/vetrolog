@@ -46,7 +46,7 @@ When a missing index is detected:
    * The sidebar schema tree automatically updates to reflect the new index.
    * Re-running the query now converts the high-cost `SCAN` node into an optimal `SEARCH ... USING INDEX` node!
 
-![VetroLog Index Advisor Recommendations](/vetrolog/assets/images/sql_playground_editor.png)
+![VetroLog Index Advisor Recommendations](/assets/images/sql_playground_editor.png)
 
 ---
 
@@ -59,5 +59,5 @@ When a missing index is detected:
 
 ## Next Steps
 
-* Verify query latency against mobile frame budgets in the **[Performance Profiler](/vetrolog/profiler-and-dryrun/)**.
-* Export your optimized queries into native code with the **[Code Generator](/vetrolog/code-generator/)**.
+* Verify query latency against mobile frame budgets in the **[Performance Profiler](/profiler-and-dryrun/)**.
+* Export your optimized queries into native code with the **[Code Generator](/code-generator/)**.

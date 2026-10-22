@@ -6,7 +6,7 @@ The **Live Table Inspector** is VetroLog's primary viewing workspace, designed f
 
 ---
 
-![VetroLog Live DataGrid Table View](/vetrolog/assets/images/datagrid_view.png)
+![VetroLog Live DataGrid Table View](/assets/images/datagrid_view.png)
 
 ---
 
@@ -55,5 +55,5 @@ VetroLog handles large datasets efficiently:
 
 ## Next Steps
 
-* Learn how **[Real-Time WAL Sync](/vetrolog/wal-realtime-sync/)** updates table rows instantly when your mobile app writes data.
-* Learn how to edit or delete records in **[Bidirectional Data Editing](/vetrolog/data-editing/)**.
+* Learn how **[Real-Time WAL Sync](/wal-realtime-sync/)** updates table rows instantly when your mobile app writes data.
+* Learn how to edit or delete records in **[Bidirectional Data Editing](/data-editing/)**.

@@ -2,8 +2,8 @@ import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
 export default defineConfig({
-  site: 'https://tanvirul-swe.github.io',
-  base: '/vetrolog',
+  site: 'https://vetro.hifzio.com',
+  base: '/',
   integrations: [
     starlight({
       title: 'VetroLog',

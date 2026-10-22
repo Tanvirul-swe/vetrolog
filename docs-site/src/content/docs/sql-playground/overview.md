@@ -6,13 +6,13 @@ The **SQL Playground** is a full-featured, developer-centric SQL environment tai
 
 ---
 
-![VetroLog SQL Playground Editor](/vetrolog/assets/images/sql_playground_editor.png)
+![VetroLog SQL Playground Editor](/assets/images/sql_playground_editor.png)
 
 ---
 
 ## 🎬 Interactive SQL Playground Tour
 
-![VetroLog SQL Playground Execution](/vetrolog/assets/demos/sql_playground_demo.webp)
+![VetroLog SQL Playground Execution](/assets/demos/sql_playground_demo.webp)
 
 ---
 
@@ -83,5 +83,5 @@ To prevent accidental queries like `SELECT * FROM large_log_table` from overwhel
 
 ## Next Steps
 
-* Visualize SQLite execution plans in the **[Visual Query Plan](/vetrolog/visual-query-plan/)** guide.
-* Generate queries in plain English with **[Natural Language AI (Gemini 2.5)](/vetrolog/natural-language-ai/)**.
+* Visualize SQLite execution plans in the **[Visual Query Plan](/visual-query-plan/)** guide.
+* Generate queries in plain English with **[Natural Language AI (Gemini 2.5)](/natural-language-ai/)**.

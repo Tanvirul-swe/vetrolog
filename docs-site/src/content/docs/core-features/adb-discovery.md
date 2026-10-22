@@ -25,7 +25,7 @@ graph TD
 
 ## 🎬 Discovery in Action
 
-![VetroLog Device & App Discovery Demo](/vetrolog/assets/demos/quickstart_tour.webp)
+![VetroLog Device & App Discovery Demo](/assets/demos/quickstart_tour.webp)
 
 ---
 
@@ -72,5 +72,5 @@ If you unplug your USB cable while inspecting a database:
 
 ## Next Steps
 
-* Discover how the **[Live Table Inspector](/vetrolog/live-inspector/)** renders and filters database records.
-* Learn how **[Real-Time WAL Sync](/vetrolog/wal-realtime-sync/)** updates changes on the fly.
+* Discover how the **[Live Table Inspector](/live-inspector/)** renders and filters database records.
+* Learn how **[Real-Time WAL Sync](/wal-realtime-sync/)** updates changes on the fly.

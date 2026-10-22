@@ -168,3 +168,97 @@ jobs:
           generate_release_notes: true
           draft: false
           prerelease: false
+
+  bump-homebrew:
+    name: Bump Homebrew Cask
+    needs: release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download macOS build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: VetroLog-macOS-Universal
+          path: macos-artifact
+
+      - name: Calculate SHA-256 and update Homebrew Tap
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN || secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          DMG_FILE=$(find macos-artifact -name "*.dmg" | head -n 1)
+          if [ -z "$DMG_FILE" ]; then
+            echo "DMG file not found, skipping cask update"
+            exit 0
+          fi
+
+          SHA256=$(sha256sum "$DMG_FILE" | awk '{print $1}')
+          echo "Bumping VetroLog to v${VERSION} with SHA256: ${SHA256}"
+
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          git clone "https://x-access-token:${TAP_TOKEN}@github.com/Tanvirul-swe/homebrew-tap.git" tap-repo || {
+            echo "::warning::Unable to clone homebrew-tap. Set HOMEBREW_TAP_TOKEN secret with write permissions to automate."
+            exit 0
+          }
+
+          cd tap-repo
+          mkdir -p Casks
+          cat <<EOF > Casks/vetrolog.rb
+cask "vetrolog" do
+  version "${VERSION}"
+  sha256 "${SHA256}"
+
+  url "https://github.com/Tanvirul-swe/vetrolog/releases/download/v#{version}/VetroLog-macOS-Universal.dmg"
+  name "VetroLog"
+  desc "Real-time Mobile SQLite Database Inspector for Flutter, Android & React Native"
+  homepage "https://vetro.hifzio.com/"
+
+  livecheck do
+    url :url
+    strategy :github_latest
+  end
+
+  app "VetroLog.app"
+
+  zap trash: [
+    "~/.vetrolog",
+    "~/Library/Preferences/com.wails.vetrolog.plist",
+    "~/Library/Saved Application State/com.wails.vetrolog.savedState",
+  ]
+end
+EOF
+
+          git add Casks/vetrolog.rb
+          if git diff --staged --quiet; then
+            echo "No cask changes to commit."
+          else
+            git commit -m "chore(cask): bump vetrolog to v${VERSION}"
+            git push origin main || echo "::warning::Failed to push to homebrew-tap. Ensure token has repo write scope."
+          fi
+
+  publish-winget:
+    name: Submit to Microsoft WinGet
+    needs: release
+    runs-on: windows-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Extract Version
+        id: version
+        shell: bash
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Submit package to WinGet Community Repo
+        uses: vedantmgoyal2009/winget-releaser@v2
+        if: env.WINGET_TOKEN != ''
+        env:
+          WINGET_TOKEN: ${{ secrets.WINGET_PAT || secrets.WINGET_TOKEN }}
+        with:
+          identifier: Hifzio.VetroLog
+          version: ${{ steps.version.outputs.version }}
+          installers-regex: 'VetroLog-Windows-.*\.zip$'
+          token: ${{ secrets.WINGET_PAT || secrets.WINGET_TOKEN }}

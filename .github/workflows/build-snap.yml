@@ -2,11 +2,8 @@ name: Build Snap Package
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - 'snap/snapcraft.yaml'
+  release:
+    types: [published]
 
 jobs:
   build:

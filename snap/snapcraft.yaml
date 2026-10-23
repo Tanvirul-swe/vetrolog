@@ -1,7 +1,7 @@
 name: vetrolog
 title: VetroLog
 base: core22
-version: '1.3.0'
+version: '1.3.1'
 summary: Real-time desktop SQLite database inspector for mobile developers
 description: |
   **VetroLog** is a high-performance desktop SQLite database inspector purpose-built for mobile engineers building applications with **Flutter, Android (Room), and React Native**.
@@ -44,8 +44,7 @@ apps:
 parts:
   vetrolog:
     plugin: dump
-    source: https://github.com/Tanvirul-swe/vetrolog/releases/download/v1.3.0/VetroLog-Linux-x64.tar.gz
-    source-checksum: sha256/e00b74efa8fde3fb88a61c638205d715b3d3a4f8bdedc27de183fc1daccee478
+    source: https://github.com/Tanvirul-swe/vetrolog/releases/download/v1.3.1/VetroLog-Linux-x64.tar.gz
     organize:
       vetrolog: bin/vetrolog
   metadata:

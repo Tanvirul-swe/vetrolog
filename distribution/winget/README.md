@@ -8,10 +8,10 @@ To validate and test installing VetroLog locally from these manifests:
 
 ```powershell
 # Validate manifests
-winget validate --manifest distribution/winget/manifests/h/Hifzio/VetroLog/1.3.0/
+winget validate --manifest distribution/winget/manifests/h/Hifzio/VetroLog/1.3.1/
 
 # Test local installation
-winget install --manifest distribution/winget/manifests/h/Hifzio/VetroLog/1.3.0/
+winget install --manifest distribution/winget/manifests/h/Hifzio/VetroLog/1.3.1/
 ```
 
 ## 🚀 Submitting to Microsoft Official Repository
@@ -23,12 +23,12 @@ winget install --manifest distribution/winget/manifests/h/Hifzio/VetroLog/1.3.0/
    ```
 2. Submit with your GitHub Personal Access Token:
    ```powershell
-   wingetcreate submit distribution/winget/manifests/h/Hifzio/VetroLog/1.3.0/ --token <YOUR_GITHUB_TOKEN>
+   wingetcreate submit distribution/winget/manifests/h/Hifzio/VetroLog/1.3.1/ --token <YOUR_GITHUB_TOKEN>
    ```
 
 ### Option B: Fork & PR to `microsoft/winget-pkgs`
 1. Fork [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs).
-2. Copy the directory `distribution/winget/manifests/h/Hifzio/VetroLog/1.3.0/` into `manifests/h/Hifzio/VetroLog/1.3.0/` in your fork.
+2. Copy the directory `distribution/winget/manifests/h/Hifzio/VetroLog/1.3.1/` into `manifests/h/Hifzio/VetroLog/1.3.1/` in your fork.
 3. Open a Pull Request to `microsoft/winget-pkgs`. Microsoft's automated CI will validate, virus-scan, and auto-merge!
 
 Once merged, anyone on Windows can install with:

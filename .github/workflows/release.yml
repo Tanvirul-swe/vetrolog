@@ -208,30 +208,7 @@ jobs:
 
           cd tap-repo
           mkdir -p Casks
-          cat <<EOF > Casks/vetrolog.rb
-cask "vetrolog" do
-  version "${VERSION}"
-  sha256 "${SHA256}"
-
-  url "https://github.com/Tanvirul-swe/vetrolog/releases/download/v#{version}/VetroLog-macOS-Universal.dmg"
-  name "VetroLog"
-  desc "Real-time Mobile SQLite Database Inspector for Flutter, Android & React Native"
-  homepage "https://vetro.hifzio.com/"
-
-  livecheck do
-    url :url
-    strategy :github_latest
-  end
-
-  app "VetroLog.app"
-
-  zap trash: [
-    "~/.vetrolog",
-    "~/Library/Preferences/com.wails.vetrolog.plist",
-    "~/Library/Saved Application State/com.wails.vetrolog.savedState",
-  ]
-end
-EOF
+          printf 'cask "vetrolog" do\n  version "%s"\n  sha256 "%s"\n\n  url "https://github.com/Tanvirul-swe/vetrolog/releases/download/v#{version}/VetroLog-macOS-Universal.dmg"\n  name "VetroLog"\n  desc "Real-time Mobile SQLite Database Inspector for Flutter, Android & React Native"\n  homepage "https://vetro.hifzio.com/"\n\n  livecheck do\n    url :url\n    strategy :github_latest\n  end\n\n  app "VetroLog.app"\n\n  zap trash: [\n    "~/.vetrolog",\n    "~/Library/Preferences/com.wails.vetrolog.plist",\n    "~/Library/Saved Application State/com.wails.vetrolog.savedState",\n  ]\nend\n' "$VERSION" "$SHA256" > Casks/vetrolog.rb
 
           git add Casks/vetrolog.rb
           if git diff --staged --quiet; then
@@ -255,7 +232,7 @@ EOF
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
       - name: Submit package to WinGet Community Repo
-        uses: vedantmgoyal2009/winget-releaser@v2
+        uses: vedantmgoyal9/winget-releaser@v2
         if: ${{ env.WINGET_TOKEN != '' }}
         with:
           identifier: Hifzio.VetroLog

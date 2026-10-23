@@ -41,7 +41,7 @@ interface UpdaterStoreState {
   initEventListeners: () => () => void;
 }
 
-export const CURRENT_APP_VERSION = 'v1.3.1';
+export const CURRENT_APP_VERSION = 'v1.3.2';
 
 export const useUpdaterStore = create<UpdaterStoreState>((set, get) => ({
   status: 'idle',
@@ -151,9 +151,9 @@ export const useUpdaterStore = create<UpdaterStoreState>((set, get) => ({
   simulateUpdateFlow: () => {
     const mockInfo: UpdateInfoBridge = {
       currentVersion: CURRENT_APP_VERSION,
-      latestVersion: 'v1.3.1',
-      releaseName: 'v1.3.1 — Canonical Snapcraft & Multi-Distribution Ecosystem',
-      releaseNotes: '### What is New in v1.3.1:\n• Ubuntu Snap Store & Canonical App Center official listing\n• Linux desktop launcher & AppStream metadata compliance\n• Microsoft WinGet automated manifest pipelines\n• Performance optimizations for real-time table sync',
+      latestVersion: 'v1.3.2',
+      releaseName: 'v1.3.2 — Serverless Product Analytics & Privacy Controls',
+      releaseNotes: '### What is New in v1.3.2:\n• Anonymous serverless telemetry via GA4 Measurement Protocol\n• Privacy & Analytics Settings Modal with 1-click opt-out\n• Real-time feature usage and active user tracking\n• Continuous stability and performance enhancements',
       releaseUrl: 'https://github.com/Tanvirul-swe/vetrolog/releases',
       assetUrl: 'https://github.com/Tanvirul-swe/vetrolog/releases/download/v1.2.0/VetroLog-macOS-Universal.zip',
       assetName: 'VetroLog-macOS-Universal.zip',

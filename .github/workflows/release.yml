@@ -246,6 +246,8 @@ EOF
     needs: release
     runs-on: windows-latest
     if: startsWith(github.ref, 'refs/tags/v')
+    env:
+      WINGET_TOKEN: ${{ secrets.WINGET_PAT || secrets.WINGET_TOKEN }}
     steps:
       - name: Extract Version
         id: version
@@ -254,11 +256,9 @@ EOF
 
       - name: Submit package to WinGet Community Repo
         uses: vedantmgoyal2009/winget-releaser@v2
-        if: env.WINGET_TOKEN != ''
-        env:
-          WINGET_TOKEN: ${{ secrets.WINGET_PAT || secrets.WINGET_TOKEN }}
+        if: ${{ env.WINGET_TOKEN != '' }}
         with:
           identifier: Hifzio.VetroLog
           version: ${{ steps.version.outputs.version }}
           installers-regex: 'VetroLog-Windows-.*\.zip$'
-          token: ${{ secrets.WINGET_PAT || secrets.WINGET_TOKEN }}
+          token: ${{ env.WINGET_TOKEN }}

@@ -13,7 +13,7 @@ conflicts=('vetrolog')
 source_x86_64=("https://github.com/Tanvirul-swe/vetrolog/releases/download/v${pkgver}/VetroLog-Linux-x64.tar.gz"
                "vetrolog.desktop::https://raw.githubusercontent.com/Tanvirul-swe/vetrolog/main/distribution/desktop/vetrolog.desktop"
                "vetrolog.png::https://raw.githubusercontent.com/Tanvirul-swe/vetrolog/main/build/appicon.png")
-sha256sums_x86_64=('e00b74efa8fde3fb88a61c638205d715b3d3a4f8bdedc27de183fc1daccee478'
+sha256sums_x86_64=('1602af3649bf0f73ba96eeee4a238d63c27358fd9772f8f7c30619bcadea17f5'
                    'SKIP'
                    'SKIP')
 

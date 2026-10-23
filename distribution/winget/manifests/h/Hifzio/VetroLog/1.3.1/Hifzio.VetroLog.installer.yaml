@@ -12,6 +12,6 @@ Installers:
   - RelativeFilePath: vetrolog.exe
     PortableCommandAlias: vetrolog
   InstallerUrl: https://github.com/Tanvirul-swe/vetrolog/releases/download/v1.3.1/VetroLog-Windows-x64-Portable.zip
-  InstallerSha256: E3385CF987ABDBC59D98B6082D25868E2EF2A22F23B09E4C7E33F6176D748E22
+  InstallerSha256: AE07C10CA9A0073885DB808A9E173590D8B0030199EFA75F08CFED671CC5E2A0
 ManifestType: installer
 ManifestVersion: 1.6.0

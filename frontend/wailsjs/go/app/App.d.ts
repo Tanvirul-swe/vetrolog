@@ -44,16 +44,16 @@ export function GetConnectionState():Promise<models.ConnectionState>;
 
 export function GetLocalIPAddresses():Promise<Array<string>>;
 
+export function GetTelemetryStatus():Promise<Record<string, any>>;
+
 export function RequestTableData(arg1:string,arg2:string,arg3:number,arg4:number):Promise<boolean>;
 
 export function SaveExportFile(arg1:string,arg2:string,arg3:string):Promise<string>;
 
-export function StartDownloadUpdate(arg1:string,arg2:string):Promise<void>;
-
-export function UpdateRow(arg1:string,arg2:string,arg3:string,arg4:string):Promise<boolean>;
-
-export function GetTelemetryStatus():Promise<Record<string, any>>;
-
 export function SetTelemetryEnabled(arg1:boolean):Promise<boolean>;
 
+export function StartDownloadUpdate(arg1:string,arg2:string):Promise<void>;
+
 export function TrackTelemetryEvent(arg1:string,arg2:string):Promise<boolean>;
+
+export function UpdateRow(arg1:string,arg2:string,arg3:string,arg4:string):Promise<boolean>;

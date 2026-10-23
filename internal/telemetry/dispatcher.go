@@ -20,9 +20,9 @@ const defaultGA4Endpoint = "https://www.google-analytics.com/mp/collect"
 // Default GA4 credentials (can be overridden via environment variables or build flags)
 var (
 	// DefaultMeasurementID is the fallback Google Analytics 4 Property Measurement ID (e.g. G-XXXXXXXXXX)
-	DefaultMeasurementID = "G-VETROLOG01"
+	DefaultMeasurementID = "G-1RENXYMKEC"
 	// DefaultAPISecret is the Measurement Protocol API secret created in GA4 Data Stream settings
-	DefaultAPISecret = "vetrolog_mp_secret"
+	DefaultAPISecret = "QDD0WZyfT3GP-yyHcm7b4A"
 )
 
 // Service manages anonymous telemetry collection and asynchronous dispatching

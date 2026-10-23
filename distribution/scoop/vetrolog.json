@@ -6,7 +6,7 @@
   "architecture": {
     "64bit": {
       "url": "https://github.com/Tanvirul-swe/vetrolog/releases/download/v1.3.2/VetroLog-Windows-x64-Portable.zip",
-      "hash": "ae07c10ca9a0073885db808a9e173590d8b0030199efa75f08cfed671cc5e2a0",
+      "hash": "03e140b2fcb9c72861830a94c8e0b038534a3a1acccc32c877cb91ca8c4c561e",
       "bin": "vetrolog.exe",
       "shortcuts": [
         [

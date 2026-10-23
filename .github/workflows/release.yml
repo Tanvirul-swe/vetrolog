@@ -232,9 +232,23 @@ jobs:
         shell: bash
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
+      - name: Check if Package Exists in winget-pkgs
+        id: check-package
+        shell: bash
+        run: |
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://api.github.com/repos/microsoft/winget-pkgs/contents/manifests/h/Hifzio/VetroLog)
+          if [ "$HTTP_STATUS" = "200" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Package Hifzio.VetroLog found in microsoft/winget-pkgs. Proceeding with automated release."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "Package Hifzio.VetroLog does not exist in microsoft/winget-pkgs yet (PR #458642 is awaiting moderator approval)."
+            echo "Skipping automated winget-releaser until the initial package is merged."
+          fi
+
       - name: Submit package to WinGet Community Repo
         uses: vedantmgoyal9/winget-releaser@v2
-        if: ${{ env.WINGET_TOKEN != '' }}
+        if: ${{ env.WINGET_TOKEN != '' && steps.check-package.outputs.exists == 'true' }}
         with:
           identifier: Hifzio.VetroLog
           version: ${{ steps.version.outputs.version }}

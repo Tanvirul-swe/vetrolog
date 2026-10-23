@@ -13,7 +13,7 @@ pkgbase = vetrolog-bin
 	source_x86_64 = https://github.com/Tanvirul-swe/vetrolog/releases/download/v1.3.2/VetroLog-Linux-x64.tar.gz
 	source_x86_64 = vetrolog.desktop::https://raw.githubusercontent.com/Tanvirul-swe/vetrolog/main/distribution/desktop/vetrolog.desktop
 	source_x86_64 = vetrolog.png::https://raw.githubusercontent.com/Tanvirul-swe/vetrolog/main/build/appicon.png
-	sha256sums_x86_64 = 1602af3649bf0f73ba96eeee4a238d63c27358fd9772f8f7c30619bcadea17f5
+	sha256sums_x86_64 = 1bd97d4008c55d6b40404b28d1e228b10183c760d66360737489c5fec4a53253
 	sha256sums_x86_64 = SKIP
 	sha256sums_x86_64 = SKIP
 

@@ -51,3 +51,9 @@ export function SaveExportFile(arg1:string,arg2:string,arg3:string):Promise<stri
 export function StartDownloadUpdate(arg1:string,arg2:string):Promise<void>;
 
 export function UpdateRow(arg1:string,arg2:string,arg3:string,arg4:string):Promise<boolean>;
+
+export function GetTelemetryStatus():Promise<Record<string, any>>;
+
+export function SetTelemetryEnabled(arg1:boolean):Promise<boolean>;
+
+export function TrackTelemetryEvent(arg1:string,arg2:string):Promise<boolean>;

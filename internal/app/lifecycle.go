@@ -39,6 +39,9 @@ func (a *App) BeforeClose(ctx context.Context) (prevent bool) {
 // Shutdown is called during application teardown
 func (a *App) Shutdown(ctx context.Context) {
 	log.Printf("[VetroLog] Shutting down server and mDNS...")
+	if a.telemetry != nil {
+		a.telemetry.Close()
+	}
 	if a.updater != nil {
 		_ = a.updater.CancelUpdate()
 	}

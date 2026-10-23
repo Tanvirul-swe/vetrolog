@@ -243,3 +243,38 @@ func (a *App) CancelUpdate() error {
 	return a.updater.CancelUpdate()
 }
 
+// TrackTelemetryEvent logs a high-level anonymous feature engagement event
+func (a *App) TrackTelemetryEvent(name string, propertiesJSON string) bool {
+	if a.telemetry == nil || !a.telemetry.IsEnabled() {
+		return false
+	}
+	var meta map[string]interface{}
+	if propertiesJSON != "" {
+		_ = json.Unmarshal([]byte(propertiesJSON), &meta)
+	}
+	a.telemetry.TrackFeature(name, meta)
+	return true
+}
+
+// GetTelemetryStatus returns whether anonymous telemetry is enabled and the anonymous client ID
+func (a *App) GetTelemetryStatus() map[string]interface{} {
+	if a.telemetry == nil {
+		return map[string]interface{}{"enabled": false, "clientId": ""}
+	}
+	enabled, clientID := a.telemetry.GetStatus()
+	return map[string]interface{}{
+		"enabled":  enabled,
+		"clientId": clientID,
+	}
+}
+
+// SetTelemetryEnabled updates user preference for anonymous telemetry
+func (a *App) SetTelemetryEnabled(enabled bool) bool {
+	if a.telemetry == nil {
+		return false
+	}
+	_ = a.telemetry.SetEnabled(enabled)
+	return a.telemetry.IsEnabled()
+}
+
+

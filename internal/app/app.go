@@ -8,6 +8,7 @@ import (
 	"vetrolog/internal/config"
 	"vetrolog/internal/discovery"
 	"vetrolog/internal/server"
+	"vetrolog/internal/telemetry"
 	"vetrolog/internal/updater"
 )
 
@@ -21,6 +22,7 @@ type App struct {
 	server      *server.Server
 	mdns        *discovery.MDNSService
 	updater     *updater.Service
+	telemetry   *telemetry.Service
 }
 
 // NewApp creates a new App struct with initialized subsystems
@@ -30,6 +32,7 @@ func NewApp() *App {
 	batcher := broadcaster.NewMutationBatcher(b, cfg.BatchFlushWindow, cfg.MaxBatchSize)
 	srv := server.NewServer(cfg, b, batcher)
 	upd := updater.NewService()
+	tel := telemetry.NewService("desktop")
 
 	return &App{
 		config:      cfg,
@@ -37,5 +40,6 @@ func NewApp() *App {
 		batcher:     batcher,
 		server:      srv,
 		updater:     upd,
+		telemetry:   tel,
 	}
 }

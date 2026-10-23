@@ -3,6 +3,7 @@ import { apiBridge } from '@/services/apiBridge';
 import { useDatabaseStore } from './useDatabaseStore';
 import { usePlaygroundStore } from './usePlaygroundStore';
 import { DatabaseInfo } from '../types/database';
+import { telemetry } from '@/features/telemetry/telemetryService';
 
 export interface AdbDevice {
   id: string;
@@ -302,6 +303,8 @@ export const useAdbStore = create<AdbState>((set, get) => ({
       discoveryMessage: `Connected to ${devLabel}. Scanning running debug apps...`,
     });
 
+    telemetry.trackDeviceConnected('adb_usb');
+
     try {
       const apps = await apiBridge.listApps(deviceId);
       const appsList = apps || [];
@@ -580,6 +583,7 @@ export const useAdbStore = create<AdbState>((set, get) => ({
 
       if (success) {
         get().loadTableData(tableName);
+        telemetry.trackFeature('row_edited');
       }
       return success;
     } catch (e) {
@@ -610,6 +614,7 @@ export const useAdbStore = create<AdbState>((set, get) => ({
 
       if (success) {
         get().loadTableData(tableName);
+        telemetry.trackFeature('row_deleted');
       }
       return success;
     } catch (e) {

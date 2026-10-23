@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { usePlaygroundStore } from '@/stores/usePlaygroundStore';
 import { parseNaturalLanguageToSql } from '../services/offlineNlParser';
 import { generateSqlWithAI } from '../services/aiService';
+import { telemetry } from '@/features/telemetry/telemetryService';
 
 export function NaturalLanguageBar() {
   const [prompt, setPrompt] = useState('');
@@ -43,6 +44,7 @@ export function NaturalLanguageBar() {
           setQuery(result.sql);
           const prefix = result.explanation ? `${result.explanation} • ` : '';
           setFeedback({ message: `${prefix}AI Generated: ${result.sql}` });
+          telemetry.trackFeature('ai_sql_generated', { provider: aiConfig.provider });
         }
       }
     } catch (err: any) {

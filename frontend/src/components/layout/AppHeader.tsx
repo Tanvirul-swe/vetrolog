@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Terminal, Trash2, Smartphone, RefreshCw, QrCode, Table } from 'lucide-react';
+import { Search, Terminal, Trash2, Smartphone, RefreshCw, QrCode, Table, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,7 @@ import { QRPairingModal } from '@/features/connection/components/QRPairingModal'
 import { AdbDeviceSelector } from '@/features/adb/components/AdbDeviceSelector';
 import { UpdateBadge } from '@/features/updater/UpdateBadge';
 import { UpdateProgressModal } from '@/features/updater/UpdateProgressModal';
+import { TelemetrySettingsModal } from '@/features/telemetry/components/TelemetrySettingsModal';
 import { isWailsApp } from '@/services/apiBridge';
 import logoIcon from '@/assets/images/vetrolog-icon.png';
 
@@ -25,6 +26,7 @@ export function AppHeader({ searchInputRef, onRefresh }: AppHeaderProps) {
   const isWails = isWailsApp();
 
   const [isPairingOpen, setIsPairingOpen] = useState(false);
+  const [isTelemetryOpen, setIsTelemetryOpen] = useState(false);
   const isConnected = useConnectionStore((s) => s.isConnected);
   const currentDevice = useConnectionStore((s) => s.currentDevice);
   const port = useConnectionStore((s) => s.port);
@@ -179,6 +181,16 @@ export function AppHeader({ searchInputRef, onRefresh }: AppHeaderProps) {
           <Terminal className="size-3.5" />
           <span>Console</span>
         </Button>
+
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={() => setIsTelemetryOpen(true)}
+          title="Privacy & Analytics Settings"
+          className="text-muted-foreground hover:text-foreground"
+        >
+          <Shield className="size-3.5" />
+        </Button>
       </div>
     </header>
 
@@ -190,6 +202,11 @@ export function AppHeader({ searchInputRef, onRefresh }: AppHeaderProps) {
     )}
 
     <UpdateProgressModal />
+
+    <TelemetrySettingsModal
+      isOpen={isTelemetryOpen}
+      onClose={() => setIsTelemetryOpen(false)}
+    />
   </>
   );
 }

@@ -9,6 +9,7 @@ import { apiBridge } from '@/services/apiBridge';
 import { formatSqlIdentifier } from '@/features/playground/services/sqlIdentifier';
 import { useAdbStore } from './useAdbStore';
 import { useDatabaseStore } from './useDatabaseStore';
+import { telemetry } from '@/features/telemetry/telemetryService';
 
 export type PlaygroundTab = 'results' | 'plan' | 'profiler' | 'advisor' | 'history';
 export type WorkspaceView = 'grid' | 'playground';
@@ -664,6 +665,11 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
         if (get().activeTab === 'plan' || get().activeTab === 'advisor') {
           get().runExplain(sql);
         }
+
+        telemetry.trackFeature('sql_playground_query_executed', {
+          success: result.success,
+          duration_ms: Math.round(result.durationMs || elapsed),
+        });
       }
     } catch (err) {
       console.error('Playground executeQuery error:', err);
@@ -702,6 +708,10 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
           t.id === targetTabId ? { ...t, queryPlan: plan } : t
         ),
       }));
+
+      telemetry.trackFeature('visual_query_plan_viewed', {
+        has_full_scan: plan.hasFullScan,
+      });
     } catch (e: any) {
       const fallbackPlan: QueryPlanResult = {
         rawNodes: [],

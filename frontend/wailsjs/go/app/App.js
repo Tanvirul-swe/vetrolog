@@ -97,3 +97,16 @@ export function StartDownloadUpdate(arg1, arg2) {
 export function UpdateRow(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['UpdateRow'](arg1, arg2, arg3, arg4);
 }
+
+export function GetTelemetryStatus() {
+  return window['go']['app']['App']['GetTelemetryStatus']();
+}
+
+export function SetTelemetryEnabled(arg1) {
+  return window['go']['app']['App']['SetTelemetryEnabled'](arg1);
+}
+
+export function TrackTelemetryEvent(arg1, arg2) {
+  return window['go']['app']['App']['TrackTelemetryEvent'](arg1, arg2);
+}
+

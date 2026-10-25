@@ -9,6 +9,7 @@ import { apiBridge } from '@/services/apiBridge';
 import { formatSqlIdentifier } from '@/features/playground/services/sqlIdentifier';
 import { useAdbStore } from './useAdbStore';
 import { useDatabaseStore } from './useDatabaseStore';
+import { useConnectionManagerStore } from './useConnectionManagerStore';
 import { telemetry } from '@/features/telemetry/telemetryService';
 
 export type PlaygroundTab = 'results' | 'plan' | 'profiler' | 'advisor' | 'history';
@@ -610,7 +611,15 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
     const startTime = performance.now();
 
     try {
-      const result = await useAdbStore.getState().executeQuery(sql);
+      const isRemote = useConnectionManagerStore.getState().workspaceMode === 'remote';
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let result: any = null;
+
+      if (isRemote) {
+        result = await useConnectionManagerStore.getState().executeRemoteQuery(sql);
+      } else {
+        result = await useAdbStore.getState().executeQuery(sql);
+      }
       const elapsed = performance.now() - startTime;
 
       if (result) {
@@ -619,13 +628,15 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
         const selectivity = Math.min(100, Math.round((rowsReturned / totalRowsEstimate) * 100));
 
         const tabResult: QueryResultData = {
-          requestId: `adb_${Date.now()}`,
-          databaseId: useDatabaseStore.getState().selectedDatabaseId || '',
+          requestId: result.requestId || `query_${Date.now()}`,
+          databaseId: result.databaseId || useDatabaseStore.getState().selectedDatabaseId || '',
           query: sql,
-          columns: (result.columns || []).map((col: string) => ({
-            name: col,
-            type: 'TEXT',
-          })),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          columns: (result.columns || []).map((col: any) =>
+            typeof col === 'string'
+              ? { name: col, type: 'TEXT' }
+              : { name: col.name, type: col.type || 'TEXT' }
+          ),
           rows: result.rows || [],
           affected: result.affected || 0,
           durationMs: result.durationMs || elapsed,

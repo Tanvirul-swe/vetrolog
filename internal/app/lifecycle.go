@@ -48,6 +48,9 @@ func (a *App) Shutdown(ctx context.Context) {
 	if a.mdns != nil {
 		a.mdns.Stop()
 	}
+	if a.dbManager != nil {
+		a.dbManager.CloseAll()
+	}
 	a.batcher.Stop()
 	a.server.Stop()
 }

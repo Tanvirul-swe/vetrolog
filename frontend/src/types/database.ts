@@ -1,4 +1,135 @@
-export type DatabaseType = 'sqlite' | 'hive' | 'shared_preferences';
+export type DatabaseType = 'sqlite' | 'hive' | 'shared_preferences' | 'postgres' | 'mysql' | 'mariadb' | 'redis' | 'sqlite_file';
+
+export type EngineType = 'postgres' | 'mysql' | 'mariadb' | 'sqlite' | 'redis';
+export type EnvironmentType = 'production' | 'staging' | 'development' | 'local';
+export type ColorTag = 'red' | 'amber' | 'blue' | 'green' | 'purple';
+
+export interface SSHTunnelConfig {
+  enabled: boolean;
+  host: string;
+  port: number;
+  user: string;
+  authMethod: 'password' | 'private_key';
+  password?: string;
+  privateKey?: string;
+  passphrase?: string;
+}
+
+export interface ConnectionConfig {
+  id?: string;
+  name: string;
+  engine: EngineType;
+  host: string;
+  port: number;
+  user: string;
+  password?: string;
+  database: string;
+  schema?: string;
+  sslMode: string;
+  sslCert?: string;
+  sslKey?: string;
+  sslRootCert?: string;
+  colorTag: ColorTag;
+  environment: EnvironmentType;
+  safeMode: boolean;
+  filePath?: string;
+  ssh?: SSHTunnelConfig;
+  createdAt?: number;
+  updatedAt?: number;
+}
+
+export interface ConnectionSummary {
+  id: string;
+  name: string;
+  engine: EngineType;
+  host: string;
+  port: number;
+  database: string;
+  colorTag: ColorTag;
+  environment: EnvironmentType;
+  safeMode: boolean;
+  filePath?: string;
+  hasSSH: boolean;
+  updatedAt: number;
+}
+
+export interface ConnectionTestResult {
+  success: boolean;
+  latencyMs: number;
+  serverVersion?: string;
+  message?: string;
+  error?: string;
+}
+
+export interface ConnectionSession {
+  sessionId: string;
+  config: ConnectionSummary;
+  connectedAt: number;
+  currentDatabase: string;
+  currentSchema: string;
+  pingDurationMs: number;
+}
+
+export interface TableSummary {
+  name: string;
+  schema: string;
+  type: string;
+  rowCount: number;
+  sizeBytes?: number;
+}
+
+export interface TableDataResult {
+  tableName: string;
+  schema: string;
+  columns: ColumnInfo[];
+  rows: Record<string, unknown>[];
+  totalRows: number;
+  page: number;
+  pageSize: number;
+  durationMs: number;
+}
+
+export interface PendingChange {
+  type: 'UPDATE' | 'INSERT' | 'DELETE';
+  schema: string;
+  table: string;
+  primaryKey: Record<string, unknown>;
+  oldValues?: Record<string, unknown>;
+  newValues?: Record<string, unknown>;
+}
+
+export interface ChangeResult {
+  success: boolean;
+  affectedRows: number;
+  generatedSql?: string;
+  durationMs: number;
+  error?: string;
+}
+
+export interface RedisKeyInfo {
+  key: string;
+  type: string;
+  ttl: number;
+  ttlSec: number;
+  sizeBytes: number;
+}
+
+export interface RedisScanResult {
+  keys: RedisKeyInfo[];
+  cursor: number;
+  totalEstimate: number;
+  durationMs: number;
+}
+
+export interface RedisValueResult {
+  key: string;
+  type: string;
+  ttlSec: number;
+  value: unknown;
+  success: boolean;
+  durationMs: number;
+  error?: string;
+}
 
 export interface ColumnInfo {
   name: string;

@@ -5,6 +5,8 @@ import { EVENTS } from './constants/events';
 import { useConnectionStore } from './stores/useConnectionStore';
 import { useDatabaseStore } from './stores/useDatabaseStore';
 import { useAdbStore } from './stores/useAdbStore';
+import { useConnectionManagerStore } from './stores/useConnectionManagerStore';
+import { useStagedChangesStore } from './stores/useStagedChangesStore';
 import * as AppBindings from '../wailsjs/go/app/App';
 
 export function App() {
@@ -97,6 +99,14 @@ export function App() {
   const handleRequestTableData = useCallback((targetPage = page) => {
     if (!selectedTableName) return;
 
+    if (useConnectionManagerStore.getState().workspaceMode === 'remote') {
+      const activeSession = useConnectionManagerStore.getState().activeSession;
+      if (activeSession) {
+        useConnectionManagerStore.getState().loadTableData(selectedTableName, targetPage, pageSize);
+      }
+      return;
+    }
+
     if (useAdbStore.getState().isAdbMode) {
       useAdbStore.getState().loadTableData(selectedTableName, targetPage, pageSize);
       return;
@@ -125,6 +135,11 @@ export function App() {
 
   // 5. Query execution trigger
   const handleExecuteQuery = (query: string) => {
+    if (useConnectionManagerStore.getState().workspaceMode === 'remote') {
+      useConnectionManagerStore.getState().executeRemoteQuery(query);
+      return;
+    }
+
     if (useAdbStore.getState().isAdbMode) {
       useAdbStore.getState().executeQuery(query);
       return;
@@ -148,6 +163,26 @@ export function App() {
   // 6. Data Editing / Mutation from Desktop
   const handleUpdateRow = (pkField: string, pkValue: unknown, newValues: Record<string, unknown>) => {
     if (!selectedTableName) return;
+
+    if (useConnectionManagerStore.getState().workspaceMode === 'remote') {
+      const selectedSchema = useConnectionManagerStore.getState().selectedSchema || 'public';
+      const rows = useDatabaseStore.getState().rows;
+      const currentRow = rows.find((r) => r[pkField] === pkValue);
+      Object.entries(newValues).forEach(([col, newVal]) => {
+        const oldVal = currentRow ? currentRow[col] : undefined;
+        useStagedChangesStore.getState().stageCellUpdate(
+          selectedSchema,
+          selectedTableName,
+          pkField,
+          pkValue,
+          col,
+          oldVal,
+          newVal
+        );
+      });
+      updateRowLocally(pkField, pkValue, newValues);
+      return;
+    }
 
     if (useAdbStore.getState().isAdbMode) {
       useAdbStore.getState().updateRow(selectedTableName, { [pkField]: pkValue }, newValues);
@@ -195,6 +230,21 @@ export function App() {
   // 7. Delete Row from Desktop
   const handleDeleteRow = (pkField: string, pkValue: unknown) => {
     if (!selectedTableName) return;
+
+    if (useConnectionManagerStore.getState().workspaceMode === 'remote') {
+      const selectedSchema = useConnectionManagerStore.getState().selectedSchema || 'public';
+      const rows = useDatabaseStore.getState().rows;
+      const currentRow = rows.find((r) => r[pkField] === pkValue);
+      useStagedChangesStore.getState().stageRowDelete(
+        selectedSchema,
+        selectedTableName,
+        pkField,
+        pkValue,
+        currentRow
+      );
+      deleteRowLocally(pkField, pkValue);
+      return;
+    }
 
     if (useAdbStore.getState().isAdbMode) {
       useAdbStore.getState().deleteRow(selectedTableName, { [pkField]: pkValue });

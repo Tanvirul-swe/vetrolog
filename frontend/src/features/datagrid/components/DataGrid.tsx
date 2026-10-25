@@ -13,24 +13,36 @@ import {
   CheckCircle2,
   RefreshCw,
   Sparkles,
+  Server,
+  FolderOpen,
 } from 'lucide-react';
 import { CellRenderer } from './CellRenderer';
 import { GridToolbar } from './GridToolbar';
 import { RowDetailSheet } from './RowDetailSheet';
+import { TableStructureView } from '@/features/structure/TableStructureView';
 import { Button } from '@/components/ui/button';
 import { useDatabaseStore } from '@/stores/useDatabaseStore';
 import { useAdbStore } from '@/stores/useAdbStore';
+import { useConnectionManagerStore } from '@/stores/useConnectionManagerStore';
+import { useStagedChangesStore } from '@/stores/useStagedChangesStore';
 
 interface DataGridProps {
   onRefresh?: () => void;
   onRequestPage?: (page: number) => void;
   onUpdateRow?: (pkField: string, pkValue: unknown, newValues: Record<string, unknown>) => void;
   onDeleteRow?: (pkField: string, pkValue: unknown) => void;
+  onOpenConnectionManager?: () => void;
 }
 
 type SortDirection = 'asc' | 'desc' | null;
 
-export function DataGrid({ onRefresh, onRequestPage, onUpdateRow, onDeleteRow }: DataGridProps) {
+export function DataGrid({
+  onRefresh,
+  onRequestPage,
+  onUpdateRow,
+  onDeleteRow,
+  onOpenConnectionManager,
+}: DataGridProps) {
   const selectedTable = useDatabaseStore((s) => s.selectedTableName);
   const databases = useDatabaseStore((s) => s.databases);
   const columns = useDatabaseStore((s) => s.columns);
@@ -39,6 +51,14 @@ export function DataGrid({ onRefresh, onRequestPage, onUpdateRow, onDeleteRow }:
   const selectedRow = useDatabaseStore((s) => s.selectedRow);
   const setSelectedRow = useDatabaseStore((s) => s.setSelectedRow);
   const isLoadingTable = useDatabaseStore((s) => s.isLoadingTable);
+
+  const workspaceMode = useConnectionManagerStore((s) => s.workspaceMode);
+  const activeSession = useConnectionManagerStore((s) => s.activeSession);
+  const activeRemoteView = useConnectionManagerStore((s) => s.activeRemoteView);
+  const tableSchema = useConnectionManagerStore((s) => s.tableSchema);
+  const selectLocalFileDialog = useConnectionManagerStore((s) => s.selectLocalFileDialog);
+
+  const pendingChanges = useStagedChangesStore((s) => s.pendingChanges);
 
   const isInitialLoading = useAdbStore((s) => s.isInitialLoading);
   const discoveryStage = useAdbStore((s) => s.discoveryStage);
@@ -149,6 +169,65 @@ export function DataGrid({ onRefresh, onRequestPage, onUpdateRow, onDeleteRow }:
         return isInitialLoading ? 35 : 10;
     }
   }, [discoveryStage, isInitialLoading]);
+
+  if (workspaceMode === 'remote') {
+    if (!activeSession) {
+      return (
+        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center select-none bg-background">
+          <div className="size-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary mb-3">
+            <Server className="size-6" />
+          </div>
+          <h3 className="font-semibold text-foreground text-sm">Remote Database Studio</h3>
+          <p className="text-xs text-muted-foreground mt-1 max-w-sm mb-4">
+            Connect to PostgreSQL, MySQL, Redis, or open a local .sqlite file with TablePlus-grade inspection.
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="default"
+              size="sm"
+              onClick={onOpenConnectionManager}
+              className="h-8 text-xs gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground font-medium"
+            >
+              <Server className="size-3.5" />
+              <span>Connect to Database</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => selectLocalFileDialog()}
+              className="h-8 text-xs gap-1.5 border-dashed border-border/80 hover:bg-muted"
+            >
+              <FolderOpen className="size-3.5 text-amber-400" />
+              <span>Open Local .sqlite</span>
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
+    if (!selectedTable) {
+      return (
+        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center select-none bg-background">
+          <div className="size-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary mb-2.5">
+            <Database className="size-5" />
+          </div>
+          <h3 className="font-semibold text-foreground text-sm">No Table Selected</h3>
+          <p className="text-xs text-muted-foreground mt-1 max-w-sm">
+            Select a table or view from the left sidebar to inspect records or visual schema.
+          </p>
+        </div>
+      );
+    }
+
+    if (activeRemoteView === 'structure') {
+      return (
+        <div className="flex-1 flex flex-col overflow-hidden bg-background">
+          <GridToolbar onRefresh={onRefresh} onRequestPage={onRequestPage} />
+          <TableStructureView schema={tableSchema} tableName={selectedTable} />
+        </div>
+      );
+    }
+  }
 
   if (!selectedTable) {
     if (isConnecting) {
@@ -466,11 +545,35 @@ export function DataGrid({ onRefresh, onRequestPage, onUpdateRow, onDeleteRow }:
                         <td className="px-3 py-1.5 text-center text-muted-foreground/40 text-[10px] border-r border-border/30 select-none">
                           {idx + 1}
                         </td>
-                        {tableColumns.map((col) => (
-                          <td key={col.name} className="px-3 py-1.5 border-r border-border/30 max-w-sm truncate">
-                            <CellRenderer value={row[col.name]} columnType={col.type} />
-                          </td>
-                        ))}
+                        {tableColumns.map((col) => {
+                          const isStaged = pendingChanges.some(
+                            (c) =>
+                              c.type === 'UPDATE' &&
+                              c.table === selectedTable &&
+                              c.newValues &&
+                              col.name in c.newValues &&
+                              (row.id !== undefined
+                                ? c.primaryKey.id === row.id
+                                : c.primaryKey[col.name] === row[col.name])
+                          );
+
+                          return (
+                            <td
+                              key={col.name}
+                              className={`px-3 py-1.5 border-r border-border/30 max-w-sm truncate relative ${
+                                isStaged ? 'bg-amber-500/10' : ''
+                              }`}
+                            >
+                              {isStaged && (
+                                <span
+                                  className="absolute top-1 right-1 size-1.5 rounded-full bg-amber-400"
+                                  title="Uncommitted staged change"
+                                />
+                              )}
+                              <CellRenderer value={row[col.name]} columnType={col.type} />
+                            </td>
+                          );
+                        })}
                       </tr>
                     );
                   })

@@ -15,6 +15,7 @@ import {
   Eye,
   EyeOff,
   Terminal,
+  Link2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -138,6 +139,56 @@ export function ConnectionManagerModal({ isOpen, onClose }: ConnectionManagerMod
     }));
   };
 
+  const [isImportUrlOpen, setIsImportUrlOpen] = useState(false);
+  const [importUrlInput, setImportUrlInput] = useState('');
+  const [importUrlError, setImportUrlError] = useState<string | null>(null);
+
+  const handleImportUrl = () => {
+    setImportUrlError(null);
+    let trimmed = importUrlInput.trim();
+    // Support DATABASE_URL='...' or DATABASE_URL="..." or raw URI
+    trimmed = trimmed.replace(/^DATABASE_URL=['"]?/, '').replace(/['"]$/, '').trim();
+    if (!trimmed) return;
+
+    try {
+      const parsed = new URL(trimmed);
+      let engine: EngineType = 'postgres';
+      if (parsed.protocol.startsWith('postgres')) engine = 'postgres';
+      else if (parsed.protocol.startsWith('mysql')) engine = 'mysql';
+      else if (parsed.protocol.startsWith('mariadb')) engine = 'mariadb';
+      else if (parsed.protocol.startsWith('redis')) engine = 'redis';
+      else {
+        setImportUrlError('Unsupported database scheme: ' + parsed.protocol);
+        return;
+      }
+
+      const dbName = parsed.pathname.replace(/^\//, '') || (engine === 'postgres' ? 'postgres' : engine === 'redis' ? '0' : 'mysql');
+      const sslMode = parsed.searchParams.get('sslmode') || (parsed.searchParams.get('ssl') === 'true' ? 'require' : 'disable');
+      const port = parsed.port ? parseInt(parsed.port, 10) : (DEFAULT_PORTS[engine] || 5432);
+
+      setSelectedId(null);
+      setTestResult({ tested: false, success: false });
+      setFormConfig({
+        name: `${parsed.hostname.split('.')[0]} (${dbName})`,
+        engine,
+        host: parsed.hostname,
+        port,
+        user: decodeURIComponent(parsed.username || ''),
+        password: decodeURIComponent(parsed.password || ''),
+        database: decodeURIComponent(dbName),
+        sslMode,
+        colorTag: 'green',
+        environment: 'development',
+        safeMode: false,
+      });
+
+      setIsImportUrlOpen(false);
+      setImportUrlInput('');
+    } catch (err) {
+      setImportUrlError('Invalid connection URL: ' + String(err));
+    }
+  };
+
   const handleTest = async () => {
     setIsTesting(true);
     setTestResult({ tested: false, success: false });
@@ -252,15 +303,29 @@ export function ConnectionManagerModal({ isOpen, onClose }: ConnectionManagerMod
                 <span>New Connection</span>
               </Button>
 
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleBrowseSQLite}
-                className="w-full h-8 text-xs gap-1.5 border-dashed border-border/80 hover:bg-muted"
-              >
-                <FolderOpen className="size-3.5 text-amber-400" />
-                <span>Open Local SQLite File...</span>
-              </Button>
+              <div className="grid grid-cols-2 gap-1.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsImportUrlOpen(true)}
+                  className="h-8 text-[11px] px-2 gap-1 border-border/80 hover:bg-muted"
+                  title="Import from Connection URL (DATABASE_URL)"
+                >
+                  <Link2 className="size-3 text-sky-400" />
+                  <span>Import URL</span>
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleBrowseSQLite}
+                  className="h-8 text-[11px] px-2 gap-1 border-dashed border-border/80 hover:bg-muted"
+                  title="Open local .sqlite / .db file"
+                >
+                  <FolderOpen className="size-3 text-amber-400" />
+                  <span>Open .db</span>
+                </Button>
+              </div>
 
               <div className="relative">
                 <Search className="absolute left-2.5 top-2.5 size-3.5 text-muted-foreground" />
@@ -663,6 +728,74 @@ export function ConnectionManagerModal({ isOpen, onClose }: ConnectionManagerMod
           </div>
         </div>
       </div>
+
+      {/* Import URL Modal */}
+      {isImportUrlOpen && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-lg bg-card border border-border/80 rounded-xl shadow-2xl overflow-hidden p-5 space-y-4">
+            <div className="flex items-center justify-between border-b border-border/60 pb-3">
+              <div className="flex items-center gap-2">
+                <Link2 className="size-4 text-sky-400" />
+                <h3 className="text-sm font-semibold text-foreground">Import Connection URL</h3>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => {
+                  setIsImportUrlOpen(false);
+                  setImportUrlError(null);
+                }}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="size-4" />
+              </Button>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Paste your database connection string or <code className="text-foreground font-mono bg-muted px-1.5 py-0.5 rounded text-[11px]">DATABASE_URL</code> (PostgreSQL, MySQL, Redis):
+              </p>
+              <textarea
+                value={importUrlInput}
+                onChange={(e) => setImportUrlInput(e.target.value)}
+                placeholder="postgresql://user:password@ep-sample.neon.tech/neondb?sslmode=require"
+                rows={4}
+                className="w-full p-2.5 text-xs font-mono rounded-lg border border-border bg-muted/20 text-foreground resize-none focus:outline-none focus:ring-1 focus:ring-primary leading-relaxed"
+              />
+              {importUrlError && (
+                <div className="text-xs text-rose-400 flex items-center gap-1.5">
+                  <AlertCircle className="size-3.5 shrink-0" />
+                  <span>{importUrlError}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/60">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setIsImportUrlOpen(false);
+                  setImportUrlError(null);
+                }}
+                className="h-8 text-xs"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleImportUrl}
+                disabled={!importUrlInput.trim()}
+                className="h-8 text-xs gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground font-medium"
+              >
+                <Check className="size-3.5" />
+                <span>Parse & Populate Form</span>
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

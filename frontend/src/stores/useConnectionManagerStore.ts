@@ -49,6 +49,7 @@ interface ConnectionManagerState {
   setWorkspaceMode: (mode: WorkspaceMode) => void;
   setActiveRemoteView: (view: 'data' | 'structure' | 'redis') => void;
   loadSavedConnections: () => Promise<void>;
+  getSavedConnection: (id: string) => Promise<ConnectionConfig | null>;
   saveConnection: (cfg: ConnectionConfig) => Promise<ConnectionSummary | null>;
   deleteConnection: (id: string) => Promise<boolean>;
   testConnection: (cfg: ConnectionConfig) => Promise<{ success: boolean; latencyMs: number; message?: string; error?: string }>;
@@ -112,6 +113,21 @@ export const useConnectionManagerStore = create<ConnectionManagerState>((set, ge
       }
     } catch (err) {
       set({ isLoadingConnections: false, connectionError: String(err) });
+    }
+  },
+
+  getSavedConnection: async (id: string): Promise<ConnectionConfig | null> => {
+    try {
+      if (typeof window !== 'undefined' && (AppBindings as any)?.GetSavedConnection) {
+        const raw = await (AppBindings as any).GetSavedConnection(id);
+        if (raw) {
+          return JSON.parse(raw) as ConnectionConfig;
+        }
+      }
+      return null;
+    } catch (err) {
+      console.error('Failed to get saved connection:', err);
+      return null;
     }
   },
 

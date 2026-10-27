@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Database,
   Table as TableIcon,
@@ -11,6 +11,8 @@ import {
   Layers,
   Activity,
   Plus,
+  Play,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -47,11 +49,21 @@ export function RemoteDatabaseTree({
   const selectTable = useConnectionManagerStore((s) => s.selectTable);
   const activeRemoteView = useConnectionManagerStore((s) => s.activeRemoteView);
   const setActiveRemoteView = useConnectionManagerStore((s) => s.setActiveRemoteView);
+  const savedConnections = useConnectionManagerStore((s) => s.savedConnections);
+  const loadSavedConnections = useConnectionManagerStore((s) => s.loadSavedConnections);
+  const connect = useConnectionManagerStore((s) => s.connect);
+  const openLocalFile = useConnectionManagerStore((s) => s.openLocalFile);
+  const isConnecting = useConnectionManagerStore((s) => s.isConnecting);
 
   const activeWorkspaceView = usePlaygroundStore((s) => s.activeWorkspaceView);
   const openTableInPlayground = usePlaygroundStore((s) => s.openTableInPlayground);
 
   const [tableFilter, setTableFilter] = useState('');
+  const [connectingId, setConnectingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadSavedConnections();
+  }, [loadSavedConnections]);
 
   const handleTableClick = (tableName: string) => {
     selectTable(tableName);
@@ -61,6 +73,107 @@ export function RemoteDatabaseTree({
   };
 
   if (!activeSession) {
+    if (savedConnections.length > 0) {
+      return (
+        <div className="flex-1 flex flex-col overflow-hidden bg-card/20 select-none">
+          <div className="p-3 border-b border-border/70 flex items-center justify-between">
+            <div className="flex items-center gap-1.5 font-semibold text-xs text-foreground">
+              <Server className="size-3.5 text-primary" />
+              <span>Saved Connections</span>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={onOpenConnectionManager}
+              className="size-6 text-muted-foreground hover:text-foreground"
+              title="New Connection / Manage"
+            >
+              <Plus className="size-3.5" />
+            </Button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
+            {savedConnections.map((conn) => {
+              const isThisConnecting = isConnecting && connectingId === conn.id;
+
+              return (
+                <div
+                  key={conn.id}
+                  className="group p-2 rounded-lg border border-border/60 hover:border-primary/50 bg-background/50 hover:bg-muted/40 transition-all flex items-center justify-between gap-2"
+                >
+                  <div
+                    className="min-w-0 flex-1 cursor-pointer"
+                    onClick={() => {
+                      setConnectingId(conn.id);
+                      if (conn.engine === 'sqlite' && conn.filePath) {
+                        openLocalFile(conn.filePath);
+                      } else {
+                        connect(conn.id);
+                      }
+                    }}
+                    title="Click to connect"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span className="size-2 rounded-full bg-emerald-400 shrink-0" />
+                      <span className="text-xs font-medium text-foreground truncate">
+                        {conn.name}
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-muted-foreground font-mono truncate mt-0.5">
+                      {conn.engine.toUpperCase()} · {conn.engine === 'sqlite' ? conn.filePath || conn.database : `${conn.host}:${conn.port}`}
+                    </div>
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={isConnecting}
+                    onClick={() => {
+                      setConnectingId(conn.id);
+                      if (conn.engine === 'sqlite' && conn.filePath) {
+                        openLocalFile(conn.filePath);
+                      } else {
+                        connect(conn.id);
+                      }
+                    }}
+                    className="h-6 text-[10px] px-2 gap-1 bg-primary/10 hover:bg-primary/20 text-primary border-primary/30 shrink-0 font-medium"
+                  >
+                    {isThisConnecting ? (
+                      <Loader2 className="size-2.5 animate-spin" />
+                    ) : (
+                      <Play className="size-2.5 fill-current" />
+                    )}
+                    <span>Connect</span>
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="p-2 border-t border-border/70 space-y-1.5 bg-background/40">
+            <Button
+              variant="default"
+              size="sm"
+              onClick={onOpenConnectionManager}
+              className="w-full h-7 text-xs gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground font-medium"
+            >
+              <Server className="size-3" />
+              <span>Manage Connections...</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onOpenLocalFileDialog}
+              className="w-full h-7 text-xs gap-1.5 border-dashed border-border/80 hover:bg-muted"
+            >
+              <FolderOpen className="size-3 text-amber-400" />
+              <span>Open .sqlite File</span>
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-4 text-center select-none space-y-3">
         <div className="size-9 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">

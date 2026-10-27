@@ -74,6 +74,8 @@ const ENV_BADGES: Record<EnvironmentType, { label: string; className: string }> 
 export function ConnectionManagerModal({ isOpen, onClose }: ConnectionManagerModalProps) {
   const savedConnections = useConnectionManagerStore((s) => s.savedConnections);
   const loadSavedConnections = useConnectionManagerStore((s) => s.loadSavedConnections);
+  const getSavedConnection = useConnectionManagerStore((s) => s.getSavedConnection);
+  const activeSession = useConnectionManagerStore((s) => s.activeSession);
   const saveConnection = useConnectionManagerStore((s) => s.saveConnection);
   const deleteConnection = useConnectionManagerStore((s) => s.deleteConnection);
   const testConnection = useConnectionManagerStore((s) => s.testConnection);
@@ -101,27 +103,62 @@ export function ConnectionManagerModal({ isOpen, onClose }: ConnectionManagerMod
 
   useEffect(() => {
     if (isOpen) {
-      loadSavedConnections();
+      loadSavedConnections().then(async () => {
+        const list = useConnectionManagerStore.getState().savedConnections;
+        if (list.length > 0) {
+          const lastId = localStorage.getItem('vetrolog_last_connection_id') || activeSession?.config.id || list[0].id;
+          const found = list.find((c) => c.id === lastId) || list[0];
+          setSelectedId(found.id);
+          const full = await getSavedConnection(found.id);
+          if (full) {
+            setFormConfig(full);
+          } else {
+            handleSelectSaved(found);
+          }
+        }
+      });
     }
-  }, [isOpen, loadSavedConnections]);
+  }, [isOpen, loadSavedConnections, activeSession?.config.id]);
 
-  const handleSelectSaved = (conn: ConnectionSummary) => {
+  const handleSelectSaved = async (conn: ConnectionSummary) => {
     setSelectedId(conn.id);
     setTestResult({ tested: false, success: false });
-    setFormConfig({
+    setFormConfig((prev) => ({
+      ...prev,
       id: conn.id,
       name: conn.name,
       engine: conn.engine,
       host: conn.host,
       port: conn.port,
-      user: '',
       database: conn.database,
-      sslMode: 'disable',
       colorTag: conn.colorTag,
       environment: conn.environment,
       safeMode: conn.safeMode,
       filePath: conn.filePath,
-    });
+    }));
+
+    // Fetch full decrypted credentials including user, password, ssh
+    const full = await getSavedConnection(conn.id);
+    if (full) {
+      setFormConfig(full);
+    }
+  };
+
+  const handleDirectConnect = async (conn: ConnectionSummary) => {
+    setIsConnecting(true);
+    try {
+      if (conn.engine === 'sqlite' && conn.filePath) {
+        localStorage.setItem('vetrolog_last_connection_id', conn.id);
+        const ok = await openLocalFile(conn.filePath);
+        if (ok) onClose();
+      } else {
+        localStorage.setItem('vetrolog_last_connection_id', conn.id);
+        const ok = await connect(conn.id);
+        if (ok) onClose();
+      }
+    } finally {
+      setIsConnecting(false);
+    }
   };
 
   const handleNewConnection = () => {
@@ -198,9 +235,21 @@ export function ConnectionManagerModal({ isOpen, onClose }: ConnectionManagerMod
         tested: true,
         success: res.success,
         latencyMs: res.latencyMs,
-        message: res.message,
+        message: res.success
+          ? `${res.message || 'Connected successfully'} (credentials saved)`
+          : res.message,
         error: res.error,
       });
+
+      // Auto-save credentials when test connection succeeds!
+      if (res.success) {
+        const saved = await saveConnection(formConfig);
+        if (saved) {
+          setSelectedId(saved.id);
+          setFormConfig((prev) => ({ ...prev, id: saved.id }));
+          localStorage.setItem('vetrolog_last_connection_id', saved.id);
+        }
+      }
     } finally {
       setIsTesting(false);
     }
@@ -212,6 +261,8 @@ export function ConnectionManagerModal({ isOpen, onClose }: ConnectionManagerMod
       const saved = await saveConnection(formConfig);
       if (saved) {
         setSelectedId(saved.id);
+        setFormConfig((prev) => ({ ...prev, id: saved.id }));
+        localStorage.setItem('vetrolog_last_connection_id', saved.id);
       }
     } finally {
       setIsSaving(false);
@@ -222,11 +273,20 @@ export function ConnectionManagerModal({ isOpen, onClose }: ConnectionManagerMod
     setIsConnecting(true);
     try {
       if (formConfig.engine === 'sqlite' && formConfig.filePath) {
+        const saved = await saveConnection(formConfig);
+        if (saved) {
+          setSelectedId(saved.id);
+          localStorage.setItem('vetrolog_last_connection_id', saved.id);
+        }
         const ok = await openLocalFile(formConfig.filePath);
         if (ok) onClose();
       } else {
+        // Auto-save credentials on connect so user doesn't need to re-enter
         const saved = await saveConnection(formConfig);
         if (saved) {
+          setSelectedId(saved.id);
+          setFormConfig((prev) => ({ ...prev, id: saved.id }));
+          localStorage.setItem('vetrolog_last_connection_id', saved.id);
           const ok = await connect(saved.id);
           if (ok) onClose();
         }
@@ -273,9 +333,6 @@ export function ConnectionManagerModal({ isOpen, onClose }: ConnectionManagerMod
           <div className="flex items-center gap-2.5">
             <Server className="size-4 text-primary" />
             <h2 className="text-sm font-semibold text-foreground">Connection Manager</h2>
-            <span className="text-[11px] text-muted-foreground px-2 py-0.5 rounded-full bg-muted border border-border">
-              TablePlus Compatible
-            </span>
           </div>
           <Button
             variant="ghost"
@@ -354,7 +411,9 @@ export function ConnectionManagerModal({ isOpen, onClose }: ConnectionManagerMod
                       key={conn.id}
                       type="button"
                       onClick={() => handleSelectSaved(conn)}
-                      className={`w-full text-left p-2.5 rounded-lg border transition-all ${
+                      onDoubleClick={() => handleDirectConnect(conn)}
+                      title="Click to edit credentials, double-click to connect immediately"
+                      className={`group w-full text-left p-2.5 rounded-lg border transition-all ${
                         isSelected
                           ? 'border-primary bg-primary/10 shadow-xs'
                           : 'border-transparent hover:border-border hover:bg-muted/40'
@@ -369,8 +428,13 @@ export function ConnectionManagerModal({ isOpen, onClose }: ConnectionManagerMod
                           {env.label}
                         </span>
                       </div>
-                      <div className="text-[11px] text-muted-foreground truncate font-mono">
-                        {conn.engine === 'sqlite' ? conn.filePath || conn.database : `${conn.host}:${conn.port}`}
+                      <div className="flex items-center justify-between text-[11px] text-muted-foreground font-mono">
+                        <span className="truncate">
+                          {conn.engine === 'sqlite' ? conn.filePath || conn.database : `${conn.host}:${conn.port}`}
+                        </span>
+                        <span className="text-[10px] text-primary opacity-0 group-hover:opacity-100 transition-opacity font-sans font-medium">
+                          Connect →
+                        </span>
                       </div>
                     </button>
                   );

@@ -178,6 +178,21 @@ func (s *Store) Save(cfg *types.ConnectionConfig) (*types.ConnectionSummary, err
 	found := false
 	for i := range all {
 		if all[i].ID == cfg.ID {
+			// If incoming password is empty, preserve already saved encrypted password
+			if toSave.Password == "" && all[i].Password != "" {
+				toSave.Password = all[i].Password
+			}
+			if toSave.SSH != nil && all[i].SSH != nil {
+				if toSave.SSH.Password == "" && all[i].SSH.Password != "" {
+					toSave.SSH.Password = all[i].SSH.Password
+				}
+				if toSave.SSH.Passphrase == "" && all[i].SSH.Passphrase != "" {
+					toSave.SSH.Passphrase = all[i].SSH.Passphrase
+				}
+			}
+			if toSave.CreatedAt == 0 && all[i].CreatedAt != 0 {
+				toSave.CreatedAt = all[i].CreatedAt
+			}
 			all[i] = toSave
 			found = true
 			break

@@ -49,6 +49,8 @@ export function GetConnectionState():Promise<models.ConnectionState>;
 
 export function GetLocalIPAddresses():Promise<Array<string>>;
 
+export function GetSavedConnection(arg1:string):Promise<string>;
+
 export function GetTelemetryStatus():Promise<Record<string, any>>;
 
 export function ListSavedConnections():Promise<Array<types.ConnectionSummary>>;

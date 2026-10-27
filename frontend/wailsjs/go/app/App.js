@@ -90,6 +90,10 @@ export function GetLocalIPAddresses() {
   return window['go']['app']['App']['GetLocalIPAddresses']();
 }
 
+export function GetSavedConnection(arg1) {
+  return window['go']['app']['App']['GetSavedConnection'](arg1);
+}
+
 export function GetTelemetryStatus() {
   return window['go']['app']['App']['GetTelemetryStatus']();
 }

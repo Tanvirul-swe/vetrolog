@@ -291,6 +291,22 @@ func (a *App) ListSavedConnections() ([]types.ConnectionSummary, error) {
 	return a.dbManager.Store().ListSummaries()
 }
 
+// GetSavedConnection retrieves full decrypted profile by ID serialized as JSON
+func (a *App) GetSavedConnection(id string) (string, error) {
+	if a.dbManager == nil {
+		return "", fmt.Errorf("database manager not initialized")
+	}
+	cfg, err := a.dbManager.Store().Get(id)
+	if err != nil {
+		return "", err
+	}
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal connection config: %w", err)
+	}
+	return string(data), nil
+}
+
 // SaveConnection creates or updates a connection configuration profile
 func (a *App) SaveConnection(configJSON string) (*types.ConnectionSummary, error) {
 	if a.dbManager == nil {

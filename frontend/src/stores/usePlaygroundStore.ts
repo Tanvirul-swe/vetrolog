@@ -798,6 +798,32 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
     const sql = overrideSql || get().query;
     if (!sql.trim()) return;
 
+    const isRemote = useConnectionManagerStore.getState().workspaceMode === 'remote';
+    if (isRemote) {
+      const activeSession = useConnectionManagerStore.getState().activeSession;
+      if (!activeSession) return;
+
+      set({ isSimulating: true });
+      try {
+        const sim = await useConnectionManagerStore.getState().simulateRemoteQuery(sql);
+        set({ simulation: sim });
+      } catch (e: any) {
+        set({
+          simulation: {
+            query: sql,
+            isMutation: true,
+            affectedRows: 0,
+            durationMs: 0,
+            success: false,
+            error: e.message || 'Dry-run simulation failed',
+          },
+        });
+      } finally {
+        set({ isSimulating: false });
+      }
+      return;
+    }
+
     const deviceId = useAdbStore.getState().selectedDeviceId;
     const packageName = useAdbStore.getState().selectedPackageName;
     const selectedDbId = useDatabaseStore.getState().selectedDatabaseId;

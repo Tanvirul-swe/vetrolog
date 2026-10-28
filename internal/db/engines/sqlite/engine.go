@@ -626,6 +626,103 @@ func (e *Engine) ExplainQuery(ctx context.Context, query string) (*types.QueryPl
 	}, nil
 }
 
+func (e *Engine) SimulateQuery(ctx context.Context, query string) (*types.SimulationResult, error) {
+	if e.dbInstance == nil {
+		return nil, fmt.Errorf("engine not connected")
+	}
+
+	start := time.Now()
+	trimmed := strings.TrimSpace(query)
+	upper := strings.ToUpper(trimmed)
+
+	isMutation := strings.HasPrefix(upper, "UPDATE") ||
+		strings.HasPrefix(upper, "DELETE") ||
+		strings.HasPrefix(upper, "INSERT") ||
+		strings.HasPrefix(upper, "DROP") ||
+		strings.HasPrefix(upper, "ALTER")
+
+	if !isMutation {
+		// Read-only query simulation
+		rows, err := e.dbInstance.QueryContext(ctx, query)
+		elapsed := float64(time.Since(start).Microseconds()) / 1000.0
+		if err != nil {
+			return &types.SimulationResult{
+				Query:      query,
+				IsMutation: false,
+				DurationMs: elapsed,
+				Success:    false,
+				Error:      err.Error(),
+			}, nil
+		}
+		defer rows.Close()
+
+		var count int64
+		for rows.Next() {
+			count++
+			if count >= 100 {
+				break
+			}
+		}
+		return &types.SimulationResult{
+			Query:        query,
+			IsMutation:   false,
+			AffectedRows: count,
+			DurationMs:   elapsed,
+			Success:      true,
+		}, nil
+	}
+
+	// For UPDATE or DELETE, attempt to capture preview of affected rows before executing
+	var previewRows []map[string]interface{}
+	if strings.HasPrefix(upper, "UPDATE") || strings.HasPrefix(upper, "DELETE") {
+		tableName := types.ExtractTableNameFromMutation(trimmed)
+		whereClause := types.ExtractWhereClause(trimmed)
+		if tableName != "" {
+			previewSQL := fmt.Sprintf(`SELECT * FROM "%s"`, tableName)
+			if whereClause != "" {
+				previewSQL += " " + whereClause
+			}
+			previewSQL += " LIMIT 20"
+
+			pRows, err := e.dbInstance.QueryContext(ctx, previewSQL)
+			if err == nil {
+				defer pRows.Close()
+				colTypes, _ := pRows.ColumnTypes()
+				previewRows, _ = scanRows(pRows, colTypes)
+			}
+		}
+	}
+
+	// Execute inside isolated transaction and ALWAYS rollback
+	tx, err := e.dbInstance.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open sandbox transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	res, err := tx.ExecContext(ctx, query)
+	elapsed := float64(time.Since(start).Microseconds()) / 1000.0
+	if err != nil {
+		return &types.SimulationResult{
+			Query:      query,
+			IsMutation: true,
+			DurationMs: elapsed,
+			Success:    false,
+			Error:      err.Error(),
+		}, nil
+	}
+
+	affected, _ := res.RowsAffected()
+	return &types.SimulationResult{
+		Query:        query,
+		IsMutation:   true,
+		AffectedRows: affected,
+		PreviewRows:  previewRows,
+		DurationMs:   elapsed,
+		Success:      true,
+	}, nil
+}
+
 func scanRows(rows *sql.Rows, colTypes []*sql.ColumnType) ([]map[string]interface{}, error) {
 	var results []map[string]interface{}
 	colNames := make([]string, len(colTypes))

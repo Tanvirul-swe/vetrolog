@@ -7,6 +7,7 @@ import {
   TableDataResult,
   ExtendedTableSchema,
   QueryResult,
+  SimulationResult,
   ChangeResult,
   RedisScanResult,
   RedisValueResult,
@@ -64,6 +65,7 @@ interface ConnectionManagerState {
   loadTableData: (table: string, page?: number, pageSize?: number, sortCol?: string, sortDir?: string, filter?: string) => Promise<void>;
   loadTableSchema: (table: string) => Promise<void>;
   executeRemoteQuery: (query: string, maxRows?: number) => Promise<QueryResult | null>;
+  simulateRemoteQuery: (query: string) => Promise<SimulationResult | null>;
   applyPendingChanges: (changesJSON: string) => Promise<ChangeResult | null>;
 
   // Redis Actions
@@ -603,6 +605,25 @@ export const useConnectionManagerStore = create<ConnectionManagerState>((set, ge
       };
       useDatabaseStore.getState().setLatestQueryResult(errRes);
       return errRes;
+    }
+  },
+
+  simulateRemoteQuery: async (query: string): Promise<SimulationResult | null> => {
+    const session = get().activeSession;
+    if (!session) return null;
+
+    try {
+      const res = await AppBindings.RemoteSimulateQuery(session.sessionId, query);
+      return res as unknown as SimulationResult;
+    } catch (err) {
+      return {
+        query,
+        isMutation: true,
+        affectedRows: 0,
+        durationMs: 0,
+        success: false,
+        error: String(err),
+      };
     }
   },
 

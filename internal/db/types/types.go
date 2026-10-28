@@ -3,6 +3,7 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -265,4 +266,41 @@ type RedisValueResult struct {
 	Success    bool        `json:"success"`
 	DurationMs float64     `json:"durationMs"`
 	Error      string      `json:"error,omitempty"`
+}
+
+// SimulationResult represents the safe dry-run preview of mutating queries.
+type SimulationResult struct {
+	Query        string                   `json:"query"`
+	IsMutation   bool                     `json:"isMutation"`
+	AffectedRows int64                    `json:"affectedRows"`
+	PreviewRows  []map[string]interface{} `json:"previewRows,omitempty"`
+	DurationMs   float64                  `json:"durationMs"`
+	Success      bool                     `json:"success"`
+	Error        string                   `json:"error,omitempty"`
+}
+
+// ExtractTableNameFromMutation parses table name from an UPDATE or DELETE statement.
+func ExtractTableNameFromMutation(sql string) string {
+	parts := strings.Fields(sql)
+	if len(parts) < 2 {
+		return ""
+	}
+	upper := strings.ToUpper(parts[0])
+	if upper == "UPDATE" {
+		return strings.Trim(parts[1], "\"`';")
+	}
+	if upper == "DELETE" && len(parts) >= 3 && strings.ToUpper(parts[1]) == "FROM" {
+		return strings.Trim(parts[2], "\"`';")
+	}
+	return ""
+}
+
+// ExtractWhereClause extracts the WHERE clause from a SQL statement.
+func ExtractWhereClause(sql string) string {
+	upper := strings.ToUpper(sql)
+	idx := strings.Index(upper, "WHERE")
+	if idx != -1 {
+		return strings.TrimRight(strings.TrimSpace(sql[idx:]), ";")
+	}
+	return ""
 }

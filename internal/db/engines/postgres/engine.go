@@ -767,6 +767,115 @@ func (e *Engine) ExplainQuery(ctx context.Context, query string) (*types.QueryPl
 	}, nil
 }
 
+func (e *Engine) SimulateQuery(ctx context.Context, query string) (*types.SimulationResult, error) {
+	if e.pool == nil {
+		return nil, fmt.Errorf("engine not connected")
+	}
+
+	start := time.Now()
+	trimmed := strings.TrimSpace(query)
+	upper := strings.ToUpper(trimmed)
+
+	isMutation := strings.HasPrefix(upper, "UPDATE") ||
+		strings.HasPrefix(upper, "DELETE") ||
+		strings.HasPrefix(upper, "INSERT") ||
+		strings.HasPrefix(upper, "DROP") ||
+		strings.HasPrefix(upper, "ALTER")
+
+	if !isMutation {
+		// Read-only query simulation
+		rows, err := e.pool.Query(ctx, query)
+		elapsed := float64(time.Since(start).Microseconds()) / 1000.0
+		if err != nil {
+			return &types.SimulationResult{
+				Query:      query,
+				IsMutation: false,
+				DurationMs: elapsed,
+				Success:    false,
+				Error:      err.Error(),
+			}, nil
+		}
+		defer rows.Close()
+
+		var count int64
+		for rows.Next() {
+			count++
+			if count >= 100 {
+				break
+			}
+		}
+		return &types.SimulationResult{
+			Query:        query,
+			IsMutation:   false,
+			AffectedRows: count,
+			DurationMs:   elapsed,
+			Success:      true,
+		}, nil
+	}
+
+	// For UPDATE or DELETE, attempt to capture preview of affected rows before executing
+	var previewRows []map[string]interface{}
+	if strings.HasPrefix(upper, "UPDATE") || strings.HasPrefix(upper, "DELETE") {
+		tableName := types.ExtractTableNameFromMutation(trimmed)
+		whereClause := types.ExtractWhereClause(trimmed)
+		if tableName != "" {
+			schema := e.config.Schema
+			if schema == "" {
+				schema = "public"
+			}
+			previewSQL := fmt.Sprintf(`SELECT * FROM "%s"."%s"`, schema, tableName)
+			if whereClause != "" {
+				previewSQL += " " + whereClause
+			}
+			previewSQL += " LIMIT 20"
+
+			pRows, err := e.pool.Query(ctx, previewSQL)
+			if err == nil {
+				defer pRows.Close()
+				fds := pRows.FieldDescriptions()
+				for pRows.Next() {
+					vals, err := pRows.Values()
+					if err == nil {
+						rowMap := make(map[string]interface{})
+						for i, fd := range fds {
+							rowMap[string(fd.Name)] = vals[i]
+						}
+						previewRows = append(previewRows, rowMap)
+					}
+				}
+			}
+		}
+	}
+
+	// Execute inside isolated transaction and ALWAYS rollback
+	tx, err := e.pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open sandbox transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	tag, err := tx.Exec(ctx, query)
+	elapsed := float64(time.Since(start).Microseconds()) / 1000.0
+	if err != nil {
+		return &types.SimulationResult{
+			Query:      query,
+			IsMutation: true,
+			DurationMs: elapsed,
+			Success:    false,
+			Error:      err.Error(),
+		}, nil
+	}
+
+	return &types.SimulationResult{
+		Query:        query,
+		IsMutation:   true,
+		AffectedRows: tag.RowsAffected(),
+		PreviewRows:  previewRows,
+		DurationMs:   elapsed,
+		Success:      true,
+	}, nil
+}
+
 func escapeSql(s string) string {
 	return strings.ReplaceAll(s, "'", "''")
 }

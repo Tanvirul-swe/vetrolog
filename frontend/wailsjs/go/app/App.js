@@ -158,6 +158,10 @@ export function RemoteListTables(arg1, arg2, arg3) {
   return window['go']['app']['App']['RemoteListTables'](arg1, arg2, arg3);
 }
 
+export function RemoteSimulateQuery(arg1, arg2) {
+  return window['go']['app']['App']['RemoteSimulateQuery'](arg1, arg2);
+}
+
 export function RequestTableData(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['RequestTableData'](arg1, arg2, arg3, arg4);
 }

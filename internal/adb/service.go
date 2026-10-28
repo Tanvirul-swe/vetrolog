@@ -1429,7 +1429,7 @@ func extractWhereClause(sql string) string {
 	upper := strings.ToUpper(sql)
 	idx := strings.Index(upper, "WHERE")
 	if idx != -1 {
-		return strings.TrimSpace(sql[idx:])
+		return strings.TrimRight(strings.TrimSpace(sql[idx:]), ";")
 	}
 	return ""
 }

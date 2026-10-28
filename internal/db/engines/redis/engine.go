@@ -306,6 +306,16 @@ func (e *Engine) ExplainQuery(_ context.Context, _ string) (*types.QueryPlanResu
 	}, nil
 }
 
+func (e *Engine) SimulateQuery(_ context.Context, query string) (*types.SimulationResult, error) {
+	return &types.SimulationResult{
+		Query:        query,
+		IsMutation:   false,
+		AffectedRows: 0,
+		Success:      true,
+		Error:        "Dry-run simulation is not applicable for key-value store Redis",
+	}, nil
+}
+
 // RedisScan lists keys with pattern and cursor
 func (e *Engine) RedisScan(ctx context.Context, pattern string, cursor uint64, count int64) (*types.RedisScanResult, error) {
 	if e.client == nil {

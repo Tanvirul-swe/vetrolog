@@ -121,6 +121,12 @@ export function SqlEditor({
   const isLoadingDatabases = useAdbStore((s) => s.isLoadingDatabases);
   const isLoadingApps = useAdbStore((s) => s.isLoadingApps);
   const isInitialLoading = useAdbStore((s) => s.isInitialLoading);
+  const workspaceMode = useConnectionManagerStore((s) => s.workspaceMode);
+  const activeSession = useConnectionManagerStore((s) => s.activeSession);
+
+  const hasValidTarget =
+    (workspaceMode === 'remote' ? Boolean(activeSession) : Boolean(selectedDbId)) &&
+    Boolean(query.trim());
 
   const handleToggleDbMenu = () => {
     if (isDbMenuOpen) {
@@ -214,7 +220,6 @@ export function SqlEditor({
   const activeDb = useMemo(() => databases.find((d) => d.id === selectedDbId), [databases, selectedDbId]);
   const remoteTables = useConnectionManagerStore((s) => s.remoteTables);
   const tableSchema = useConnectionManagerStore((s) => s.tableSchema);
-  const activeSession = useConnectionManagerStore((s) => s.activeSession);
   const loadTableSchema = useConnectionManagerStore((s) => s.loadTableSchema);
 
   // Combine extendedSchema with activeDb.tables, remoteTables, and tableSchema to guarantee all tables and columns are always available
@@ -967,7 +972,7 @@ export function SqlEditor({
           <Button
             size="sm"
             onClick={handleExecute}
-            disabled={!selectedDbId || !query.trim() || isExecuting}
+            disabled={!hasValidTarget || isExecuting}
             className="h-7 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium shadow-xs shrink-0"
             title="Execute query and commit changes (⌘Enter)"
           >
@@ -995,7 +1000,7 @@ export function SqlEditor({
             size="sm"
             variant="outline"
             onClick={handleDryRun}
-            disabled={!selectedDbId || !query.trim() || isSimulating || isExecuting}
+            disabled={!hasValidTarget || isSimulating || isExecuting}
             className="h-7 text-xs gap-1.5 border-amber-500/30 text-amber-400 hover:bg-amber-500/10 font-medium shrink-0"
             title="Simulate mutating query in safe rollback transaction sandbox (⌘⇧Enter)"
           >
@@ -1008,7 +1013,7 @@ export function SqlEditor({
               size="sm"
               variant="ghost"
               onClick={handleExplain}
-              disabled={!selectedDbId || !query.trim() || isExplaining || isExecuting}
+              disabled={!hasValidTarget || isExplaining || isExecuting}
               className="h-7 text-xs gap-1.5 text-muted-foreground hover:text-foreground shrink-0"
               title="Inspect visual execution plan tree"
             >

@@ -886,6 +886,30 @@ export namespace types {
 	        this.error = source["error"];
 	    }
 	}
+	export class SimulationResult {
+	    query: string;
+	    isMutation: boolean;
+	    affectedRows: number;
+	    previewRows?: any[];
+	    durationMs: number;
+	    success: boolean;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SimulationResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.query = source["query"];
+	        this.isMutation = source["isMutation"];
+	        this.affectedRows = source["affectedRows"];
+	        this.previewRows = source["previewRows"];
+	        this.durationMs = source["durationMs"];
+	        this.success = source["success"];
+	        this.error = source["error"];
+	    }
+	}
 	export class TableDataResult {
 	    tableName: string;
 	    schema: string;

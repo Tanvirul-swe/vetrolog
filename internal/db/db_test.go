@@ -208,6 +208,30 @@ func TestLocalSQLiteEngineOperations(t *testing.T) {
 		t.Fatalf("Expected DefaultLimitApplied to be false for query with explicit LIMIT")
 	}
 
+	// 5. Test SimulateQuery (Dry-Run with guaranteed rollback)
+	simRes, err := active.Engine.SimulateQuery(ctx, "UPDATE users SET username = 'temp_simulation' WHERE id = 1;")
+	if err != nil || !simRes.Success {
+		t.Fatalf("SimulateQuery failed: %v", err)
+	}
+	if !simRes.IsMutation {
+		t.Fatalf("Expected IsMutation to be true")
+	}
+	if simRes.AffectedRows != 1 {
+		t.Fatalf("Expected 1 affected row in simulation, got %d", simRes.AffectedRows)
+	}
+	if len(simRes.PreviewRows) != 1 {
+		t.Fatalf("Expected 1 preview row, got %d", len(simRes.PreviewRows))
+	}
+
+	// Verify database is completely untouched after simulation rollback
+	verifyRes, err := active.Engine.ExecuteQuery(ctx, "SELECT username FROM users WHERE id = 1;", 1)
+	if err != nil || len(verifyRes.Rows) == 0 {
+		t.Fatalf("Verify query failed: %v", err)
+	}
+	if verifyRes.Rows[0]["username"] != "alice_updated" {
+		t.Fatalf("Expected database to be untouched (alice_updated), but got %v", verifyRes.Rows[0]["username"])
+	}
+
 	// Close session
 	if err := mgr.CloseConnection(session.SessionID); err != nil {
 		t.Fatalf("CloseConnection failed: %v", err)

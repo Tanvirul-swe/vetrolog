@@ -83,6 +83,8 @@ export function RemoteListSchemas(arg1:string,arg2:string):Promise<Array<string>
 
 export function RemoteListTables(arg1:string,arg2:string,arg3:string):Promise<Array<types.TableSummary>>;
 
+export function RemoteSimulateQuery(arg1:string,arg2:string):Promise<types.SimulationResult>;
+
 export function RequestTableData(arg1:string,arg2:string,arg3:number,arg4:number):Promise<boolean>;
 
 export function SaveConnection(arg1:string):Promise<types.ConnectionSummary>;

@@ -492,6 +492,18 @@ func (a *App) RemoteExplainQuery(sessionID string, query string) (*types.QueryPl
 	return session.Engine.ExplainQuery(context.Background(), query)
 }
 
+// RemoteSimulateQuery runs mutating queries in an isolated rollback transaction sandbox
+func (a *App) RemoteSimulateQuery(sessionID string, query string) (*types.SimulationResult, error) {
+	if a.dbManager == nil {
+		return nil, fmt.Errorf("database manager not initialized")
+	}
+	session, err := a.dbManager.GetSession(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return session.Engine.SimulateQuery(context.Background(), query)
+}
+
 // RedisScan scans keys in Redis
 func (a *App) RedisScan(sessionID string, pattern string, cursor uint64, count int64) (*types.RedisScanResult, error) {
 	if a.dbManager == nil {

@@ -26,8 +26,9 @@ type DatabaseEngine interface {
 	// Atomic Staged Changes
 	ApplyPendingChanges(ctx context.Context, changes PendingChanges) (*ChangeResult, error)
 
-	// Performance analysis
+	// Performance analysis & Dry Run simulation
 	ExplainQuery(ctx context.Context, query string) (*QueryPlanResult, error)
+	SimulateQuery(ctx context.Context, query string) (*SimulationResult, error)
 }
 
 // RedisEngineExtension provides optional key-value methods for Redis

@@ -8,7 +8,6 @@ import {
   Hash,
   CheckCircle2,
   XCircle,
-  Database,
   ArrowRight,
   Loader2,
 } from 'lucide-react';

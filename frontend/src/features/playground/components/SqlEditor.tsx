@@ -229,7 +229,6 @@ export function SqlEditor({
 
   // Combine extendedSchema with activeDb.tables, remoteTables, and tableSchema to guarantee all tables and columns are always available
   const availableTables = useMemo(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const tableMap = new Map<string, any>();
 
     // 1. From database store
@@ -250,7 +249,6 @@ export function SqlEditor({
             schema: t.schema || 'public',
             type: t.type || 'table',
             rowCount: t.rowCount || 0,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             columns: (t.columns || []).map((c: any) => ({
               name: c.name,
               type: c.type || 'TEXT',

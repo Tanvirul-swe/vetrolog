@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Database,
   Plus,
@@ -8,7 +8,6 @@ import {
   Loader2,
   Server,
   FolderOpen,
-  Key,
   Shield,
   X,
   Search,
@@ -102,26 +101,7 @@ export function ConnectionManagerModal({ isOpen, onClose }: ConnectionManagerMod
   const [isSaving, setIsSaving] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
 
-  useEffect(() => {
-    if (isOpen) {
-      loadSavedConnections().then(async () => {
-        const list = useConnectionManagerStore.getState().savedConnections;
-        if (list.length > 0) {
-          const lastId = localStorage.getItem('vetrolog_last_connection_id') || activeSession?.config.id || list[0].id;
-          const found = list.find((c) => c.id === lastId) || list[0];
-          setSelectedId(found.id);
-          const full = await getSavedConnection(found.id);
-          if (full) {
-            setFormConfig(full);
-          } else {
-            handleSelectSaved(found);
-          }
-        }
-      });
-    }
-  }, [isOpen, loadSavedConnections, activeSession?.config.id]);
-
-  const handleSelectSaved = async (conn: ConnectionSummary) => {
+  const handleSelectSaved = useCallback(async (conn: ConnectionSummary) => {
     setSelectedId(conn.id);
     setTestResult({ tested: false, success: false });
     setFormConfig((prev) => ({
@@ -143,7 +123,26 @@ export function ConnectionManagerModal({ isOpen, onClose }: ConnectionManagerMod
     if (full) {
       setFormConfig(full);
     }
-  };
+  }, [getSavedConnection]);
+
+  useEffect(() => {
+    if (isOpen) {
+      loadSavedConnections().then(async () => {
+        const list = useConnectionManagerStore.getState().savedConnections;
+        if (list.length > 0) {
+          const lastId = localStorage.getItem('vetrolog_last_connection_id') || activeSession?.config.id || list[0].id;
+          const found = list.find((c) => c.id === lastId) || list[0];
+          setSelectedId(found.id);
+          const full = await getSavedConnection(found.id);
+          if (full) {
+            setFormConfig(full);
+          } else {
+            handleSelectSaved(found);
+          }
+        }
+      });
+    }
+  }, [isOpen, loadSavedConnections, activeSession?.config.id, getSavedConnection, handleSelectSaved]);
 
   const handleDirectConnect = async (conn: ConnectionSummary) => {
     setIsConnecting(true);

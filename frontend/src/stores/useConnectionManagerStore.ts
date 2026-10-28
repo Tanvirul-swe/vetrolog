@@ -111,12 +111,10 @@ export const useConnectionManagerStore = create<ConnectionManagerState>((set, ge
       {
         id: session.currentDatabase || 'remote',
         name: session.config.name,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         type: session.config.engine === 'sqlite' ? 'sqlite' : (session.config.engine as any),
         path: session.config.filePath || `${session.config.host}:${session.config.port}`,
         tables: rawTables.map((t) => ({
           name: t.name,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           type: (t.type === 'VIEW' ? 'view' : 'table') as any,
           columns: (t.columns || []).map((col) => ({
             name: col.name,

@@ -657,7 +657,6 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
 
     try {
       const isRemote = useConnectionManagerStore.getState().workspaceMode === 'remote';
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let result: any = null;
 
       if (isRemote) {
@@ -680,7 +679,6 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
           requestId: result.requestId || `query_${Date.now()}`,
           databaseId: result.databaseId || useDatabaseStore.getState().selectedDatabaseId || '',
           query: sql,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           columns: (result.columns || []).map((col: any) =>
             typeof col === 'string'
               ? { name: col, type: 'TEXT' }

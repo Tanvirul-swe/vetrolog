@@ -95,3 +95,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Core Go runtime: `internal/version/version.go`
   - Frontend SPA: `frontend/package.json` & `useUpdaterStore.ts`
   - Package Managers: Scoop (`vetrolog.json`), Arch Linux AUR (`PKGBUILD`, `.SRCINFO`), and Snapcraft (`snapcraft.yaml`).
+

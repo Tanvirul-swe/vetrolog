@@ -24,7 +24,6 @@ export function App() {
   const setLatestQueryResult = useDatabaseStore((s) => s.setLatestQueryResult);
   const updateRowLocally = useDatabaseStore((s) => s.updateRowLocally);
   const deleteRowLocally = useDatabaseStore((s) => s.deleteRowLocally);
-  const page = useDatabaseStore((s) => s.page);
   const pageSize = useDatabaseStore((s) => s.pageSize);
 
   // 1. Fetch initial connection state from Go backend
@@ -100,7 +99,6 @@ export function App() {
 
   const selectedRemoteTable = useConnectionManagerStore((s) => s.selectedTable);
   const workspaceMode = useConnectionManagerStore((s) => s.workspaceMode);
-  const activeTable = workspaceMode === 'remote' ? (selectedRemoteTable || selectedTableName) : selectedTableName;
 
   // 4. Request table data on selection or page change
   const handleRequestTableData = useCallback((targetPage?: number) => {

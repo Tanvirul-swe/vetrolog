@@ -1,4 +1,4 @@
-import { FolderTree, Database, Loader2, Globe, Smartphone } from 'lucide-react';
+import { FolderTree, Database, Loader2, Globe } from 'lucide-react';
 import { DatabaseTree } from '@/features/databases/components/DatabaseTree';
 import { RemoteDatabaseTree } from '@/features/databases/components/RemoteDatabaseTree';
 import { useDatabaseStore } from '@/stores/useDatabaseStore';

@@ -4,7 +4,6 @@ import {
   Trash2,
   Smartphone,
   RefreshCw,
-  QrCode,
   Table,
   User,
   Server,
@@ -13,7 +12,6 @@ import {
   Globe,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useConnectionStore } from '@/stores/useConnectionStore';
 import { useDatabaseStore } from '@/stores/useDatabaseStore';
 import { usePlaygroundStore } from '@/stores/usePlaygroundStore';
 import { useConnectionManagerStore } from '@/stores/useConnectionManagerStore';
@@ -45,10 +43,6 @@ export function AppHeader({
   const [isPairingOpen, setIsPairingOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPod|iPad/.test(navigator.userAgent);
-
-  const isConnected = useConnectionStore((s) => s.isConnected);
-  const currentDevice = useConnectionStore((s) => s.currentDevice);
-  const port = useConnectionStore((s) => s.port);
 
   const clearLogs = useDatabaseStore((s) => s.clearLogs);
 

@@ -1,14 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
-  Database,
   Table as TableIcon,
   Eye,
   Server,
   FolderOpen,
   Search,
   Power,
-  ChevronDown,
-  Layers,
   Activity,
   Plus,
   Play,
@@ -48,7 +45,6 @@ export function RemoteDatabaseTree({
   const remoteTables = useConnectionManagerStore((s) => s.remoteTables);
   const selectedTable = useConnectionManagerStore((s) => s.selectedTable);
   const selectTable = useConnectionManagerStore((s) => s.selectTable);
-  const activeRemoteView = useConnectionManagerStore((s) => s.activeRemoteView);
   const setActiveRemoteView = useConnectionManagerStore((s) => s.setActiveRemoteView);
   const savedConnections = useConnectionManagerStore((s) => s.savedConnections);
   const loadSavedConnections = useConnectionManagerStore((s) => s.loadSavedConnections);

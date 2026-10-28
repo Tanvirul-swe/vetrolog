@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Play, RotateCcw, Code2, AlertTriangle, Check, Copy, Loader2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useStagedChangesStore } from '@/stores/useStagedChangesStore';
@@ -25,12 +25,12 @@ export function PendingChangesBar({ onCommitted }: PendingChangesBarProps) {
   const engineType = activeSession?.config.engine || 'postgres';
   const sqlPreview = generatePreviewSQL(engineType);
 
-  const handleCommit = async () => {
+  const handleCommit = useCallback(async () => {
     const res = await commitChanges(applyPendingChanges);
     if (res.success && onCommitted) {
       onCommitted();
     }
-  };
+  }, [applyPendingChanges, commitChanges, onCommitted]);
 
   const handleCopySql = () => {
     navigator.clipboard.writeText(sqlPreview);
@@ -59,7 +59,7 @@ export function PendingChangesBar({ onCommitted }: PendingChangesBarProps) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [pendingChanges.length, isCommitting, isPreviewModalOpen]);
+  }, [pendingChanges.length, isCommitting, isPreviewModalOpen, handleCommit, setIsPreviewModalOpen]);
 
   if (pendingChanges.length === 0) return null;
 

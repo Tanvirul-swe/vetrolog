@@ -10,8 +10,6 @@ import {
   Copy,
   Loader2,
   Database,
-  FileCode,
-  Tag,
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';

@@ -64,31 +64,31 @@ export function GridToolbar({ onRefresh, onRequestPage }: GridToolbarProps) {
 
         {/* Remote Mode: Data Grid vs Structure View Tabs */}
         {workspaceMode === 'remote' && (
-          <div className="flex items-center rounded-lg border border-border/70 bg-muted/40 p-0.5 ml-2">
+          <div className="flex items-center rounded-lg border border-border/80 bg-muted/60 p-0.5 ml-2 gap-0.5 shadow-inner">
             <button
               type="button"
               onClick={() => setActiveRemoteView('data')}
               className={cn(
-                'flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] transition-colors',
+                'h-6 px-2.5 rounded-md text-[11px] font-medium flex items-center gap-1.5 transition-all cursor-pointer select-none active:scale-[0.98]',
                 activeRemoteView === 'data'
-                  ? 'bg-background text-foreground shadow-xs font-semibold'
-                  : 'text-muted-foreground hover:text-foreground'
+                  ? 'bg-background text-foreground font-semibold shadow-xs border border-border/80'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-background/60 border border-transparent'
               )}
             >
-              <TableIcon className="size-3 text-sky-400" />
+              <TableIcon className={`size-3 ${activeRemoteView === 'data' ? 'text-sky-400' : 'text-muted-foreground'}`} />
               <span>Data</span>
             </button>
             <button
               type="button"
               onClick={() => setActiveRemoteView('structure')}
               className={cn(
-                'flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] transition-colors',
+                'h-6 px-2.5 rounded-md text-[11px] font-medium flex items-center gap-1.5 transition-all cursor-pointer select-none active:scale-[0.98]',
                 activeRemoteView === 'structure'
-                  ? 'bg-background text-foreground shadow-xs font-semibold'
-                  : 'text-muted-foreground hover:text-foreground'
+                  ? 'bg-background text-foreground font-semibold shadow-xs border border-border/80'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-background/60 border border-transparent'
               )}
             >
-              <Columns className="size-3 text-amber-400" />
+              <Columns className={`size-3 ${activeRemoteView === 'structure' ? 'text-amber-400' : 'text-muted-foreground'}`} />
               <span>Structure</span>
             </button>
           </div>

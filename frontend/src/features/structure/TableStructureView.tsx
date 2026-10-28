@@ -91,17 +91,17 @@ export function TableStructureView({ schema, tableName }: TableStructureViewProp
           </div>
 
           {/* Sub-tabs */}
-          <div className="flex items-center rounded-lg border border-border/60 bg-muted/40 p-0.5">
+          <div className="flex items-center rounded-lg border border-border/80 bg-muted/60 p-0.5 gap-0.5 shadow-inner">
             <button
               type="button"
               onClick={() => setActiveTab('columns')}
-              className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs transition-colors ${
+              className={`h-6 px-2.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer select-none active:scale-[0.98] ${
                 activeTab === 'columns'
-                  ? 'bg-background text-foreground shadow-xs font-semibold'
-                  : 'text-muted-foreground hover:text-foreground'
+                  ? 'bg-background text-foreground font-semibold shadow-xs border border-border/80'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-background/60 border border-transparent'
               }`}
             >
-              <Columns className="size-3 text-sky-400" />
+              <Columns className={`size-3 ${activeTab === 'columns' ? 'text-sky-400' : 'text-muted-foreground'}`} />
               <span>Columns</span>
               <span className="text-[10px] opacity-70 font-mono">({columnsList.length})</span>
             </button>
@@ -109,13 +109,13 @@ export function TableStructureView({ schema, tableName }: TableStructureViewProp
             <button
               type="button"
               onClick={() => setActiveTab('indexes')}
-              className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs transition-colors ${
+              className={`h-6 px-2.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer select-none active:scale-[0.98] ${
                 activeTab === 'indexes'
-                  ? 'bg-background text-foreground shadow-xs font-semibold'
-                  : 'text-muted-foreground hover:text-foreground'
+                  ? 'bg-background text-foreground font-semibold shadow-xs border border-border/80'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-background/60 border border-transparent'
               }`}
             >
-              <Hash className="size-3 text-amber-400" />
+              <Hash className={`size-3 ${activeTab === 'indexes' ? 'text-amber-400' : 'text-muted-foreground'}`} />
               <span>Indexes</span>
               <span className="text-[10px] opacity-70 font-mono">({indexesList.length})</span>
             </button>
@@ -123,13 +123,13 @@ export function TableStructureView({ schema, tableName }: TableStructureViewProp
             <button
               type="button"
               onClick={() => setActiveTab('foreign_keys')}
-              className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs transition-colors ${
+              className={`h-6 px-2.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer select-none active:scale-[0.98] ${
                 activeTab === 'foreign_keys'
-                  ? 'bg-background text-foreground shadow-xs font-semibold'
-                  : 'text-muted-foreground hover:text-foreground'
+                  ? 'bg-background text-foreground font-semibold shadow-xs border border-border/80'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-background/60 border border-transparent'
               }`}
             >
-              <Link className="size-3 text-emerald-400" />
+              <Link className={`size-3 ${activeTab === 'foreign_keys' ? 'text-emerald-400' : 'text-muted-foreground'}`} />
               <span>Foreign Keys</span>
               <span className="text-[10px] opacity-70 font-mono">({fksList.length})</span>
             </button>

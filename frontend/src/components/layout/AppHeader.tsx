@@ -89,63 +89,74 @@ export function AppHeader({
           </div>
 
           {/* Source Mode Switcher: Mobile ADB vs Remote / Local DB */}
-          <div className="wails-no-drag ml-2 flex items-center rounded-lg border border-border/70 bg-muted/40 p-0.5 shadow-2xs">
+          <div className="wails-no-drag ml-2 flex items-center rounded-lg border border-border/80 bg-muted/60 p-1 shadow-inner gap-1">
             <button
               type="button"
               onClick={() => handleModeSwitch('mobile')}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs transition-colors ${
+              className={`h-7 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer select-none active:scale-[0.98] ${
                 workspaceMode === 'mobile'
-                  ? 'bg-background text-foreground shadow-xs font-semibold'
-                  : 'text-muted-foreground hover:text-foreground'
+                  ? 'bg-background text-foreground font-semibold shadow-xs border border-border/80 ring-1 ring-black/5 dark:ring-white/5'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-background/60 hover:shadow-2xs border border-transparent hover:border-border/50'
               }`}
-              title="Mobile ADB SQLite & Key-Value Inspection"
+              title="Switch source to Mobile ADB (Android SQLite & SharedPreferences)"
             >
-              <Smartphone className="size-3 text-sky-400" />
+              <Smartphone className={`size-3.5 ${workspaceMode === 'mobile' ? 'text-sky-400' : 'text-muted-foreground'}`} />
               <span>Mobile ADB</span>
+              {workspaceMode === 'mobile' && (
+                <span className="size-1.5 rounded-full bg-sky-400 shadow-xs shadow-sky-400/50" />
+              )}
             </button>
             <button
               type="button"
               onClick={() => handleModeSwitch('remote')}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs transition-colors ${
+              className={`h-7 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer select-none active:scale-[0.98] ${
                 workspaceMode === 'remote'
-                  ? 'bg-background text-foreground shadow-xs font-semibold'
-                  : 'text-muted-foreground hover:text-foreground'
+                  ? 'bg-background text-foreground font-semibold shadow-xs border border-border/80 ring-1 ring-black/5 dark:ring-white/5'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-background/60 hover:shadow-2xs border border-transparent hover:border-border/50'
               }`}
-              title="Remote Databases (Postgres, MySQL, Redis, SQLite files)"
+              title="Switch source to Remote Databases (PostgreSQL, MySQL, MariaDB, Redis, Local SQLite files)"
             >
-              <Globe className="size-3 text-emerald-400" />
+              <Globe className={`size-3.5 ${workspaceMode === 'remote' ? 'text-emerald-400' : 'text-muted-foreground'}`} />
               <span>Remote / Files</span>
+              {workspaceMode === 'remote' && (
+                <span className="size-1.5 rounded-full bg-emerald-400 shadow-xs shadow-emerald-400/50" />
+              )}
             </button>
           </div>
         </div>
 
         {/* Center Workspace Switcher (Inspector vs SQL Playground) */}
         <div className="wails-no-drag flex items-center justify-center">
-          <div className="flex items-center rounded-lg border border-border/70 bg-muted/40 p-0.5 shadow-2xs">
+          <div className="flex items-center rounded-lg border border-border/80 bg-muted/60 p-1 shadow-inner gap-1">
             <button
               type="button"
               onClick={() => setActiveWorkspaceView('grid')}
-              className={`flex items-center gap-1.5 px-3.5 py-1 rounded-md text-xs transition-all ${
+              className={`h-7 px-3.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer select-none active:scale-[0.98] ${
                 activeWorkspaceView === 'grid'
-                  ? 'bg-background text-foreground shadow-xs font-semibold'
-                  : 'text-muted-foreground hover:text-foreground'
+                  ? 'bg-background text-foreground font-semibold shadow-xs border border-border/80 ring-1 ring-black/5 dark:ring-white/5'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-background/60 hover:shadow-2xs border border-transparent hover:border-border/50'
               }`}
+              title="Inspector: Browse table data, schema structure, and row inspector"
             >
-              <Table className="size-3.5 text-sky-400" />
+              <Table className={`size-3.5 ${activeWorkspaceView === 'grid' ? 'text-sky-400' : 'text-muted-foreground'}`} />
               <span>Inspector</span>
+              {activeWorkspaceView === 'grid' && (
+                <span className="size-1.5 rounded-full bg-sky-400 shadow-xs shadow-sky-400/50" />
+              )}
             </button>
             <button
               type="button"
               onClick={() => setActiveWorkspaceView('playground')}
-              className={`flex items-center gap-1.5 px-3.5 py-1 rounded-md text-xs transition-all ${
+              className={`h-7 px-3.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer select-none active:scale-[0.98] ${
                 activeWorkspaceView === 'playground'
-                  ? 'bg-background text-foreground shadow-xs font-semibold'
-                  : 'text-muted-foreground hover:text-foreground'
+                  ? 'bg-background text-foreground font-semibold shadow-xs border border-border/80 ring-1 ring-black/5 dark:ring-white/5'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-background/60 hover:shadow-2xs border border-transparent hover:border-border/50'
               }`}
+              title="SQL Playground: Multi-tab SQL query editor, autocomplete, and dry run"
             >
-              <Terminal className="size-3.5 text-primary" />
+              <Terminal className={`size-3.5 ${activeWorkspaceView === 'playground' ? 'text-primary' : 'text-muted-foreground'}`} />
               <span>SQL Playground</span>
-              <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse ml-0.5" />
+              <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse ml-0.5 shadow-xs shadow-emerald-400/50" />
             </button>
           </div>
         </div>

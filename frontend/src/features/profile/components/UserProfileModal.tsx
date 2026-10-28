@@ -92,7 +92,7 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
                 </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-muted-foreground">App Version</span>
-                  <span className="font-mono text-foreground font-semibold">v1.3.2</span>
+                  <span className="font-mono text-foreground font-semibold">v1.4.0</span>
                 </div>
               </div>
 

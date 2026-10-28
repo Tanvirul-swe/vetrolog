@@ -41,7 +41,7 @@ interface UpdaterStoreState {
   initEventListeners: () => () => void;
 }
 
-export const CURRENT_APP_VERSION = 'v1.3.2';
+export const CURRENT_APP_VERSION = 'v1.4.0';
 
 export const useUpdaterStore = create<UpdaterStoreState>((set, get) => ({
   status: 'idle',
@@ -151,9 +151,9 @@ export const useUpdaterStore = create<UpdaterStoreState>((set, get) => ({
   simulateUpdateFlow: () => {
     const mockInfo: UpdateInfoBridge = {
       currentVersion: CURRENT_APP_VERSION,
-      latestVersion: 'v1.3.2',
-      releaseName: 'v1.3.2 — Serverless Product Analytics & Privacy Controls',
-      releaseNotes: '### What is New in v1.3.2:\n• Anonymous serverless telemetry via GA4 Measurement Protocol\n• Privacy & Analytics Settings Modal with 1-click opt-out\n• Real-time feature usage and active user tracking\n• Continuous stability and performance enhancements',
+      latestVersion: 'v1.4.0',
+      releaseName: 'v1.4.0 — Multi-Database Studio & Enterprise Scale',
+      releaseNotes: '### What is New in v1.4.0:\n• Full Remote Database Management: PostgreSQL, MySQL, MariaDB, Microsoft SQL Server, Redis Studio, SQLite\n• Direct URL import & encrypted credential storage with SSH tunneling\n• Enterprise scale safeguards: instant O(1) row counts on million-row tables\n• Dialect-aware AI SQL generation with stop button and smart schema pruning\n• Seamless workspace switching between Mobile ADB and Remote databases',
       releaseUrl: 'https://github.com/Tanvirul-swe/vetrolog/releases',
       assetUrl: 'https://github.com/Tanvirul-swe/vetrolog/releases/download/v1.2.0/VetroLog-macOS-Universal.zip',
       assetName: 'VetroLog-macOS-Universal.zip',

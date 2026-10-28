@@ -267,7 +267,9 @@ func (e *Engine) GetTableSchema(ctx context.Context, _ string, _ string, table s
 	}
 
 	var exactCount int64
-	_ = e.dbInstance.QueryRowContext(ctx, fmt.Sprintf(`SELECT COUNT(*) FROM "%s"`, table)).Scan(&exactCount)
+	countCtx, countCancel := context.WithTimeout(ctx, 1*time.Second)
+	defer countCancel()
+	_ = e.dbInstance.QueryRowContext(countCtx, fmt.Sprintf(`SELECT COUNT(*) FROM "%s"`, table)).Scan(&exactCount)
 
 	return &types.ExtendedTableSchema{
 		TableName:   table,

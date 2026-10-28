@@ -702,6 +702,7 @@ export namespace types {
 	    indexes: IndexInfo[];
 	    foreignKeys: ForeignKeyInfo[];
 	    rowCount: number;
+	    isRowCountEstimated?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new ExtendedTableSchema(source);
@@ -718,6 +719,7 @@ export namespace types {
 	        this.indexes = this.convertValues(source["indexes"], IndexInfo);
 	        this.foreignKeys = this.convertValues(source["foreignKeys"], ForeignKeyInfo);
 	        this.rowCount = source["rowCount"];
+	        this.isRowCountEstimated = source["isRowCountEstimated"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -916,6 +918,7 @@ export namespace types {
 	    columns: ColumnInfo[];
 	    rows: any[];
 	    totalRows: number;
+	    isRowCountEstimated?: boolean;
 	    page: number;
 	    pageSize: number;
 	    durationMs: number;
@@ -931,6 +934,7 @@ export namespace types {
 	        this.columns = this.convertValues(source["columns"], ColumnInfo);
 	        this.rows = source["rows"];
 	        this.totalRows = source["totalRows"];
+	        this.isRowCountEstimated = source["isRowCountEstimated"];
 	        this.page = source["page"];
 	        this.pageSize = source["pageSize"];
 	        this.durationMs = source["durationMs"];
@@ -959,6 +963,7 @@ export namespace types {
 	    schema: string;
 	    type: string;
 	    rowCount: number;
+	    isRowCountEstimated?: boolean;
 	    sizeBytes?: number;
 	    columns?: ColumnInfo[];
 	
@@ -972,6 +977,7 @@ export namespace types {
 	        this.schema = source["schema"];
 	        this.type = source["type"];
 	        this.rowCount = source["rowCount"];
+	        this.isRowCountEstimated = source["isRowCountEstimated"];
 	        this.sizeBytes = source["sizeBytes"];
 	        this.columns = this.convertValues(source["columns"], ColumnInfo);
 	    }

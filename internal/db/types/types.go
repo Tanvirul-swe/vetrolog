@@ -91,12 +91,13 @@ type ConnectionSession struct {
 
 // TableSummary describes a table, view, or collection
 type TableSummary struct {
-	Name      string       `json:"name"`
-	Schema    string       `json:"schema"`
-	Type      string       `json:"type"` // "table" | "view" | "materialized_view" | "key"
-	RowCount  int64        `json:"rowCount"`
-	SizeBytes int64        `json:"sizeBytes,omitempty"`
-	Columns   []ColumnInfo `json:"columns,omitempty"`
+	Name                string       `json:"name"`
+	Schema              string       `json:"schema"`
+	Type                string       `json:"type"` // "table" | "view" | "materialized_view" | "key"
+	RowCount            int64        `json:"rowCount"`
+	IsRowCountEstimated bool         `json:"isRowCountEstimated,omitempty"`
+	SizeBytes           int64        `json:"sizeBytes,omitempty"`
+	Columns             []ColumnInfo `json:"columns,omitempty"`
 }
 
 // ColumnInfo holds details about a specific table column
@@ -131,15 +132,16 @@ type ForeignKeyInfo struct {
 
 // ExtendedTableSchema details structure, constraints, and indexes
 type ExtendedTableSchema struct {
-	TableName   string           `json:"tableName"`
-	Name        string           `json:"name,omitempty"`
-	Schema      string           `json:"schema"`
-	Type        string           `json:"type"` // "TABLE" | "VIEW"
-	Columns     []ColumnInfo     `json:"columns"`
-	PrimaryKeys []string         `json:"primaryKeys"`
-	Indexes     []IndexInfo      `json:"indexes"`
-	ForeignKeys []ForeignKeyInfo `json:"foreignKeys"`
-	RowCount    int64            `json:"rowCount"`
+	TableName           string           `json:"tableName"`
+	Name                string           `json:"name,omitempty"`
+	Schema              string           `json:"schema"`
+	Type                string           `json:"type"` // "TABLE" | "VIEW"
+	Columns             []ColumnInfo     `json:"columns"`
+	PrimaryKeys         []string         `json:"primaryKeys"`
+	Indexes             []IndexInfo      `json:"indexes"`
+	ForeignKeys         []ForeignKeyInfo `json:"foreignKeys"`
+	RowCount            int64            `json:"rowCount"`
+	IsRowCountEstimated bool             `json:"isRowCountEstimated,omitempty"`
 }
 
 // TableDataRequest contains query filters and pagination
@@ -155,14 +157,15 @@ type TableDataRequest struct {
 
 // TableDataResult holds paginated rows
 type TableDataResult struct {
-	TableName  string                   `json:"tableName"`
-	Schema     string                   `json:"schema"`
-	Columns    []ColumnInfo             `json:"columns"`
-	Rows       []map[string]interface{} `json:"rows"`
-	TotalRows  int64                    `json:"totalRows"`
-	Page       int                      `json:"page"`
-	PageSize   int                      `json:"pageSize"`
-	DurationMs float64                  `json:"durationMs"`
+	TableName           string                   `json:"tableName"`
+	Schema              string                   `json:"schema"`
+	Columns             []ColumnInfo             `json:"columns"`
+	Rows                []map[string]interface{} `json:"rows"`
+	TotalRows           int64                    `json:"totalRows"`
+	IsRowCountEstimated bool                     `json:"isRowCountEstimated,omitempty"`
+	Page                int                      `json:"page"`
+	PageSize            int                      `json:"pageSize"`
+	DurationMs          float64                  `json:"durationMs"`
 }
 
 // QueryResult represents executed SQL outcome

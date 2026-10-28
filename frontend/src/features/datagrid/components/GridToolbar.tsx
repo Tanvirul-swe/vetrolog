@@ -50,6 +50,8 @@ export function GridToolbar({ onRefresh, onRequestPage }: GridToolbarProps) {
   const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
+  const isEstimated = workspaceMode === 'remote' && !!remoteTableData?.isRowCountEstimated;
+
   if (!selectedTable) return null;
 
   return (
@@ -58,8 +60,12 @@ export function GridToolbar({ onRefresh, onRequestPage }: GridToolbarProps) {
       <div className="flex items-center gap-2.5">
         <Layers className="size-4 text-primary" />
         <span className="font-semibold text-xs text-foreground">{selectedTable}</span>
-        <Badge variant="secondary" className="text-[10px] font-mono px-1.5 py-0">
-          {totalRows.toLocaleString()} rows
+        <Badge
+          variant="secondary"
+          className="text-[10px] font-mono px-1.5 py-0"
+          title={isEstimated ? 'Estimated count from database statistics for ultra-fast loading' : undefined}
+        >
+          {isEstimated ? `~${totalRows.toLocaleString()} rows` : `${totalRows.toLocaleString()} rows`}
         </Badge>
 
         {/* Remote Mode: Data Grid vs Structure View Tabs */}

@@ -84,8 +84,11 @@ export function TableStructureView({ schema, tableName }: TableStructureViewProp
               {displayType}
             </span>
             {schema.rowCount !== undefined && (
-              <span className="text-[10px] text-muted-foreground font-mono ml-1">
-                ({schema.rowCount.toLocaleString()} rows)
+              <span
+                className="text-[10px] text-muted-foreground font-mono ml-1"
+                title={schema.isRowCountEstimated ? 'Estimated count from catalog statistics' : undefined}
+              >
+                ({schema.isRowCountEstimated ? '~' : ''}{schema.rowCount.toLocaleString()} rows{schema.isRowCountEstimated ? ' est.' : ''})
               </span>
             )}
           </div>

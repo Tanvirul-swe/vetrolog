@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Database,
   Table as TableIcon,
@@ -64,6 +64,13 @@ export function RemoteDatabaseTree({
   useEffect(() => {
     loadSavedConnections();
   }, [loadSavedConnections]);
+
+  const filteredTables = useMemo(() => {
+    if (!remoteTables) return [];
+    if (!tableFilter.trim()) return remoteTables;
+    const q = tableFilter.toLowerCase().trim();
+    return remoteTables.filter((t) => t.name.toLowerCase().includes(q));
+  }, [remoteTables, tableFilter]);
 
   const handleTableClick = (tableName: string) => {
     selectTable(tableName);
@@ -219,9 +226,6 @@ export function RemoteDatabaseTree({
   }
 
   const isRedis = activeSession.config.engine === 'redis';
-  const filteredTables = remoteTables.filter((t) =>
-    t.name.toLowerCase().includes(tableFilter.toLowerCase())
-  );
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -340,6 +344,7 @@ export function RemoteDatabaseTree({
                     key={tbl.name}
                     type="button"
                     onClick={() => handleTableClick(tbl.name)}
+                    style={{ contentVisibility: 'auto', containIntrinsicSize: '30px' }}
                     className={`w-full flex items-center justify-between px-2 py-1.5 rounded-md text-left transition-colors ${
                       isSelected
                         ? 'bg-primary/20 text-foreground font-semibold border border-primary/30'
@@ -355,8 +360,11 @@ export function RemoteDatabaseTree({
                       <span className="truncate">{tbl.name}</span>
                     </div>
 
-                    <span className="text-[10px] text-muted-foreground font-sans shrink-0 ml-1">
-                      {tbl.rowCount >= 0 ? tbl.rowCount.toLocaleString() : ''}
+                    <span
+                      className="text-[10px] text-muted-foreground font-sans shrink-0 ml-1"
+                      title={tbl.isRowCountEstimated ? 'Estimated count from catalog statistics' : undefined}
+                    >
+                      {tbl.rowCount >= 0 ? `${tbl.isRowCountEstimated ? '~' : ''}${tbl.rowCount.toLocaleString()}` : ''}
                     </span>
                   </button>
                 );

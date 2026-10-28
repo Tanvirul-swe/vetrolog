@@ -75,6 +75,7 @@ export interface TableSummary {
   schema: string;
   type: string;
   rowCount: number;
+  isRowCountEstimated?: boolean;
   sizeBytes?: number;
   columns?: ColumnInfo[];
 }
@@ -85,6 +86,7 @@ export interface TableDataResult {
   columns: ColumnInfo[];
   rows: Record<string, unknown>[];
   totalRows: number;
+  isRowCountEstimated?: boolean;
   page: number;
   pageSize: number;
   durationMs: number;
@@ -274,6 +276,7 @@ export interface ExtendedTableSchema {
   schema?: string;
   type?: string;
   rowCount: number;
+  isRowCountEstimated?: boolean;
   columns: ColumnInfo[];
   primaryKeys?: string[];
   foreignKeys: ForeignKeyInfo[];

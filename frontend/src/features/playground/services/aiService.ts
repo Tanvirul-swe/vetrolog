@@ -7,24 +7,148 @@ export interface AIQueryResponse {
 }
 
 /**
+ * Intelligently prunes and ranks table schemas for LLM prompts when the database
+ * has many tables (e.g. 50 to 600+ tables).
+ *
+ * Scoring criteria:
+ * 1. Currently selected/active table (+1000 points)
+ * 2. Foreign-key linked tables (parent/child) (+500 points)
+ * 3. Exact table name match in prompt (+300 points)
+ * 4. Partial table name match in prompt (+150 points)
+ * 5. Matching column name in prompt (+60 points)
+ * 6. Tiebreaker: row count / prominence
+ */
+export function pruneTablesForPrompt(
+  tables: ExtendedTableSchema[],
+  userPrompt: string,
+  activeTableName?: string,
+  maxTables: number = 30
+): { prunedTables: ExtendedTableSchema[]; totalAvailable: number; wasPruned: boolean } {
+  if (!tables || tables.length <= maxTables) {
+    return { prunedTables: tables || [], totalAvailable: tables?.length || 0, wasPruned: false };
+  }
+
+  // Tokenize user prompt into alphanumeric words (lowercase, length >= 3)
+  const rawTerms = userPrompt.toLowerCase().match(/[a-z0-9_]{3,}/g) || [];
+  const terms = new Set<string>();
+  for (const t of rawTerms) {
+    terms.add(t);
+    // Add singular form if ends with 's' or 'es'
+    if (t.endsWith('ies') && t.length > 4) {
+      terms.add(t.slice(0, -3) + 'y');
+    } else if (t.endsWith('es') && t.length > 3) {
+      terms.add(t.slice(0, -2));
+    } else if (t.endsWith('s') && t.length > 3) {
+      terms.add(t.slice(0, -1));
+    }
+  }
+
+  const activeNorm = activeTableName?.toLowerCase() || '';
+
+  // Identify foreign key relations for active table
+  const relatedTableNames = new Set<string>();
+  if (activeNorm) {
+    for (const t of tables) {
+      const isCurrent = t.name.toLowerCase() === activeNorm;
+      for (const fk of t.foreignKeys || []) {
+        const toTbl = (fk.toTable || fk.refTable || '').toLowerCase();
+        if (isCurrent && toTbl) {
+          relatedTableNames.add(toTbl);
+        } else if (toTbl === activeNorm) {
+          relatedTableNames.add(t.name.toLowerCase());
+        }
+      }
+    }
+  }
+
+  const scored = tables.map((table) => {
+    let score = 0;
+    const tName = table.name.toLowerCase();
+
+    // 1. Active table
+    if (activeNorm && tName === activeNorm) {
+      score += 1000;
+    }
+
+    // 2. FK relation with active table
+    if (relatedTableNames.has(tName)) {
+      score += 500;
+    }
+
+    // 3. User prompt term matches
+    for (const term of terms) {
+      if (tName === term) {
+        score += 300;
+      } else if (tName.includes(term) || term.includes(tName)) {
+        score += 150;
+      }
+
+      // Check column names
+      for (const col of table.columns || []) {
+        const cName = col.name.toLowerCase();
+        if (cName === term) {
+          score += 60;
+        } else if (cName.includes(term) || term.includes(cName)) {
+          score += 25;
+        }
+      }
+    }
+
+    // Tiebreaker: table row count / activity
+    if (table.rowCount > 0) {
+      score += Math.min(10, Math.log10(table.rowCount + 1));
+    }
+
+    return { table, score };
+  });
+
+  // Sort descending by score
+  scored.sort((a, b) => b.score - a.score);
+
+  const selectedTables = scored.slice(0, maxTables).map((s) => s.table);
+
+  return {
+    prunedTables: selectedTables,
+    totalAvailable: tables.length,
+    wasPruned: true,
+  };
+}
+
+/**
  * Builds schema prompt context for LLM code generation.
  */
-function buildSchemaPrompt(tables: ExtendedTableSchema[]): string {
+function buildSchemaPrompt(
+  tables: ExtendedTableSchema[],
+  wasPruned: boolean = false,
+  totalAvailable: number = 0
+): string {
   if (!tables || tables.length === 0) {
     return 'Database Schema: No schema information available.\n';
   }
+  const header = wasPruned
+    ? `Database Schema (Focusing on ${tables.length} most relevant tables out of ${totalAvailable} total tables in database catalog):\n`
+    : 'Database Schema:\n';
+
   const schemaLines = tables.map((t) => {
     const colDefs = (t.columns || [])
       .map((c) => `${c.name} ${c.type || 'TEXT'}${c.isPrimaryKey ? ' PRIMARY KEY' : ''}`)
       .join(', ');
     const fkDefs = (t.foreignKeys || [])
-      .map((fk) => `FOREIGN KEY (${fk.fromCol}) REFERENCES ${fk.toTable}(${fk.toCol})`)
+      .map((fk) => {
+        const fromCol = fk.fromCol || fk.column;
+        const toTable = fk.toTable || fk.refTable;
+        const toCol = fk.toCol || fk.refColumn;
+        return fromCol && toTable && toCol
+          ? `FOREIGN KEY (${fromCol}) REFERENCES ${toTable}(${toCol})`
+          : '';
+      })
+      .filter(Boolean)
       .join(', ');
     const all = [colDefs, fkDefs].filter(Boolean).join(', ');
     return `CREATE TABLE ${t.name} (${all || 'id'});`;
   });
 
-  return `Database Schema:\n${schemaLines.join('\n')}\n`;
+  return `${header}${schemaLines.join('\n')}\n`;
 }
 
 /**
@@ -72,10 +196,17 @@ export async function generateSqlWithAI(
   config: AIConfig,
   engine: string = 'sqlite',
   onModelAutoMigrated?: (newModel: string) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  activeTableName?: string
 ): Promise<AIQueryResponse> {
   const dialect = getDialectName(engine);
-  const schemaContext = buildSchemaPrompt(tables);
+  const { prunedTables, totalAvailable, wasPruned } = pruneTablesForPrompt(
+    tables,
+    prompt,
+    activeTableName,
+    30
+  );
+  const schemaContext = buildSchemaPrompt(prunedTables, wasPruned, totalAvailable);
   const systemInstruction = `You are an expert ${dialect} database engineer.
 Given the database schema below:
 ${schemaContext}

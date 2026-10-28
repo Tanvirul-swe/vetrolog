@@ -389,21 +389,49 @@ func (e *Engine) GetTableSchema(ctx context.Context, _ string, schema string, ta
 		}
 	}
 
-	// 5. Exact Row Count
-	var exactCount int64
-	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM "%s"."%s"`, schema, table)
-	_ = e.pool.QueryRow(ctx, countQuery).Scan(&exactCount)
+	// 5. Row Count (Optimized for massive tables & sub-millisecond response)
+	var rowCount int64
+	var isEstimated bool
+
+	// Step A: Fetch instant O(1) estimate from PostgreSQL statistics catalog (pg_class)
+	var estimatedCount int64 = -1
+	estQuery := `
+		SELECT COALESCE(c.reltuples::bigint, -1)
+		FROM pg_class c
+		JOIN pg_namespace n ON n.oid = c.relnamespace
+		WHERE n.nspname = $1 AND c.relname = $2;
+	`
+	_ = e.pool.QueryRow(ctx, estQuery, schema, table).Scan(&estimatedCount)
+
+	if estimatedCount > 50000 {
+		// Large table (>50k rows); use statistics estimate to avoid blocking sequential disk scans
+		rowCount = estimatedCount
+		isEstimated = true
+	} else {
+		// Small or unanalyzed table: compute exact count with a 500ms safety timeout guard
+		countCtx, countCancel := context.WithTimeout(ctx, 500*time.Millisecond)
+		defer countCancel()
+
+		countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM "%s"."%s"`, schema, table)
+		if err := e.pool.QueryRow(countCtx, countQuery).Scan(&rowCount); err != nil {
+			if estimatedCount >= 0 {
+				rowCount = estimatedCount
+				isEstimated = true
+			}
+		}
+	}
 
 	return &types.ExtendedTableSchema{
-		TableName:   table,
-		Name:        table,
-		Schema:      schema,
-		Type:        "TABLE",
-		Columns:     columns,
-		PrimaryKeys: pks,
-		Indexes:     indexes,
-		ForeignKeys: foreignKeys,
-		RowCount:    exactCount,
+		TableName:           table,
+		Name:                table,
+		Schema:              schema,
+		Type:                "TABLE",
+		Columns:             columns,
+		PrimaryKeys:         pks,
+		Indexes:             indexes,
+		ForeignKeys:         foreignKeys,
+		RowCount:            rowCount,
+		IsRowCountEstimated: isEstimated,
 	}, nil
 }
 
@@ -499,14 +527,15 @@ func (e *Engine) GetTableData(ctx context.Context, req types.TableDataRequest) (
 	}
 
 	return &types.TableDataResult{
-		TableName:  req.Table,
-		Schema:     schema,
-		Columns:    columns,
-		Rows:       dataRows,
-		TotalRows:  schemaInfo.RowCount,
-		Page:       req.Page,
-		PageSize:   limit,
-		DurationMs: float64(time.Since(start).Microseconds()) / 1000.0,
+		TableName:           req.Table,
+		Schema:              schema,
+		Columns:             columns,
+		Rows:                dataRows,
+		TotalRows:           schemaInfo.RowCount,
+		IsRowCountEstimated: schemaInfo.IsRowCountEstimated,
+		Page:                req.Page,
+		PageSize:            limit,
+		DurationMs:          float64(time.Since(start).Microseconds()) / 1000.0,
 	}, nil
 }
 

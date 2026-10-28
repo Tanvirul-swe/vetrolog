@@ -26,9 +26,12 @@ export function NaturalLanguageBar() {
   const workspaceMode = useConnectionManagerStore((s) => s.workspaceMode);
   const activeSession = useConnectionManagerStore((s) => s.activeSession);
   const remoteTables = useConnectionManagerStore((s) => s.remoteTables);
+  const remoteSelectedTable = useConnectionManagerStore((s) => s.selectedTable);
   const tableSchema = useConnectionManagerStore((s) => s.tableSchema);
+  const mobileSelectedTable = useDatabaseStore((s) => s.selectedTableName);
   const activeDb = useDatabaseStore((s) => s.databases.find((d) => d.id === s.selectedDatabaseId));
 
+  const selectedTable = workspaceMode === 'remote' ? (remoteSelectedTable || mobileSelectedTable) : mobileSelectedTable;
   const currentEngine = workspaceMode === 'remote' ? activeSession?.config.engine || 'postgres' : 'sqlite';
   const dialectName = getDialectName(currentEngine);
 
@@ -140,7 +143,8 @@ export function NaturalLanguageBar() {
           (migratedModel) => {
             setAiConfig({ modelName: migratedModel });
           },
-          controller.signal
+          controller.signal,
+          selectedTable || undefined
         );
 
         if (controller.signal.aborted) {

@@ -14,6 +14,7 @@ import {
 } from '../types/database';
 import * as AppBindings from '../../wailsjs/go/app/App';
 import { useDatabaseStore } from './useDatabaseStore';
+import { useAdbStore } from './useAdbStore';
 
 export type WorkspaceMode = 'mobile' | 'remote';
 
@@ -48,6 +49,7 @@ interface ConnectionManagerState {
 
   // Actions
   setWorkspaceMode: (mode: WorkspaceMode) => void;
+  syncRemoteCatalogToDbStore: () => void;
   setActiveRemoteView: (view: 'data' | 'structure' | 'redis') => void;
   loadSavedConnections: () => Promise<void>;
   getSavedConnection: (id: string) => Promise<ConnectionConfig | null>;
@@ -101,7 +103,57 @@ export const useConnectionManagerStore = create<ConnectionManagerState>((set, ge
   redisKeyValue: null,
   isLoadingRedis: false,
 
-  setWorkspaceMode: (mode) => set({ workspaceMode: mode }),
+  syncRemoteCatalogToDbStore: () => {
+    const session = get().activeSession;
+    if (!session) return;
+    const rawTables = get().remoteTables || [];
+    useDatabaseStore.getState().setDatabases([
+      {
+        id: session.currentDatabase || 'remote',
+        name: session.config.name,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        type: session.config.engine === 'sqlite' ? 'sqlite' : (session.config.engine as any),
+        path: session.config.filePath || `${session.config.host}:${session.config.port}`,
+        tables: rawTables.map((t) => ({
+          name: t.name,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          type: (t.type === 'VIEW' ? 'view' : 'table') as any,
+          columns: (t.columns || []).map((col) => ({
+            name: col.name,
+            type: col.type || 'TEXT',
+            isPrimaryKey: !!col.isPrimaryKey,
+            isNullable: !!col.isNullable,
+          })),
+          rowCount: t.rowCount,
+        })),
+        sizeBytes: 0,
+        updatedAt: Date.now(),
+      },
+    ]);
+  },
+
+  setWorkspaceMode: (mode) => {
+    set({ workspaceMode: mode });
+    if (mode === 'mobile') {
+      // 1. Wipe remote database and table selections from useDatabaseStore
+      useDatabaseStore.getState().resetState();
+      // 2. Reset ADB state and initiate device scan
+      useAdbStore.getState().resetAdbState();
+      useAdbStore.getState().fetchDevices();
+    } else if (mode === 'remote') {
+      const activeSession = get().activeSession;
+      if (activeSession) {
+        get().syncRemoteCatalogToDbStore();
+        const selectedTable = get().selectedTable;
+        if (selectedTable) {
+          get().loadTableData(selectedTable);
+        }
+      } else {
+        useDatabaseStore.getState().resetState();
+        get().loadSavedConnections();
+      }
+    }
+  },
   setActiveRemoteView: (view) => set({ activeRemoteView: view }),
 
   loadSavedConnections: async () => {
@@ -205,29 +257,7 @@ export const useConnectionManagerStore = create<ConnectionManagerState>((set, ge
           });
 
           // Sync database catalog to useDatabaseStore for unified Playground and Inspector access
-          useDatabaseStore.getState().setDatabases([
-            {
-              id: typedSession.currentDatabase || 'remote',
-              name: typedSession.config.name,
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              type: typedSession.config.engine === 'sqlite' ? 'sqlite' : (typedSession.config.engine as any),
-              path: typedSession.config.filePath || `${typedSession.config.host}:${typedSession.config.port}`,
-              tables: rawTables.map((t) => ({
-                name: t.name,
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                type: (t.type === 'VIEW' ? 'view' : 'table') as any,
-                columns: (t.columns || []).map((col) => ({
-                  name: col.name,
-                  type: col.type || 'TEXT',
-                  isPrimaryKey: !!col.isPrimaryKey,
-                  isNullable: !!col.isNullable,
-                })),
-                rowCount: t.rowCount,
-              })),
-              sizeBytes: 0,
-              updatedAt: Date.now(),
-            },
-          ]);
+          get().syncRemoteCatalogToDbStore();
 
           if (tables && tables.length > 0) {
             await get().selectTable(tables[0].name);
@@ -269,18 +299,8 @@ export const useConnectionManagerStore = create<ConnectionManagerState>((set, ge
     });
     await get().loadSavedConnections();
 
-    // Reset database store rows/table so inspector/grid is cleanly reset
-    const dbStore = useDatabaseStore.getState();
-    dbStore.selectTable('');
-    dbStore.setTableData({
-      databaseId: '',
-      tableName: '',
-      totalRows: 0,
-      page: 1,
-      pageSize: 50,
-      columns: [],
-      rows: [],
-    });
+    // Reset database store so inspector/grid is cleanly reset
+    useDatabaseStore.getState().resetState();
   },
 
   openLocalFile: async (filePath: string) => {
@@ -307,28 +327,7 @@ export const useConnectionManagerStore = create<ConnectionManagerState>((set, ge
           remoteTables: rawTables,
         });
 
-        useDatabaseStore.getState().setDatabases([
-          {
-            id: typedSession.currentDatabase || 'sqlite_local',
-            name: typedSession.config.name,
-            type: 'sqlite',
-            path: filePath,
-            tables: rawTables.map((t) => ({
-              name: t.name,
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              type: (t.type === 'VIEW' ? 'view' : 'table') as any,
-              columns: (t.columns || []).map((col) => ({
-                name: col.name,
-                type: col.type || 'TEXT',
-                isPrimaryKey: !!col.isPrimaryKey,
-                isNullable: !!col.isNullable,
-              })),
-              rowCount: t.rowCount,
-            })),
-            sizeBytes: 0,
-            updatedAt: Date.now(),
-          },
-        ]);
+        get().syncRemoteCatalogToDbStore();
 
         if (tables && tables.length > 0) {
           await get().selectTable(tables[0].name);
@@ -372,29 +371,7 @@ export const useConnectionManagerStore = create<ConnectionManagerState>((set, ge
       const rawTables = (tables as unknown as TableSummary[]) || [];
       set({ remoteTables: rawTables });
 
-      useDatabaseStore.getState().setDatabases([
-        {
-          id: dbName,
-          name: session.config.name,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          type: session.config.engine === 'sqlite' ? 'sqlite' : (session.config.engine as any),
-          path: session.config.filePath || `${session.config.host}:${session.config.port}`,
-          tables: rawTables.map((t) => ({
-            name: t.name,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            type: (t.type === 'VIEW' ? 'view' : 'table') as any,
-            columns: (t.columns || []).map((col) => ({
-              name: col.name,
-              type: col.type || 'TEXT',
-              isPrimaryKey: !!col.isPrimaryKey,
-              isNullable: !!col.isNullable,
-            })),
-            rowCount: t.rowCount,
-          })),
-          sizeBytes: 0,
-          updatedAt: Date.now(),
-        },
-      ]);
+      get().syncRemoteCatalogToDbStore();
 
       if (tables && tables.length > 0) {
         await get().selectTable(tables[0].name);
@@ -416,29 +393,7 @@ export const useConnectionManagerStore = create<ConnectionManagerState>((set, ge
       const rawTables = (tables as unknown as TableSummary[]) || [];
       set({ remoteTables: rawTables });
 
-      useDatabaseStore.getState().setDatabases([
-        {
-          id: get().selectedDatabase || 'remote',
-          name: session.config.name,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          type: session.config.engine === 'sqlite' ? 'sqlite' : (session.config.engine as any),
-          path: session.config.filePath || `${session.config.host}:${session.config.port}`,
-          tables: rawTables.map((t) => ({
-            name: t.name,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            type: (t.type === 'VIEW' ? 'view' : 'table') as any,
-            columns: (t.columns || []).map((col) => ({
-              name: col.name,
-              type: col.type || 'TEXT',
-              isPrimaryKey: !!col.isPrimaryKey,
-              isNullable: !!col.isNullable,
-            })),
-            rowCount: t.rowCount,
-          })),
-          sizeBytes: 0,
-          updatedAt: Date.now(),
-        },
-      ]);
+      get().syncRemoteCatalogToDbStore();
 
       if (tables && tables.length > 0) {
         await get().selectTable(tables[0].name);
@@ -553,26 +508,28 @@ export const useConnectionManagerStore = create<ConnectionManagerState>((set, ge
         };
         set({ tableSchema: normalized });
 
-        // Sync columns to useDatabaseStore for this specific table
-        const currentDbs = useDatabaseStore.getState().databases;
-        if (currentDbs && currentDbs.length > 0) {
-          const updatedDbs = currentDbs.map((db) => ({
-            ...db,
-            tables: db.tables.map((t) =>
-              t.name.toLowerCase() === tableName.toLowerCase()
-                ? {
-                    ...t,
-                    columns: normalized.columns.map((c) => ({
-                      name: c.name,
-                      type: c.type || 'TEXT',
-                      isPrimaryKey: c.isPrimaryKey,
-                      isNullable: c.isNullable,
-                    })),
-                  }
-                : t
-            ),
-          }));
-          useDatabaseStore.getState().setDatabases(updatedDbs);
+        // Sync columns to useDatabaseStore for this specific table if in remote mode
+        if (get().workspaceMode === 'remote') {
+          const currentDbs = useDatabaseStore.getState().databases;
+          if (currentDbs && currentDbs.length > 0) {
+            const updatedDbs = currentDbs.map((db) => ({
+              ...db,
+              tables: db.tables.map((t) =>
+                t.name.toLowerCase() === tableName.toLowerCase()
+                  ? {
+                      ...t,
+                      columns: normalized.columns.map((c) => ({
+                        name: c.name,
+                        type: c.type || 'TEXT',
+                        isPrimaryKey: c.isPrimaryKey,
+                        isNullable: c.isNullable,
+                      })),
+                    }
+                  : t
+              ),
+            }));
+            useDatabaseStore.getState().setDatabases(updatedDbs);
+          }
         }
       }
     } catch {

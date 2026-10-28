@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { apiBridge } from '@/services/apiBridge';
 import { useDatabaseStore } from './useDatabaseStore';
 import { usePlaygroundStore } from './usePlaygroundStore';
+import { useConnectionManagerStore } from './useConnectionManagerStore';
 import { DatabaseInfo } from '../types/database';
 import { telemetry } from '@/features/telemetry/telemetryService';
 
@@ -63,6 +64,7 @@ interface AdbState {
   updateRow: (tableName: string, pk: Record<string, any>, newValues: Record<string, any>) => Promise<boolean>;
   deleteRow: (tableName: string, pk: Record<string, any>) => Promise<boolean>;
   setSelectedDbRemotePath: (path: string | null) => void;
+  resetAdbState: () => void;
 }
 
 let isPollingInProgress = false;
@@ -76,6 +78,17 @@ export const useAdbStore = create<AdbState>((set, get) => ({
   selectedPackageName: null,
   selectedDbRemotePath: null,
   setSelectedDbRemotePath: (path: string | null) => set({ selectedDbRemotePath: path }),
+
+  resetAdbState: () => {
+    set({
+      selectedDbRemotePath: null,
+      isInitialLoading: false,
+      discoveryStage: 'no_devices',
+      discoveryMessage: 'No Android devices detected via ADB',
+      isAdbMode: false,
+    });
+    useDatabaseStore.getState().resetState();
+  },
 
   isLoadingDevices: true,
   isLoadingApps: false,
@@ -127,6 +140,8 @@ export const useAdbStore = create<AdbState>((set, get) => ({
   },
 
   pollState: async () => {
+    // Only poll ADB if active workspace is Mobile ADB mode (zero background overhead in Remote mode)
+    if (useConnectionManagerStore.getState().workspaceMode !== 'mobile') return;
     // Avoid concurrent polls or interfering with active user-initiated table loading
     if (isPollingInProgress || useDatabaseStore.getState().isLoadingTable) return;
     isPollingInProgress = true;
@@ -380,7 +395,9 @@ export const useAdbStore = create<AdbState>((set, get) => ({
           })),
         }));
 
-        useDatabaseStore.getState().setDatabases(formattedDbs);
+        if (useConnectionManagerStore.getState().workspaceMode === 'mobile') {
+          useDatabaseStore.getState().setDatabases(formattedDbs);
+        }
 
         // Select first DB and table (preserving active table selection if it exists)
         const firstDb = formattedDbs[0];
@@ -398,13 +415,15 @@ export const useAdbStore = create<AdbState>((set, get) => ({
               ? firstDb.tables[0].name
               : null;
 
-        if (tableToLoad) {
+        if (tableToLoad && useConnectionManagerStore.getState().workspaceMode === 'mobile') {
           await get().loadTableData(tableToLoad, 1, 50);
         } else {
           set({ isInitialLoading: false, discoveryStage: 'ready', discoveryMessage: 'Ready' });
         }
       } else {
-        useDatabaseStore.getState().setDatabases([]);
+        if (useConnectionManagerStore.getState().workspaceMode === 'mobile') {
+          useDatabaseStore.getState().setDatabases([]);
+        }
         set({
           isInitialLoading: false,
           discoveryStage: 'ready',

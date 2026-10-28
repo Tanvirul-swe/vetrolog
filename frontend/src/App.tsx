@@ -121,6 +121,9 @@ export function App() {
     }
 
     if (useAdbStore.getState().isAdbMode) {
+      const adbDbs = useDatabaseStore.getState().databases;
+      const isValid = adbDbs.some((db) => db.tables.some((t) => t.name.toLowerCase() === currentTable.toLowerCase()));
+      if (!isValid) return;
       useAdbStore.getState().loadTableData(currentTable, effectivePage, pageSize);
       return;
     }
@@ -140,6 +143,12 @@ export function App() {
     }
   }, [pageSize, selectedDbId, selectedTableName]);
 
+  // Clear last loaded references on mode switch so stale tables are not loaded
+  useEffect(() => {
+    lastLoadedTableRef.current = null;
+    lastLoadedDbRef.current = null;
+  }, [workspaceMode]);
+
   useEffect(() => {
     if (workspaceMode === 'remote') {
       if (selectedRemoteTable) {
@@ -152,9 +161,13 @@ export function App() {
       selectedTableName &&
       (selectedTableName !== lastLoadedTableRef.current || selectedDbId !== lastLoadedDbRef.current)
     ) {
-      lastLoadedTableRef.current = selectedTableName;
-      lastLoadedDbRef.current = selectedDbId;
-      handleRequestTableData(1);
+      const adbDbs = useDatabaseStore.getState().databases;
+      const isValid = adbDbs.some((db) => db.tables.some((t) => t.name.toLowerCase() === selectedTableName.toLowerCase()));
+      if (isValid) {
+        lastLoadedTableRef.current = selectedTableName;
+        lastLoadedDbRef.current = selectedDbId;
+        handleRequestTableData(1);
+      }
     }
   }, [workspaceMode, selectedRemoteTable, selectedTableName, selectedDbId, handleRequestTableData]);
 

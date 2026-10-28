@@ -27,9 +27,9 @@ function buildSchemaPrompt(tables: ExtendedTableSchema[]): string {
 /**
  * Fetches the list of models that support generateContent for the given Gemini API key.
  */
-export async function fetchAvailableGeminiModels(apiKey: string): Promise<string[]> {
+export async function fetchAvailableGeminiModels(apiKey: string, signal?: AbortSignal): Promise<string[]> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
-  const res = await fetch(url);
+  const res = await fetch(url, { signal });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error?.message || `Failed to fetch models: HTTP ${res.status}`);
@@ -49,7 +49,8 @@ export async function generateSqlWithAI(
   prompt: string,
   tables: ExtendedTableSchema[],
   config: AIConfig,
-  onModelAutoMigrated?: (newModel: string) => void
+  onModelAutoMigrated?: (newModel: string) => void,
+  signal?: AbortSignal
 ): Promise<AIQueryResponse> {
   const schemaContext = buildSchemaPrompt(tables);
   const systemInstruction = `You are an expert SQLite database engineer for mobile applications.
@@ -86,6 +87,7 @@ Rules:
               },
             ],
           }),
+          signal,
         });
 
         if (!res.ok) {
@@ -109,7 +111,7 @@ Rules:
       // If the target model was not found, auto-discover supported models from the user's project/key
       if (!result.ok && result.isNotFound) {
         try {
-          const availableModels = await fetchAvailableGeminiModels(config.geminiApiKey);
+          const availableModels = await fetchAvailableGeminiModels(config.geminiApiKey, signal);
           const priority = [
             'gemini-2.5-flash',
             'gemini-2.0-flash',
@@ -166,6 +168,7 @@ Rules:
           ],
           temperature: 0.1,
         }),
+        signal,
       });
 
       if (!res.ok) {
@@ -191,6 +194,7 @@ Rules:
           prompt: `${systemInstruction}\n\nUser Request: ${prompt}\n\nSQL:`,
           stream: false,
         }),
+        signal,
       });
 
       if (!res.ok) {
@@ -205,6 +209,9 @@ Rules:
 
     return { sql: '', error: 'Unsupported AI provider selected.' };
   } catch (err: any) {
+    if (err.name === 'AbortError' || signal?.aborted) {
+      return { sql: '', error: 'Generation stopped by user.' };
+    }
     return { sql: '', error: err.message || 'Failed to generate query with AI' };
   }
 }

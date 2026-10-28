@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Sparkles, ArrowRight, Settings, CheckCircle2, AlertCircle } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Sparkles, ArrowRight, Settings, CheckCircle2, AlertCircle, Loader2, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -12,6 +12,7 @@ export function NaturalLanguageBar() {
   const [prompt, setPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [feedback, setFeedback] = useState<{ message: string; isError?: boolean } | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const extendedSchema = usePlaygroundStore((s) => s.extendedSchema);
   const setQuery = usePlaygroundStore((s) => s.setQuery);
@@ -19,9 +20,30 @@ export function NaturalLanguageBar() {
   const aiConfig = usePlaygroundStore((s) => s.aiConfig);
   const setIsAiSettingsOpen = usePlaygroundStore((s) => s.setIsAiSettingsOpen);
 
+  const handleStop = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsGenerating(false);
+    setFeedback({ message: 'Generation stopped by user', isError: false });
+  };
+
+  // Clean up in-flight requests on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
   const handleGenerate = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!prompt.trim()) return;
+    if (!prompt.trim() || isGenerating) return;
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     setIsGenerating(true);
     setFeedback(null);
@@ -31,15 +53,37 @@ export function NaturalLanguageBar() {
     try {
       if (aiConfig.provider === 'offline') {
         const result = parseNaturalLanguageToSql(prompt, tables);
-        setQuery(result.sql);
-        setFeedback({ message: `Offline engine: ${result.explanation}` });
+        if (!controller.signal.aborted) {
+          setQuery(result.sql);
+          setFeedback({ message: `Offline engine: ${result.explanation}` });
+        }
       } else {
         const setAiConfig = usePlaygroundStore.getState().setAiConfig;
-        const result = await generateSqlWithAI(prompt, tables, aiConfig, (migratedModel) => {
-          setAiConfig({ modelName: migratedModel });
-        });
+        const result = await generateSqlWithAI(
+          prompt,
+          tables,
+          aiConfig,
+          (migratedModel) => {
+            setAiConfig({ modelName: migratedModel });
+          },
+          controller.signal
+        );
+
+        if (controller.signal.aborted) {
+          setFeedback({ message: 'Generation stopped by user', isError: false });
+          return;
+        }
+
         if (result.error) {
-          setFeedback({ message: result.error, isError: true });
+          if (
+            result.error.toLowerCase().includes('stopped') ||
+            result.error.toLowerCase().includes('aborted') ||
+            result.error.toLowerCase().includes('cancelled')
+          ) {
+            setFeedback({ message: 'Generation stopped by user', isError: false });
+          } else {
+            setFeedback({ message: result.error, isError: true });
+          }
         } else if (result.sql) {
           setQuery(result.sql);
           const prefix = result.explanation ? `${result.explanation} • ` : '';
@@ -48,8 +92,15 @@ export function NaturalLanguageBar() {
         }
       }
     } catch (err: any) {
-      setFeedback({ message: err.message || 'Failed to parse natural language', isError: true });
+      if (err.name === 'AbortError' || controller.signal.aborted) {
+        setFeedback({ message: 'Generation stopped by user', isError: false });
+      } else {
+        setFeedback({ message: err.message || 'Failed to parse natural language', isError: true });
+      }
     } finally {
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+      }
       setIsGenerating(false);
     }
   };
@@ -62,6 +113,12 @@ export function NaturalLanguageBar() {
           <Input
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape' && isGenerating) {
+                e.preventDefault();
+                handleStop();
+              }
+            }}
             placeholder="Ask in plain English: (e.g. 'Show top 10 users created this week who haven't logged in')"
             className="pl-8 pr-4 sm:pr-36 h-8 text-xs bg-card/60 border-border/60 focus:bg-background"
           />
@@ -73,15 +130,41 @@ export function NaturalLanguageBar() {
           </Badge>
         </div>
 
-        <Button
-          type="submit"
-          size="sm"
-          disabled={!prompt.trim() || isGenerating}
-          className="h-8 text-xs gap-1.5 shrink-0 bg-primary/90 hover:bg-primary font-medium"
-        >
-          <span>{isGenerating ? 'Thinking...' : 'Generate SQL'}</span>
-          <ArrowRight className="size-3" />
-        </Button>
+        {!isGenerating ? (
+          <Button
+            type="submit"
+            size="sm"
+            disabled={!prompt.trim()}
+            className="h-8 text-xs gap-1.5 shrink-0 bg-primary/90 hover:bg-primary font-medium cursor-pointer shadow-xs"
+          >
+            <Sparkles className="size-3" />
+            <span>Generate SQL</span>
+            <ArrowRight className="size-3" />
+          </Button>
+        ) : (
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Button
+              type="button"
+              size="sm"
+              disabled
+              className="h-8 text-xs gap-1.5 shrink-0 bg-muted/80 text-muted-foreground font-medium border border-border/60"
+            >
+              <Loader2 className="size-3 animate-spin text-primary" />
+              <span>Thinking...</span>
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="destructive"
+              onClick={handleStop}
+              className="h-8 text-xs gap-1.5 shrink-0 bg-red-600 hover:bg-red-500 text-white font-medium shadow-xs animate-pulse cursor-pointer"
+              title="Stop generating SQL query (Esc)"
+            >
+              <Square className="size-2.5 fill-white" />
+              <span>Stop</span>
+            </Button>
+          </div>
+        )}
 
         <Button
           type="button"
@@ -89,7 +172,7 @@ export function NaturalLanguageBar() {
           size="icon-sm"
           onClick={() => setIsAiSettingsOpen(true)}
           title="Configure AI Provider (Gemini / OpenAI / Ollama)"
-          className="h-8 w-8 text-muted-foreground hover:text-foreground shrink-0"
+          className="h-8 w-8 text-muted-foreground hover:text-foreground shrink-0 cursor-pointer"
         >
           <Settings className="size-3.5" />
         </Button>
@@ -117,7 +200,7 @@ export function NaturalLanguageBar() {
             <button
               type="button"
               onClick={() => runExecute()}
-              className="text-[10px] font-sans font-medium px-2 py-0.5 rounded bg-emerald-600 text-white hover:bg-emerald-500 ml-2 shrink-0 transition-colors"
+              className="text-[10px] font-sans font-medium px-2 py-0.5 rounded bg-emerald-600 text-white hover:bg-emerald-500 ml-2 shrink-0 transition-colors cursor-pointer"
             >
               Run Now
             </button>

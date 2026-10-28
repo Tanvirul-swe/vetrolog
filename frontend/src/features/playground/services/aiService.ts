@@ -10,18 +10,39 @@ export interface AIQueryResponse {
  * Builds schema prompt context for LLM code generation.
  */
 function buildSchemaPrompt(tables: ExtendedTableSchema[]): string {
+  if (!tables || tables.length === 0) {
+    return 'Database Schema: No schema information available.\n';
+  }
   const schemaLines = tables.map((t) => {
-    const colDefs = t.columns
-      .map((c) => `${c.name} ${c.type}${c.isPrimaryKey ? ' PRIMARY KEY' : ''}`)
+    const colDefs = (t.columns || [])
+      .map((c) => `${c.name} ${c.type || 'TEXT'}${c.isPrimaryKey ? ' PRIMARY KEY' : ''}`)
       .join(', ');
     const fkDefs = (t.foreignKeys || [])
       .map((fk) => `FOREIGN KEY (${fk.fromCol}) REFERENCES ${fk.toTable}(${fk.toCol})`)
       .join(', ');
     const all = [colDefs, fkDefs].filter(Boolean).join(', ');
-    return `CREATE TABLE ${t.name} (${all});`;
+    return `CREATE TABLE ${t.name} (${all || 'id'});`;
   });
 
   return `Database Schema:\n${schemaLines.join('\n')}\n`;
+}
+
+/**
+ * Returns canonical dialect name for database engine.
+ */
+export function getDialectName(engine?: string): string {
+  switch (engine?.toLowerCase()) {
+    case 'postgres':
+    case 'postgresql':
+      return 'PostgreSQL';
+    case 'mysql':
+      return 'MySQL';
+    case 'mariadb':
+      return 'MariaDB';
+    case 'sqlite':
+    default:
+      return 'SQLite';
+  }
 }
 
 /**
@@ -43,24 +64,27 @@ export async function fetchAvailableGeminiModels(apiKey: string, signal?: AbortS
 }
 
 /**
- * Invokes the configured AI provider to translate natural language into SQLite.
+ * Invokes the configured AI provider to translate natural language into dialect-aware SQL.
  */
 export async function generateSqlWithAI(
   prompt: string,
   tables: ExtendedTableSchema[],
   config: AIConfig,
+  engine: string = 'sqlite',
   onModelAutoMigrated?: (newModel: string) => void,
   signal?: AbortSignal
 ): Promise<AIQueryResponse> {
+  const dialect = getDialectName(engine);
   const schemaContext = buildSchemaPrompt(tables);
-  const systemInstruction = `You are an expert SQLite database engineer for mobile applications.
-Given the schema below:
+  const systemInstruction = `You are an expert ${dialect} database engineer.
+Given the database schema below:
 ${schemaContext}
-Translate the user's natural language request into a valid, optimized SQLite query.
+Translate the user's natural language request into a valid, optimized ${dialect} query.
 Rules:
 1. Output ONLY the raw SQL query. Do not wrap in markdown quotes (\`\`\`), do not provide introductory chit-chat.
-2. Use standard SQLite dialect.
-3. Keep queries performant and safe.`;
+2. Use standard ${dialect} syntax and dialect-specific functions (e.g. for PostgreSQL use NOW() - INTERVAL '15 days', for MySQL use NOW() - INTERVAL 15 DAY, for SQLite use datetime('now', '-15 days')).
+3. Only reference table names and column names that exist in the provided schema.
+4. Keep queries performant and safe.`;
 
   try {
     // 1. Google Gemini API

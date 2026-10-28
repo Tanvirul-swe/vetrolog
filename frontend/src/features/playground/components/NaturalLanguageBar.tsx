@@ -1,11 +1,14 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Sparkles, ArrowRight, Settings, CheckCircle2, AlertCircle, Loader2, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { usePlaygroundStore } from '@/stores/usePlaygroundStore';
+import { useConnectionManagerStore } from '@/stores/useConnectionManagerStore';
+import { useDatabaseStore } from '@/stores/useDatabaseStore';
+import { ExtendedTableSchema } from '@/types/database';
 import { parseNaturalLanguageToSql } from '../services/offlineNlParser';
-import { generateSqlWithAI } from '../services/aiService';
+import { generateSqlWithAI, getDialectName } from '../services/aiService';
 import { telemetry } from '@/features/telemetry/telemetryService';
 
 export function NaturalLanguageBar() {
@@ -19,6 +22,78 @@ export function NaturalLanguageBar() {
   const runExecute = usePlaygroundStore((s) => s.runExecute);
   const aiConfig = usePlaygroundStore((s) => s.aiConfig);
   const setIsAiSettingsOpen = usePlaygroundStore((s) => s.setIsAiSettingsOpen);
+
+  const workspaceMode = useConnectionManagerStore((s) => s.workspaceMode);
+  const activeSession = useConnectionManagerStore((s) => s.activeSession);
+  const remoteTables = useConnectionManagerStore((s) => s.remoteTables);
+  const tableSchema = useConnectionManagerStore((s) => s.tableSchema);
+  const activeDb = useDatabaseStore((s) => s.databases.find((d) => d.id === s.selectedDatabaseId));
+
+  const currentEngine = workspaceMode === 'remote' ? activeSession?.config.engine || 'postgres' : 'sqlite';
+  const dialectName = getDialectName(currentEngine);
+
+  // Combine tables across active workspace mode so AI always has accurate table and column schema
+  const tables = useMemo<ExtendedTableSchema[]>(() => {
+    const tableMap = new Map<string, ExtendedTableSchema>();
+
+    // 1. From remoteTables if in remote mode
+    if (workspaceMode === 'remote' && remoteTables) {
+      for (const t of remoteTables) {
+        tableMap.set(t.name.toLowerCase(), {
+          name: t.name,
+          tableName: t.name,
+          schema: t.schema || 'public',
+          type: t.type || 'table',
+          rowCount: t.rowCount || 0,
+          columns: (t.columns || []).map((c) => ({
+            name: c.name,
+            type: c.type || 'TEXT',
+            isPrimaryKey: !!c.isPrimaryKey,
+            isNullable: !!c.isNullable,
+          })),
+          foreignKeys: [],
+          indexes: [],
+        });
+      }
+    }
+
+    // 2. From inspected tableSchema
+    if (tableSchema) {
+      tableMap.set(tableSchema.name.toLowerCase(), tableSchema);
+    }
+
+    // 3. From extendedSchema (Mobile ADB)
+    if (extendedSchema?.tables && extendedSchema.tables.length > 0) {
+      for (const t of extendedSchema.tables) {
+        tableMap.set(t.name.toLowerCase(), t);
+      }
+    }
+
+    // 4. From activeDb (Mobile or Local)
+    if (activeDb?.tables) {
+      for (const t of activeDb.tables) {
+        const existing = tableMap.get(t.name.toLowerCase());
+        if (!existing) {
+          tableMap.set(t.name.toLowerCase(), {
+            name: t.name,
+            tableName: t.name,
+            type: t.type || 'table',
+            rowCount: t.rowCount || 0,
+            columns: (t.columns || []).map((c) => ({
+              name: c.name,
+              type: c.type || 'TEXT',
+              isPrimaryKey: !!c.isPrimaryKey,
+              isNullable: !!c.isNullable,
+            })),
+            foreignKeys: [],
+            indexes: [],
+          });
+        }
+      }
+    }
+
+    return Array.from(tableMap.values());
+  }, [workspaceMode, remoteTables, tableSchema, extendedSchema, activeDb]);
 
   const handleStop = () => {
     if (abortControllerRef.current) {
@@ -48,8 +123,6 @@ export function NaturalLanguageBar() {
     setIsGenerating(true);
     setFeedback(null);
 
-    const tables = extendedSchema?.tables || [];
-
     try {
       if (aiConfig.provider === 'offline') {
         const result = parseNaturalLanguageToSql(prompt, tables);
@@ -63,6 +136,7 @@ export function NaturalLanguageBar() {
           prompt,
           tables,
           aiConfig,
+          currentEngine,
           (migratedModel) => {
             setAiConfig({ modelName: migratedModel });
           },
@@ -87,8 +161,8 @@ export function NaturalLanguageBar() {
         } else if (result.sql) {
           setQuery(result.sql);
           const prefix = result.explanation ? `${result.explanation} • ` : '';
-          setFeedback({ message: `${prefix}AI Generated: ${result.sql}` });
-          telemetry.trackFeature('ai_sql_generated', { provider: aiConfig.provider });
+          setFeedback({ message: `${prefix}${dialectName} SQL: ${result.sql}` });
+          telemetry.trackFeature('ai_sql_generated', { provider: aiConfig.provider, dialect: dialectName });
         }
       }
     } catch (err: any) {
@@ -119,14 +193,14 @@ export function NaturalLanguageBar() {
                 handleStop();
               }
             }}
-            placeholder="Ask in plain English: (e.g. 'Show top 10 users created this week who haven't logged in')"
+            placeholder={`Ask in plain English: (e.g. 'Show ${dialectName === 'PostgreSQL' ? 'records from last 15 days' : 'top 10 users'}')`}
             className="pl-8 pr-4 sm:pr-36 h-8 text-xs bg-card/60 border-border/60 focus:bg-background"
           />
           <Badge
             variant="outline"
             className="hidden sm:inline-flex absolute right-2 top-1.5 text-[9px] px-1 py-0 capitalize text-muted-foreground border-border/60"
           >
-            {aiConfig.provider === 'offline' ? 'Offline Rule Engine' : `${aiConfig.provider} AI`}
+            {aiConfig.provider === 'offline' ? 'Offline Rule Engine' : `${aiConfig.provider} • ${dialectName}`}
           </Badge>
         </div>
 

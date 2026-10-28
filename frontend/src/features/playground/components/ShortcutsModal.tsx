@@ -18,9 +18,10 @@ const SHOW_VISUAL_PLAN = false;
 
 const SHORTCUTS: ShortcutItem[] = [
   // Execution
-  { keys: ['⌘', '↵'], description: 'Execute query or selection', category: 'Execution' },
+  { keys: ['⌘', '↵'], description: 'Execute query or selection (Mac)', category: 'Execution' },
   { keys: ['Ctrl', '↵'], description: 'Execute query or selection (Win/Linux)', category: 'Execution' },
-  { keys: ['⌘', '⇧', '↵'], description: 'Dry Run rollback transaction', category: 'Execution' },
+  { keys: ['⌘', '⇧', '↵'], description: 'Dry Run rollback transaction (Mac)', category: 'Execution' },
+  { keys: ['Ctrl', '⇧', '↵'], description: 'Dry Run rollback transaction (Win/Linux)', category: 'Execution' },
   ...(SHOW_VISUAL_PLAN
     ? [{ keys: ['⌘', 'E'], description: 'Explain visual query plan', category: 'Execution' }]
     : []),
@@ -28,26 +29,31 @@ const SHORTCUTS: ShortcutItem[] = [
   // Editing
   { keys: ['↵'], description: 'Smart auto-indent new line', category: 'Editing' },
   { keys: ['(', "'", '"', '`'], description: 'Auto-pair quotes & brackets (or wrap selection)', category: 'Editing' },
-  { keys: ['⌘', '/'], description: 'Toggle line or block comment (-- )', category: 'Editing' },
+  { keys: ['⌘', '/'], description: 'Toggle line or block comment (Mac)', category: 'Editing' },
+  { keys: ['Ctrl', '/'], description: 'Toggle line or block comment (Win/Linux)', category: 'Editing' },
   { keys: ['Tab'], description: 'Indent line or block by 2 spaces', category: 'Editing' },
   { keys: ['⇧', 'Tab'], description: 'Outdent line or block by 2 spaces', category: 'Editing' },
-  { keys: ['⌥', '↑ / ↓'], description: 'Move line or selection up / down', category: 'Editing' },
+  { keys: ['⌥', '↑ / ↓'], description: 'Move line or selection up / down (Mac)', category: 'Editing' },
   { keys: ['Alt', '↑ / ↓'], description: 'Move line up / down (Win/Linux)', category: 'Editing' },
-  { keys: ['⌘', 'D'], description: 'Duplicate line or selection', category: 'Editing' },
-  { keys: ['⌘', '⇧', 'F'], description: 'Auto-format SQL query', category: 'Editing' },
-  { keys: ['⌥', '⇧', 'F'], description: 'Format SQL (VS Code style)', category: 'Editing' },
+  { keys: ['⌘', 'D'], description: 'Duplicate line or selection (Mac)', category: 'Editing' },
+  { keys: ['Ctrl', 'D'], description: 'Duplicate line or selection (Win/Linux)', category: 'Editing' },
+  { keys: ['⌘', '⇧', 'F'], description: 'Auto-format SQL query (Mac)', category: 'Editing' },
+  { keys: ['Ctrl', '⇧', 'F'], description: 'Auto-format SQL query (Win/Linux)', category: 'Editing' },
+  { keys: ['Alt', '⇧', 'F'], description: 'Format SQL (VS Code style on Win/Linux)', category: 'Editing' },
 
-  // History
-  { keys: ['⌘', 'Z'], description: 'Undo last edit or format', category: 'History & Select' },
+  // History & Undo / Redo
+  { keys: ['⌘', 'Z'], description: 'Undo last edit or format (Mac)', category: 'History & Select' },
+  { keys: ['Ctrl', 'Z'], description: 'Undo last edit or format (Win/Linux)', category: 'History & Select' },
+  { keys: ['Ctrl', 'Y'], description: 'Redo change (Windows/Linux standard)', category: 'History & Select' },
+  { keys: ['Ctrl', '⇧', 'Z'], description: 'Redo change (Linux & Windows / VS Code)', category: 'History & Select' },
   { keys: ['⌘', '⇧', 'Z'], description: 'Redo change (Mac)', category: 'History & Select' },
-  { keys: ['Ctrl', 'Y'], description: 'Redo change (Windows/Linux)', category: 'History & Select' },
-  { keys: ['⌘', 'A'], description: 'Select all SQL text in editor', category: 'History & Select' },
+  { keys: ['⌘', 'A'], description: 'Select all SQL text (Ctrl+A on Win/Linux)', category: 'History & Select' },
 
   // Navigation & Tabs
-  { keys: ['⌘', 'T'], description: 'New Query Tab (Chrome style)', category: 'Tabs & Navigation' },
-  { keys: ['⌘', 'W'], description: 'Close active query tab', category: 'Tabs & Navigation' },
+  { keys: ['⌘', 'T'], description: 'New Query Tab (Ctrl+T on Win/Linux)', category: 'Tabs & Navigation' },
+  { keys: ['⌘', 'W'], description: 'Close active query tab (Ctrl+W on Win/Linux)', category: 'Tabs & Navigation' },
   { keys: ['Ctrl', 'Tab'], description: 'Cycle next / previous query tab', category: 'Tabs & Navigation' },
-  { keys: ['⌘', '1-9'], description: 'Jump directly to tab index', category: 'Tabs & Navigation' },
+  { keys: ['⌘', '1-9'], description: 'Jump directly to tab index (Alt+1-9 on Win/Linux)', category: 'Tabs & Navigation' },
 
   // Autocomplete
   { keys: ['Ctrl', 'Space'], description: 'Trigger autocomplete suggestions', category: 'Smart Autocomplete' },

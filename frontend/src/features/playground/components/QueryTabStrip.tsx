@@ -16,6 +16,8 @@ import {
 import { usePlaygroundStore, QueryTab } from '@/stores/usePlaygroundStore';
 import { useDatabaseStore } from '@/stores/useDatabaseStore';
 
+const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPod|iPad/.test(navigator.userAgent);
+
 export function QueryTabStrip() {
   const tabs = usePlaygroundStore((s) => s.tabs);
   const activeTabId = usePlaygroundStore((s) => s.activeTabId);
@@ -241,7 +243,7 @@ export function QueryTabStrip() {
                 className={`size-4 rounded-sm flex items-center justify-center text-muted-foreground/50 hover:text-foreground hover:bg-muted transition-colors shrink-0 ${
                   isActive ? 'opacity-90' : 'opacity-0 group-hover:opacity-100'
                 }`}
-                title="Close Tab (⌘W)"
+                title={isMac ? "Close Tab (⌘W)" : "Close Tab (Ctrl+W)"}
               >
                 <X className="size-3" />
               </button>
@@ -267,15 +269,15 @@ export function QueryTabStrip() {
         type="button"
         onClick={() => addTab()}
         className="h-6 w-6 flex items-center justify-center rounded-sm hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0 border border-border/40 bg-card/40 ml-1"
-        title="New Query Tab (⌘T)"
+        title={isMac ? "New Query Tab (⌘T)" : "New Query Tab (Ctrl+T)"}
       >
         <Plus className="size-3.5" />
       </button>
 
       {/* Right-Side Meta / Shortcut info */}
       <div className="ml-auto flex items-center gap-2 text-[10px] text-muted-foreground/50 font-mono hidden sm:flex pl-2 pr-1 shrink-0">
-        <span>⌘T new</span>
-        <span>⌘W close</span>
+        <span>{isMac ? '⌘T new' : 'Ctrl+T new'}</span>
+        <span>{isMac ? '⌘W close' : 'Ctrl+W close'}</span>
       </div>
 
       {/* Custom Context Menu */}
@@ -321,7 +323,7 @@ export function QueryTabStrip() {
           >
             <X className="size-3.5 text-muted-foreground" />
             <span>Close Tab</span>
-            <span className="ml-auto text-[10px] text-muted-foreground font-mono">⌘W</span>
+            <span className="ml-auto text-[10px] text-muted-foreground font-mono">{isMac ? '⌘W' : 'Ctrl+W'}</span>
           </button>
 
           <button

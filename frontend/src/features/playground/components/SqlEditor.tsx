@@ -13,6 +13,8 @@ import {
   Database,
   Check,
   Loader2,
+  Undo2,
+  Redo2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -81,6 +83,9 @@ const SQL_KEYWORDS = [
 
 // Feature flag: Visual Plan temporarily hidden per user request
 const SHOW_VISUAL_PLAN = false;
+
+// Platform detection for keyboard shortcut labels
+const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPod|iPad/.test(navigator.userAgent);
 
 interface SqlEditorProps {
   onRunExecute: (overrideSql?: string) => void;
@@ -315,6 +320,35 @@ export function SqlEditor({
   const isUndoRedoActionRef = useRef<boolean>(false);
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevTabIdRef = useRef<string>(activeTabId);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+
+  const updateUndoRedoState = useCallback(() => {
+    setCanUndo(historyIdxRef.current > 0);
+    setCanRedo(historyIdxRef.current < historyRef.current.length - 1);
+  }, []);
+
+  // Flush any pending debounced typing snapshot before performing an undo/redo
+  const flushPendingHistory = useCallback(() => {
+    if (typingTimerRef.current) {
+      clearTimeout(typingTimerRef.current);
+      typingTimerRef.current = null;
+      if (textareaRef.current) {
+        const val = textareaRef.current.value;
+        const start = textareaRef.current.selectionStart;
+        const end = textareaRef.current.selectionEnd;
+        const currentSnap = historyRef.current[historyIdxRef.current];
+        if (!currentSnap || currentSnap.text !== val) {
+          const newHistory = historyRef.current.slice(0, historyIdxRef.current + 1);
+          newHistory.push({ text: val, cursorStart: start, cursorEnd: end });
+          if (newHistory.length > 200) newHistory.shift();
+          historyRef.current = newHistory;
+          historyIdxRef.current = newHistory.length - 1;
+          updateUndoRedoState();
+        }
+      }
+    }
+  }, [updateUndoRedoState]);
 
   // Synchronize scrolling across textarea, pre-highlighting layer, and line number gutter
   const handleScroll = () => {
@@ -348,34 +382,39 @@ export function SqlEditor({
         if (newHistory.length > 200) newHistory.shift();
         historyRef.current = newHistory;
         historyIdxRef.current = newHistory.length - 1;
+        updateUndoRedoState();
       }
     },
-    [setQuery]
+    [setQuery, updateUndoRedoState]
   );
 
   const handleUndo = useCallback(() => {
+    flushPendingHistory();
     if (historyIdxRef.current > 0) {
       historyIdxRef.current -= 1;
       const snap = historyRef.current[historyIdxRef.current];
       isUndoRedoActionRef.current = true;
       applyTextEdit(snap.text, snap.cursorStart, snap.cursorEnd, false);
+      updateUndoRedoState();
       setTimeout(() => {
         isUndoRedoActionRef.current = false;
       }, 50);
     }
-  }, [applyTextEdit]);
+  }, [applyTextEdit, flushPendingHistory, updateUndoRedoState]);
 
   const handleRedo = useCallback(() => {
+    flushPendingHistory();
     if (historyIdxRef.current < historyRef.current.length - 1) {
       historyIdxRef.current += 1;
       const snap = historyRef.current[historyIdxRef.current];
       isUndoRedoActionRef.current = true;
       applyTextEdit(snap.text, snap.cursorStart, snap.cursorEnd, false);
+      updateUndoRedoState();
       setTimeout(() => {
         isUndoRedoActionRef.current = false;
       }, 50);
     }
-  }, [applyTextEdit]);
+  }, [applyTextEdit, flushPendingHistory, updateUndoRedoState]);
 
   // Reset history stack when active query tab changes
   useEffect(() => {
@@ -383,10 +422,11 @@ export function SqlEditor({
       prevTabIdRef.current = activeTabId;
       historyRef.current = [{ text: query, cursorStart: 0, cursorEnd: 0 }];
       historyIdxRef.current = 0;
+      updateUndoRedoState();
       setIsTypingTriggered(false);
       setPopupPos(null);
     }
-  }, [activeTabId, query]);
+  }, [activeTabId, query, updateUndoRedoState]);
 
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
@@ -406,6 +446,7 @@ export function SqlEditor({
         if (newHistory.length > 200) newHistory.shift();
         historyRef.current = newHistory;
         historyIdxRef.current = newHistory.length - 1;
+        updateUndoRedoState();
       } else {
         typingTimerRef.current = setTimeout(() => {
           const newHistory = historyRef.current.slice(0, historyIdxRef.current + 1);
@@ -413,6 +454,7 @@ export function SqlEditor({
           if (newHistory.length > 200) newHistory.shift();
           historyRef.current = newHistory;
           historyIdxRef.current = newHistory.length - 1;
+          updateUndoRedoState();
         }, 180);
       }
     }
@@ -723,17 +765,17 @@ export function SqlEditor({
       }
     }
 
-    // 2. Undo: ⌘Z or Ctrl+Z
+    // 2. Undo: ⌘Z (Mac) or Ctrl+Z (Windows/Linux)
     if (isMod && e.key.toLowerCase() === 'z' && !e.shiftKey) {
       e.preventDefault();
       handleUndo();
       return;
     }
 
-    // 3. Redo: ⌘Shift+Z, Ctrl+Shift+Z, or Ctrl+Y
+    // 3. Redo: ⌘Shift+Z (Mac), Ctrl+Shift+Z (Linux/Win), or Ctrl+Y / ⌘Y (Win/Linux/Mac)
     if (
       (isMod && e.shiftKey && e.key.toLowerCase() === 'z') ||
-      (!e.metaKey && e.ctrlKey && e.key.toLowerCase() === 'y')
+      (isMod && !e.shiftKey && e.key.toLowerCase() === 'y')
     ) {
       e.preventDefault();
       handleRedo();
@@ -974,12 +1016,12 @@ export function SqlEditor({
             onClick={handleExecute}
             disabled={!hasValidTarget || isExecuting}
             className="h-7 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium shadow-xs shrink-0"
-            title="Execute query and commit changes (⌘Enter)"
+            title={isMac ? "Execute query and commit changes (⌘Enter)" : "Execute query and commit changes (Ctrl+Enter)"}
           >
             <Play className="size-3 fill-white" />
             <span>{isExecuting ? 'Running...' : hasSelection ? 'Run Selection' : 'Execute'}</span>
             <kbd className="hidden sm:inline-block text-[9px] bg-emerald-700/60 px-1 py-0.2 rounded font-mono">
-              ⌘↵
+              {isMac ? '⌘↵' : 'Ctrl+↵'}
             </kbd>
           </Button>
 
@@ -1002,7 +1044,11 @@ export function SqlEditor({
             onClick={handleDryRun}
             disabled={!hasValidTarget || isSimulating || isExecuting}
             className="h-7 text-xs gap-1.5 border-amber-500/30 text-amber-400 hover:bg-amber-500/10 font-medium shrink-0"
-            title="Simulate mutating query in safe rollback transaction sandbox (⌘⇧Enter)"
+            title={
+              isMac
+                ? "Simulate mutating query in safe rollback transaction sandbox (⌘⇧Enter)"
+                : "Simulate mutating query in safe rollback transaction sandbox (Ctrl+Shift+Enter)"
+            }
           >
             <ShieldAlert className="size-3 text-amber-400" />
             <span>{isSimulating ? 'Simulating...' : 'Dry Run'}</span>
@@ -1242,12 +1288,36 @@ export function SqlEditor({
 
           <div className="w-px h-3.5 bg-border/60 mx-1 shrink-0" />
 
+          {/* Undo Button */}
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            onClick={handleUndo}
+            disabled={!canUndo}
+            title={isMac ? "Undo edit (⌘Z)" : "Undo edit (Ctrl+Z)"}
+            className="size-6 text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:pointer-events-none shrink-0"
+          >
+            <Undo2 className="size-3.5" />
+          </Button>
+
+          {/* Redo Button */}
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            onClick={handleRedo}
+            disabled={!canRedo}
+            title={isMac ? "Redo edit (⌘⇧Z)" : "Redo edit (Ctrl+Y or Ctrl+Shift+Z)"}
+            className="size-6 text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:pointer-events-none shrink-0"
+          >
+            <Redo2 className="size-3.5" />
+          </Button>
+
           {/* Format Query Button */}
           <Button
             size="sm"
             variant="ghost"
             onClick={formatSql}
-            title="Format SQL query (⌘⇧F / Ctrl+⇧F)"
+            title={isMac ? "Format SQL query (⌘⇧F)" : "Format SQL query (Ctrl+Shift+F)"}
             className="h-6 text-[10px] gap-1 px-2 text-muted-foreground hover:text-foreground font-mono shrink-0"
           >
             <Wand2 className="size-3 text-sky-400" />
@@ -1259,7 +1329,7 @@ export function SqlEditor({
             size="sm"
             variant="ghost"
             onClick={() => setIsShortcutsOpen(true)}
-            title="Keyboard shortcuts reference (⌘/)"
+            title="Keyboard shortcuts reference (⌘/ or Ctrl+/)"
             className="h-6 text-[10px] gap-1 px-2 text-muted-foreground hover:text-foreground font-mono shrink-0"
           >
             <Keyboard className="size-3 text-sky-400" />

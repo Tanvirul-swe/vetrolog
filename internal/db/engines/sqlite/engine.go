@@ -247,7 +247,9 @@ func (e *Engine) GetTableSchema(ctx context.Context, _ string, _ string, table s
 
 	return &types.ExtendedTableSchema{
 		TableName:   table,
+		Name:        table,
 		Schema:      "main",
+		Type:        "TABLE",
 		Columns:     columns,
 		PrimaryKeys: pks,
 		Indexes:     indexes,

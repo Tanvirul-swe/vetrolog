@@ -137,6 +137,8 @@ export interface ColumnInfo {
   isPrimaryKey: boolean;
   isNullable: boolean;
   defaultValue?: string;
+  extra?: string;
+  comment?: string;
 }
 
 export interface TableSchema {
@@ -240,8 +242,12 @@ export interface SimulationResult {
 }
 
 export interface ForeignKeyInfo {
-  id: number;
-  seq: number;
+  id?: number;
+  seq?: number;
+  constraintName?: string;
+  column?: string;
+  refTable?: string;
+  refColumn?: string;
   toTable: string;
   fromCol: string;
   toCol: string;
@@ -250,19 +256,25 @@ export interface ForeignKeyInfo {
 }
 
 export interface IndexInfo {
-  seq: number;
+  seq?: number;
   name: string;
-  unique: boolean;
-  origin: string;
-  partial: boolean;
+  unique?: boolean;
+  isUnique?: boolean;
+  isPrimary?: boolean;
+  origin?: string;
+  partial?: boolean;
+  type?: string;
   columns: string[];
 }
 
 export interface ExtendedTableSchema {
   name: string;
-  type: string;
+  tableName?: string;
+  schema?: string;
+  type?: string;
   rowCount: number;
   columns: ColumnInfo[];
+  primaryKeys?: string[];
   foreignKeys: ForeignKeyInfo[];
   indexes: IndexInfo[];
 }

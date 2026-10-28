@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Columns,
   Key,
@@ -10,9 +10,11 @@ import {
   XCircle,
   Database,
   ArrowRight,
+  Loader2,
 } from 'lucide-react';
 import { ExtendedTableSchema } from '@/types/database';
 import { Input } from '@/components/ui/input';
+import { useConnectionManagerStore } from '@/stores/useConnectionManagerStore';
 
 interface TableStructureViewProps {
   schema: ExtendedTableSchema | null;
@@ -22,31 +24,52 @@ interface TableStructureViewProps {
 export function TableStructureView({ schema, tableName }: TableStructureViewProps) {
   const [activeTab, setActiveTab] = useState<'columns' | 'indexes' | 'foreign_keys'>('columns');
   const [searchTerm, setSearchTerm] = useState('');
+  const loadTableSchema = useConnectionManagerStore((s) => s.loadTableSchema);
+
+  // Proactively fetch table schema if not already loaded
+  useEffect(() => {
+    if (!schema && tableName) {
+      loadTableSchema(tableName);
+    }
+  }, [schema, tableName, loadTableSchema]);
 
   if (!schema) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
-        <Database className="size-8 text-muted-foreground/40 mb-2" />
-        <p className="text-sm">Loading structure for table "{tableName}"...</p>
+      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-muted-foreground select-none">
+        <Loader2 className="size-8 text-primary/60 mb-2 animate-spin" />
+        <p className="text-sm font-medium text-foreground">Loading structure for table "{tableName}"...</p>
+        <p className="text-xs text-muted-foreground mt-1">Inspecting column types, constraints, and indexes</p>
       </div>
     );
   }
 
-  const filteredColumns = schema.columns.filter((c) =>
-    c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.type.toLowerCase().includes(searchTerm.toLowerCase())
+  const displayTableName = schema.tableName || schema.name || tableName;
+  const displayType = (schema.type || (schema.schema ? `${schema.schema}.table` : 'table')).toUpperCase();
+  const columnsList = schema.columns || [];
+  const indexesList = schema.indexes || [];
+  const fksList = schema.foreignKeys || [];
+  const primaryKeysList = schema.primaryKeys || [];
+
+  const filteredColumns = columnsList.filter((c) =>
+    (c.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (c.type || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const filteredIndexes = (schema.indexes || []).filter((idx) =>
-    idx.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    idx.columns.some((col) => col.toLowerCase().includes(searchTerm.toLowerCase()))
+  const filteredIndexes = indexesList.filter((idx) =>
+    (idx.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (idx.columns || []).some((col) => (col || '').toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  const filteredFks = (schema.foreignKeys || []).filter((fk) =>
-    fk.fromCol.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    fk.toTable.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    fk.toCol.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredFks = fksList.filter((fk) => {
+    const fromCol = fk.column || fk.fromCol || '';
+    const toTable = fk.refTable || fk.toTable || '';
+    const toCol = fk.refColumn || fk.toCol || '';
+    return (
+      fromCol.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      toTable.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      toCol.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  });
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-background">
@@ -56,10 +79,15 @@ export function TableStructureView({ schema, tableName }: TableStructureViewProp
           <div className="flex items-center gap-1.5 font-semibold text-xs text-foreground">
             <Layers className="size-3.5 text-primary" />
             <span>Structure:</span>
-            <span className="font-mono text-primary">{schema.name}</span>
+            <span className="font-mono text-primary">{displayTableName}</span>
             <span className="text-[10px] text-muted-foreground font-mono px-1.5 py-0.5 rounded bg-muted border border-border">
-              {schema.type.toUpperCase()}
+              {displayType}
             </span>
+            {schema.rowCount !== undefined && (
+              <span className="text-[10px] text-muted-foreground font-mono ml-1">
+                ({schema.rowCount.toLocaleString()} rows)
+              </span>
+            )}
           </div>
 
           {/* Sub-tabs */}
@@ -75,7 +103,7 @@ export function TableStructureView({ schema, tableName }: TableStructureViewProp
             >
               <Columns className="size-3 text-sky-400" />
               <span>Columns</span>
-              <span className="text-[10px] opacity-70 font-mono">({schema.columns.length})</span>
+              <span className="text-[10px] opacity-70 font-mono">({columnsList.length})</span>
             </button>
 
             <button
@@ -89,7 +117,7 @@ export function TableStructureView({ schema, tableName }: TableStructureViewProp
             >
               <Hash className="size-3 text-amber-400" />
               <span>Indexes</span>
-              <span className="text-[10px] opacity-70 font-mono">({schema.indexes?.length || 0})</span>
+              <span className="text-[10px] opacity-70 font-mono">({indexesList.length})</span>
             </button>
 
             <button
@@ -103,7 +131,7 @@ export function TableStructureView({ schema, tableName }: TableStructureViewProp
             >
               <Link className="size-3 text-emerald-400" />
               <span>Foreign Keys</span>
-              <span className="text-[10px] opacity-70 font-mono">({schema.foreignKeys?.length || 0})</span>
+              <span className="text-[10px] opacity-70 font-mono">({fksList.length})</span>
             </button>
           </div>
         </div>
@@ -135,39 +163,56 @@ export function TableStructureView({ schema, tableName }: TableStructureViewProp
               </tr>
             </thead>
             <tbody className="divide-y divide-border/40 font-mono">
-              {filteredColumns.map((col, idx) => (
-                <tr key={col.name} className="hover:bg-muted/30 transition-colors">
-                  <td className="py-2 px-4 text-center text-muted-foreground text-[10px]">{idx + 1}</td>
-                  <td className="py-2 px-4 font-semibold text-foreground flex items-center gap-1.5">
-                    {col.isPrimaryKey && <Key className="size-3 text-amber-400 shrink-0" />}
-                    <span>{col.name}</span>
-                  </td>
-                  <td className="py-2 px-4 text-sky-400">{col.type}</td>
-                  <td className="py-2 px-4">
-                    {col.isPrimaryKey && (
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/30">
-                        PRIMARY KEY
-                      </span>
-                    )}
-                  </td>
-                  <td className="py-2 px-4">
-                    {col.isNullable ? (
-                      <span className="text-muted-foreground text-[11px] flex items-center gap-1">
-                        <CheckCircle2 className="size-3 text-emerald-400" />
-                        <span>NULL</span>
-                      </span>
-                    ) : (
-                      <span className="text-foreground text-[11px] font-semibold flex items-center gap-1">
-                        <XCircle className="size-3 text-rose-400" />
-                        <span>NOT NULL</span>
-                      </span>
-                    )}
-                  </td>
-                  <td className="py-2 px-4 text-muted-foreground truncate max-w-xs">
-                    {col.defaultValue || <span className="opacity-40 italic">null</span>}
+              {filteredColumns.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-8 text-center text-muted-foreground">
+                    No columns match your filter.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                filteredColumns.map((col, idx) => {
+                  const isPk = col.isPrimaryKey || primaryKeysList.includes(col.name);
+
+                  return (
+                    <tr key={col.name || idx} className="hover:bg-muted/30 transition-colors">
+                      <td className="py-2 px-4 text-center text-muted-foreground text-[10px]">{idx + 1}</td>
+                      <td className="py-2 px-4 font-semibold text-foreground flex items-center gap-1.5">
+                        {isPk && <Key className="size-3 text-amber-400 shrink-0" />}
+                        <span>{col.name}</span>
+                      </td>
+                      <td className="py-2 px-4 text-sky-400">{col.type}</td>
+                      <td className="py-2 px-4">
+                        {isPk && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                            PRIMARY KEY
+                          </span>
+                        )}
+                        {col.extra && (
+                          <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-mono bg-muted text-muted-foreground border border-border">
+                            {col.extra}
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-2 px-4">
+                        {col.isNullable ? (
+                          <span className="text-muted-foreground text-[11px] flex items-center gap-1">
+                            <CheckCircle2 className="size-3 text-emerald-400" />
+                            <span>NULL</span>
+                          </span>
+                        ) : (
+                          <span className="text-foreground text-[11px] font-semibold flex items-center gap-1">
+                            <XCircle className="size-3 text-rose-400" />
+                            <span>NOT NULL</span>
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-2 px-4 text-muted-foreground truncate max-w-xs">
+                        {col.defaultValue || <span className="opacity-40 italic">null</span>}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         )}
@@ -180,7 +225,7 @@ export function TableStructureView({ schema, tableName }: TableStructureViewProp
                 <th className="py-2 px-4">Index Name</th>
                 <th className="py-2 px-4">Indexed Columns</th>
                 <th className="py-2 px-4 w-28">Unique</th>
-                <th className="py-2 px-4 w-28">Origin</th>
+                <th className="py-2 px-4 w-28">Type</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/40 font-mono">
@@ -191,23 +236,29 @@ export function TableStructureView({ schema, tableName }: TableStructureViewProp
                   </td>
                 </tr>
               ) : (
-                filteredIndexes.map((idx, i) => (
-                  <tr key={idx.name || i} className="hover:bg-muted/30 transition-colors">
-                    <td className="py-2 px-4 text-center text-muted-foreground text-[10px]">{i + 1}</td>
-                    <td className="py-2 px-4 font-semibold text-foreground">{idx.name}</td>
-                    <td className="py-2 px-4 text-primary">{idx.columns.join(', ')}</td>
-                    <td className="py-2 px-4">
-                      {idx.unique ? (
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                          UNIQUE
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground text-[11px]">No</span>
-                      )}
-                    </td>
-                    <td className="py-2 px-4 text-muted-foreground">{idx.origin || 'c'}</td>
-                  </tr>
-                ))
+                filteredIndexes.map((idx, i) => {
+                  const cols = idx.columns && idx.columns.length > 0 ? idx.columns.join(', ') : 'All / Primary';
+                  const isUnique = idx.isUnique ?? idx.unique ?? false;
+                  const idxType = idx.type || idx.origin || 'BTREE';
+
+                  return (
+                    <tr key={idx.name || i} className="hover:bg-muted/30 transition-colors">
+                      <td className="py-2 px-4 text-center text-muted-foreground text-[10px]">{i + 1}</td>
+                      <td className="py-2 px-4 font-semibold text-foreground">{idx.name}</td>
+                      <td className="py-2 px-4 text-primary">{cols}</td>
+                      <td className="py-2 px-4">
+                        {isUnique ? (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                            UNIQUE
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground text-[11px]">No</span>
+                        )}
+                      </td>
+                      <td className="py-2 px-4 text-muted-foreground uppercase">{idxType}</td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -232,21 +283,28 @@ export function TableStructureView({ schema, tableName }: TableStructureViewProp
                   </td>
                 </tr>
               ) : (
-                filteredFks.map((fk, i) => (
-                  <tr key={`${fk.fromCol}-${i}`} className="hover:bg-muted/30 transition-colors">
-                    <td className="py-2 px-4 text-center text-muted-foreground text-[10px]">{i + 1}</td>
-                    <td className="py-2 px-4 font-semibold text-foreground flex items-center gap-1.5">
-                      <Link className="size-3 text-emerald-400 shrink-0" />
-                      <span>{fk.fromCol}</span>
-                    </td>
-                    <td className="py-2 px-4 text-sky-400 flex items-center gap-1.5">
-                      <ArrowRight className="size-3 text-muted-foreground shrink-0" />
-                      <span>{fk.toTable} ({fk.toCol})</span>
-                    </td>
-                    <td className="py-2 px-4 text-muted-foreground">{fk.onUpdate || 'NO ACTION'}</td>
-                    <td className="py-2 px-4 text-muted-foreground">{fk.onDelete || 'NO ACTION'}</td>
-                  </tr>
-                ))
+                filteredFks.map((fk, i) => {
+                  const fromCol = fk.column || fk.fromCol || '—';
+                  const toTable = fk.refTable || fk.toTable || '—';
+                  const toCol = fk.refColumn || fk.toCol || '';
+                  const targetLabel = toCol ? `${toTable} (${toCol})` : toTable;
+
+                  return (
+                    <tr key={`${fromCol}-${i}`} className="hover:bg-muted/30 transition-colors">
+                      <td className="py-2 px-4 text-center text-muted-foreground text-[10px]">{i + 1}</td>
+                      <td className="py-2 px-4 font-semibold text-foreground flex items-center gap-1.5">
+                        <Link className="size-3 text-emerald-400 shrink-0" />
+                        <span>{fromCol}</span>
+                      </td>
+                      <td className="py-2 px-4 text-sky-400 flex items-center gap-1.5">
+                        <ArrowRight className="size-3 text-muted-foreground shrink-0" />
+                        <span>{targetLabel}</span>
+                      </td>
+                      <td className="py-2 px-4 text-muted-foreground">{fk.onUpdate || 'NO ACTION'}</td>
+                      <td className="py-2 px-4 text-muted-foreground">{fk.onDelete || 'NO ACTION'}</td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

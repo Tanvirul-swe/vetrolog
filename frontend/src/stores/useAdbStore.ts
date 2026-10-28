@@ -448,7 +448,7 @@ export const useAdbStore = create<AdbState>((set, get) => ({
 
     if (!deviceId || !packageName || !remotePath) return;
 
-    if (!isSilent) {
+    if (!isSilent && useDatabaseStore.getState().selectedTableName !== tableName) {
       useDatabaseStore.getState().selectTable(tableName);
     }
 
@@ -473,11 +473,12 @@ export const useAdbStore = create<AdbState>((set, get) => ({
           databaseId: result.databaseId,
           tableName: result.tableName,
           totalRows: result.totalRows,
-          page: result.page,
-          pageSize: result.pageSize,
+          page: result.page || page,
+          pageSize: result.pageSize || pageSize,
           columns: result.columns,
           rows: result.rows || [],
         });
+        useDatabaseStore.getState().setPage(result.page || page);
 
         // Keep left sidebar table counts updated in real-time
         if ((result as any).tableCounts) {

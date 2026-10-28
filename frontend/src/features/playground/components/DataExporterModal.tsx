@@ -103,13 +103,14 @@ export function DataExporterModal({ isOpen, onClose, rows, tableName = 'result_s
     const defaultFilename = `${tableName}_export.${ext}`;
 
     setIsSaving(true);
-    try {
-      // 1. Try native desktop save dialog via Wails AppBindings (eliminates macOS WebKit sandbox error)
-      if (
-        typeof window !== 'undefined' &&
-        // @ts-expect-error window.go may be undefined
-        typeof window?.go?.app?.App?.SaveExportFile === 'function'
-      ) {
+
+    // 1. Desktop native save dialog via Wails AppBindings (eliminates macOS WebKit sandbox error)
+    if (
+      typeof window !== 'undefined' &&
+      // @ts-expect-error window.go may be undefined
+      typeof window?.go?.app?.App?.SaveExportFile === 'function'
+    ) {
+      try {
         const savedPath = await AppBindings.SaveExportFile(
           defaultFilename,
           filterMap[format] || '*.*',
@@ -122,12 +123,12 @@ export function DataExporterModal({ isOpen, onClose, rows, tableName = 'result_s
             onClose();
           }, 800);
         }
-        return;
+      } catch (err) {
+        console.error('[VetroLog] Native save dialog failed:', err);
+      } finally {
+        setIsSaving(false);
       }
-    } catch (err) {
-      console.warn('[VetroLog] Native save dialog failed, using fallback:', err);
-    } finally {
-      setIsSaving(false);
+      return;
     }
 
     // 2. Browser fallback for web mode

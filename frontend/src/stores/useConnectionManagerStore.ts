@@ -247,7 +247,7 @@ export const useConnectionManagerStore = create<ConnectionManagerState>((set, ge
     }
     set({
       activeSession: null,
-      workspaceMode: 'mobile',
+      workspaceMode: 'remote',
       remoteDatabases: [],
       selectedDatabase: '',
       remoteSchemas: [],
@@ -259,6 +259,20 @@ export const useConnectionManagerStore = create<ConnectionManagerState>((set, ge
       redisScanResult: null,
       selectedRedisKey: null,
       redisKeyValue: null,
+    });
+    await get().loadSavedConnections();
+
+    // Reset database store rows/table so inspector/grid is cleanly reset
+    const dbStore = useDatabaseStore.getState();
+    dbStore.selectTable('');
+    dbStore.setTableData({
+      databaseId: '',
+      tableName: '',
+      totalRows: 0,
+      page: 1,
+      pageSize: 50,
+      columns: [],
+      rows: [],
     });
   },
 
@@ -403,16 +417,19 @@ export const useConnectionManagerStore = create<ConnectionManagerState>((set, ge
 
       // Sync to useDatabaseStore for unified DataGrid display and Playground
       const dbStore = useDatabaseStore.getState();
-      dbStore.selectTable(tableName);
+      if (dbStore.selectedTableName !== tableName) {
+        dbStore.selectTable(tableName);
+      }
       dbStore.setTableData({
         databaseId: session.config.database || 'remote',
         tableName: typedRes.tableName,
         totalRows: typedRes.totalRows,
-        page: typedRes.page,
-        pageSize: typedRes.pageSize,
+        page: typedRes.page || page,
+        pageSize: typedRes.pageSize || pageSize,
         columns: typedRes.columns,
         rows: typedRes.rows,
       });
+      dbStore.setPage(typedRes.page || page);
     } catch (err) {
       set({ isLoadingTable: false, tableError: String(err) });
     }
@@ -429,7 +446,51 @@ export const useConnectionManagerStore = create<ConnectionManagerState>((set, ge
         get().selectedSchema,
         tableName
       );
-      set({ tableSchema: res as unknown as ExtendedTableSchema });
+      if (res) {
+        const raw = res as any;
+        const normalized: ExtendedTableSchema = {
+          name: raw.name || raw.tableName || tableName,
+          tableName: raw.tableName || raw.name || tableName,
+          schema: raw.schema || get().selectedSchema || '',
+          type: raw.type || 'table',
+          rowCount: raw.rowCount ?? 0,
+          columns: (raw.columns || []).map((col: any) => ({
+            name: col.name,
+            type: col.type,
+            isPrimaryKey: !!col.isPrimaryKey,
+            isNullable: !!col.isNullable,
+            defaultValue: col.defaultValue || '',
+            extra: col.extra || '',
+            comment: col.comment || '',
+          })),
+          primaryKeys: raw.primaryKeys || [],
+          indexes: (raw.indexes || []).map((idx: any, i: number) => ({
+            seq: i,
+            name: idx.name || `idx_${i}`,
+            unique: idx.isUnique ?? idx.unique ?? false,
+            isUnique: idx.isUnique ?? idx.unique ?? false,
+            isPrimary: idx.isPrimary ?? false,
+            origin: idx.origin || idx.type || 'BTREE',
+            type: idx.type || idx.origin || 'BTREE',
+            partial: false,
+            columns: idx.columns || [],
+          })),
+          foreignKeys: (raw.foreignKeys || []).map((fk: any, i: number) => ({
+            id: i,
+            seq: i,
+            constraintName: fk.constraintName || '',
+            column: fk.column || fk.fromCol || '',
+            refTable: fk.refTable || fk.toTable || '',
+            refColumn: fk.refColumn || fk.toCol || '',
+            fromCol: fk.column || fk.fromCol || '',
+            toTable: fk.refTable || fk.toTable || '',
+            toCol: fk.refColumn || fk.toCol || '',
+            onUpdate: fk.onUpdate || 'NO ACTION',
+            onDelete: fk.onDelete || 'NO ACTION',
+          })),
+        };
+        set({ tableSchema: normalized });
+      }
     } catch {
       // Ignored
     }

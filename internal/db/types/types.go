@@ -126,7 +126,9 @@ type ForeignKeyInfo struct {
 // ExtendedTableSchema details structure, constraints, and indexes
 type ExtendedTableSchema struct {
 	TableName   string           `json:"tableName"`
+	Name        string           `json:"name,omitempty"`
 	Schema      string           `json:"schema"`
+	Type        string           `json:"type"` // "TABLE" | "VIEW"
 	Columns     []ColumnInfo     `json:"columns"`
 	PrimaryKeys []string         `json:"primaryKeys"`
 	Indexes     []IndexInfo      `json:"indexes"`

@@ -270,17 +270,49 @@ func (e *Engine) GetTableSchema(ctx context.Context, dbName string, _ string, ta
 		}
 	}
 
-	// 3. Exact Row Count
+	// 3. Foreign Keys
+	var foreignKeys []types.ForeignKeyInfo
+	fkQuery := `
+		SELECT 
+			constraint_name, 
+			column_name, 
+			referenced_table_name, 
+			referenced_column_name 
+		FROM information_schema.key_column_usage 
+		WHERE table_schema = ? AND table_name = ? AND referenced_table_name IS NOT NULL;
+	`
+	fkRows, err := e.dbInstance.QueryContext(ctx, fkQuery, dbName, table)
+	if err == nil {
+		defer fkRows.Close()
+		for fkRows.Next() {
+			var cName, col, refTbl, refCol string
+			if err := fkRows.Scan(&cName, &col, &refTbl, &refCol); err == nil {
+				foreignKeys = append(foreignKeys, types.ForeignKeyInfo{
+					ConstraintName: cName,
+					Column:         col,
+					RefTable:       refTbl,
+					RefColumn:      refCol,
+					OnUpdate:       "NO ACTION",
+					OnDelete:       "NO ACTION",
+				})
+			}
+		}
+	}
+
+	// 4. Exact Row Count
 	var exactCount int64
 	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM `%s`.`%s`;", dbName, table)
 	_ = e.dbInstance.QueryRowContext(ctx, countQuery).Scan(&exactCount)
 
 	return &types.ExtendedTableSchema{
 		TableName:   table,
+		Name:        table,
 		Schema:      dbName,
+		Type:        "TABLE",
 		Columns:     columns,
 		PrimaryKeys: pks,
 		Indexes:     indexes,
+		ForeignKeys: foreignKeys,
 		RowCount:    exactCount,
 	}, nil
 }

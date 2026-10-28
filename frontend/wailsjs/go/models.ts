@@ -694,7 +694,9 @@ export namespace types {
 	}
 	export class ExtendedTableSchema {
 	    tableName: string;
+	    name?: string;
 	    schema: string;
+	    type: string;
 	    columns: ColumnInfo[];
 	    primaryKeys: string[];
 	    indexes: IndexInfo[];
@@ -708,7 +710,9 @@ export namespace types {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.tableName = source["tableName"];
+	        this.name = source["name"];
 	        this.schema = source["schema"];
+	        this.type = source["type"];
 	        this.columns = this.convertValues(source["columns"], ColumnInfo);
 	        this.primaryKeys = source["primaryKeys"];
 	        this.indexes = this.convertValues(source["indexes"], IndexInfo);

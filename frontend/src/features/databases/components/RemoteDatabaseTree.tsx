@@ -103,12 +103,16 @@ export function RemoteDatabaseTree({
                 >
                   <div
                     className="min-w-0 flex-1 cursor-pointer"
-                    onClick={() => {
+                    onClick={async () => {
                       setConnectingId(conn.id);
-                      if (conn.engine === 'sqlite' && conn.filePath) {
-                        openLocalFile(conn.filePath);
-                      } else {
-                        connect(conn.id);
+                      try {
+                        if (conn.engine === 'sqlite' && conn.filePath) {
+                          await openLocalFile(conn.filePath);
+                        } else {
+                          await connect(conn.id);
+                        }
+                      } finally {
+                        setConnectingId(null);
                       }
                     }}
                     title="Click to connect"
@@ -128,12 +132,16 @@ export function RemoteDatabaseTree({
                     variant="outline"
                     size="sm"
                     disabled={isConnecting}
-                    onClick={() => {
+                    onClick={async () => {
                       setConnectingId(conn.id);
-                      if (conn.engine === 'sqlite' && conn.filePath) {
-                        openLocalFile(conn.filePath);
-                      } else {
-                        connect(conn.id);
+                      try {
+                        if (conn.engine === 'sqlite' && conn.filePath) {
+                          await openLocalFile(conn.filePath);
+                        } else {
+                          await connect(conn.id);
+                        }
+                      } finally {
+                        setConnectingId(null);
                       }
                     }}
                     className="h-6 text-[10px] px-2 gap-1 bg-primary/10 hover:bg-primary/20 text-primary border-primary/30 shrink-0 font-medium"

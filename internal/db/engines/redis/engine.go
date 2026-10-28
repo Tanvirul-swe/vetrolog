@@ -149,7 +149,9 @@ func (e *Engine) GetTableSchema(ctx context.Context, _ string, _ string, _ strin
 
 	return &types.ExtendedTableSchema{
 		TableName: "KEYS",
+		Name:      "KEYS",
 		Schema:    "default",
+		Type:      "KEY_SPACE",
 		Columns: []types.ColumnInfo{
 			{Name: "key", Type: "string", IsPrimaryKey: true},
 			{Name: "type", Type: "string"},

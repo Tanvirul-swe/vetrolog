@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { Download, ChevronLeft, ChevronRight, RefreshCw, Layers, Table as TableIcon, Columns } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useDatabaseStore } from '@/stores/useDatabaseStore';
 import { useAdbStore } from '@/stores/useAdbStore';
 import { useConnectionManagerStore } from '@/stores/useConnectionManagerStore';
+import { DataExporterModal } from '@/features/playground/components/DataExporterModal';
 import { cn } from '@/lib/utils';
 
 interface GridToolbarProps {
@@ -12,32 +14,41 @@ interface GridToolbarProps {
 }
 
 export function GridToolbar({ onRefresh, onRequestPage }: GridToolbarProps) {
-  const selectedTable = useDatabaseStore((s) => s.selectedTableName);
-  const totalRows = useDatabaseStore((s) => s.totalRows);
+  const mobileSelectedTable = useDatabaseStore((s) => s.selectedTableName);
+  const remoteSelectedTable = useConnectionManagerStore((s) => s.selectedTable);
+  const workspaceMode = useConnectionManagerStore((s) => s.workspaceMode);
+  const selectedTable = workspaceMode === 'remote' ? (remoteSelectedTable || mobileSelectedTable) : mobileSelectedTable;
+
+  const dbTotalRows = useDatabaseStore((s) => s.totalRows);
+  const remoteTableData = useConnectionManagerStore((s) => s.tableData);
+  const totalRows = workspaceMode === 'remote' && remoteTableData?.totalRows !== undefined
+    ? remoteTableData.totalRows
+    : dbTotalRows;
+
   const rows = useDatabaseStore((s) => s.rows);
-  const page = useDatabaseStore((s) => s.page);
-  const pageSize = useDatabaseStore((s) => s.pageSize);
-  const isLoading = useDatabaseStore((s) => s.isLoadingTable);
+
+  const dbPage = useDatabaseStore((s) => s.page);
+  const page = workspaceMode === 'remote' && remoteTableData?.page !== undefined
+    ? remoteTableData.page
+    : dbPage;
+
+  const dbPageSize = useDatabaseStore((s) => s.pageSize);
+  const pageSize = (workspaceMode === 'remote' && remoteTableData?.pageSize)
+    ? remoteTableData.pageSize
+    : (dbPageSize || 50);
+
+  const isDbLoading = useDatabaseStore((s) => s.isLoadingTable);
+  const isRemoteLoading = useConnectionManagerStore((s) => s.isLoadingTable);
+  const isLoading = workspaceMode === 'remote' ? isRemoteLoading : isDbLoading;
 
   const isLiveSync = useAdbStore((s) => s.isLiveSync);
   const toggleLiveSync = useAdbStore((s) => s.toggleLiveSync);
 
-  const workspaceMode = useConnectionManagerStore((s) => s.workspaceMode);
   const activeRemoteView = useConnectionManagerStore((s) => s.activeRemoteView);
   const setActiveRemoteView = useConnectionManagerStore((s) => s.setActiveRemoteView);
 
   const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
-
-  const exportToJson = () => {
-    if (rows.length === 0) return;
-    const blob = new Blob([JSON.stringify(rows, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${selectedTable || 'vetrolog_export'}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   if (!selectedTable) return null;
 
@@ -130,40 +141,54 @@ export function GridToolbar({ onRefresh, onRequestPage }: GridToolbarProps) {
         <Button
           variant="ghost"
           size="sm"
-          onClick={exportToJson}
+          onClick={() => setIsExportModalOpen(true)}
           disabled={rows.length === 0}
           className="h-7 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
-          title="Export current page as JSON"
+          title="Export table data (JSON, CSV, SQL, Markdown)"
         >
           <Download className="size-3" />
           <span>Export</span>
         </Button>
 
-        {/* Pagination */}
-        <div className="flex items-center gap-1 border-l border-border/60 pl-2 text-xs text-muted-foreground">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => onRequestPage?.(Math.max(1, page - 1))}
-            disabled={page <= 1 || isLoading}
-            className="h-7 w-7"
-          >
-            <ChevronLeft className="size-3.5" />
-          </Button>
-          <span className="font-mono text-[11px] px-1">
-            {page} / {totalPages}
-          </span>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => onRequestPage?.(page + 1)}
-            disabled={page >= totalPages || isLoading}
-            className="h-7 w-7"
-          >
-            <ChevronRight className="size-3.5" />
-          </Button>
-        </div>
+        {/* Pagination (visible on Data tab) */}
+        {activeRemoteView !== 'structure' && (
+          <div className="flex items-center gap-1 border-l border-border/60 pl-2 text-xs text-muted-foreground">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => onRequestPage?.(Math.max(1, page - 1))}
+              disabled={page <= 1 || isLoading}
+              className="h-7 w-7"
+              title="Previous Page"
+            >
+              <ChevronLeft className="size-3.5" />
+            </Button>
+            <span className="font-mono text-[11px] px-1 select-none">
+              {page} / {totalPages}
+            </span>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => onRequestPage?.(page + 1)}
+              disabled={page >= totalPages || isLoading}
+              className="h-7 w-7"
+              title="Next Page"
+            >
+              <ChevronRight className="size-3.5" />
+            </Button>
+          </div>
+        )}
       </div>
+
+      {/* Data Exporter Modal */}
+      {isExportModalOpen && (
+        <DataExporterModal
+          isOpen={isExportModalOpen}
+          onClose={() => setIsExportModalOpen(false)}
+          rows={rows}
+          tableName={selectedTable || 'table_export'}
+        />
+      )}
     </div>
   );
 }

@@ -7,7 +7,7 @@ import {
   RefreshCw,
   QrCode,
   Table,
-  Shield,
+  User,
   Server,
   FolderOpen,
   Power,
@@ -17,7 +17,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useConnectionStore } from '@/stores/useConnectionStore';
 import { useDatabaseStore } from '@/stores/useDatabaseStore';
-import { useSettingsStore } from '@/stores/useSettingsStore';
 import { usePlaygroundStore } from '@/stores/usePlaygroundStore';
 import { useConnectionManagerStore } from '@/stores/useConnectionManagerStore';
 import { QRPairingModal } from '@/features/connection/components/QRPairingModal';
@@ -25,8 +24,7 @@ import { AdbDeviceSelector } from '@/features/adb/components/AdbDeviceSelector';
 import { ConnectionManagerModal } from '@/features/connections/components/ConnectionManagerModal';
 import { UpdateBadge } from '@/features/updater/UpdateBadge';
 import { UpdateProgressModal } from '@/features/updater/UpdateProgressModal';
-import { TelemetrySettingsModal } from '@/features/telemetry/components/TelemetrySettingsModal';
-import { isWailsApp } from '@/services/apiBridge';
+import { UserProfileModal } from '@/features/profile/components/UserProfileModal';
 import logoIcon from '@/assets/images/vetrolog-icon.png';
 
 interface AppHeaderProps {
@@ -43,14 +41,14 @@ export function AppHeader({
   setIsConnectionManagerOpen: propSetIsOpen,
 }: AppHeaderProps) {
   const SHOW_QR_PAIR = false;
-  const isWails = isWailsApp();
 
   const [localIsOpen, setLocalIsOpen] = useState(false);
   const isConnectionManagerOpen = propIsOpen !== undefined ? propIsOpen : localIsOpen;
   const setIsConnectionManagerOpen = propSetIsOpen || setLocalIsOpen;
 
   const [isPairingOpen, setIsPairingOpen] = useState(false);
-  const [isTelemetryOpen, setIsTelemetryOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPod|iPad/.test(navigator.userAgent);
 
   const isConnected = useConnectionStore((s) => s.isConnected);
   const currentDevice = useConnectionStore((s) => s.currentDevice);
@@ -59,9 +57,6 @@ export function AppHeader({
   const filterTerm = useDatabaseStore((s) => s.filterTerm);
   const setFilterTerm = useDatabaseStore((s) => s.setFilterTerm);
   const clearLogs = useDatabaseStore((s) => s.clearLogs);
-
-  const isConsoleOpen = useSettingsStore((s) => s.isConsoleOpen);
-  const toggleConsole = useSettingsStore((s) => s.toggleConsole);
 
   const activeWorkspaceView = usePlaygroundStore((s) => s.activeWorkspaceView);
   const setActiveWorkspaceView = usePlaygroundStore((s) => s.setActiveWorkspaceView);
@@ -72,18 +67,22 @@ export function AppHeader({
   const disconnect = useConnectionManagerStore((s) => s.disconnect);
   const selectLocalFileDialog = useConnectionManagerStore((s) => s.selectLocalFileDialog);
 
-  const handleModeSwitch = (mode: 'mobile' | 'remote') => {
+  const handleModeSwitch = async (mode: 'mobile' | 'remote') => {
     setWorkspaceMode(mode);
     if (mode === 'remote' && !activeSession) {
-      setIsConnectionManagerOpen(true);
+      await useConnectionManagerStore.getState().loadSavedConnections();
+      const saved = useConnectionManagerStore.getState().savedConnections;
+      if (saved.length === 0) {
+        setIsConnectionManagerOpen(true);
+      }
     }
   };
 
   return (
     <>
-      <header className="wails-drag h-13 border-b border-border/80 bg-card/60 backdrop-blur-md px-4 flex items-center justify-between select-none shrink-0 z-30">
-        {/* Brand & Window Traffic Lights Offset (on macOS desktop) */}
-        <div className={`flex items-center gap-3 ${isWails ? 'pl-16' : 'pl-2'}`}>
+      <header className="wails-drag h-13 border-b border-border/80 bg-card/60 backdrop-blur-md px-3 flex items-center justify-between select-none shrink-0 z-30">
+        {/* Brand & Window Traffic Lights Offset (on macOS desktop: red, yellow, green resize) */}
+        <div className={`flex items-center gap-3 ${isMac ? 'pl-[76px]' : 'pl-1'}`}>
           <div className="size-8 rounded-lg overflow-hidden border border-primary/40 shadow-xs shadow-primary/30 bg-background/80 flex items-center justify-center shrink-0 p-0.5">
             <img src={logoIcon} alt="VetroLog" className="size-full object-cover rounded-md" />
           </div>
@@ -281,24 +280,13 @@ export function AppHeader({
           </Button>
 
           <Button
-            variant={isConsoleOpen ? 'secondary' : 'ghost'}
-            size="sm"
-            onClick={toggleConsole}
-            className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-            title="Toggle live mutation console (⌘J)"
-          >
-            <Terminal className="size-3.5" />
-            <span>Console</span>
-          </Button>
-
-          <Button
             variant="ghost"
             size="icon-sm"
-            onClick={() => setIsTelemetryOpen(true)}
-            title="Privacy & Analytics Settings"
-            className="text-muted-foreground hover:text-foreground"
+            onClick={() => setIsProfileOpen(true)}
+            title="User Profile (Upcoming Features)"
+            className="text-muted-foreground hover:text-foreground h-8 w-8 rounded-full border border-border/70 hover:border-primary/50 hover:bg-primary/10 transition-colors ml-1"
           >
-            <Shield className="size-3.5" />
+            <User className="size-4 text-primary" />
           </Button>
         </div>
       </header>
@@ -318,9 +306,9 @@ export function AppHeader({
 
       <UpdateProgressModal />
 
-      <TelemetrySettingsModal
-        isOpen={isTelemetryOpen}
-        onClose={() => setIsTelemetryOpen(false)}
+      <UserProfileModal
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
       />
     </>
   );

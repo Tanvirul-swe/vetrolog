@@ -43,7 +43,7 @@ export function DataGrid({
   onDeleteRow,
   onOpenConnectionManager,
 }: DataGridProps) {
-  const selectedTable = useDatabaseStore((s) => s.selectedTableName);
+  const mobileSelectedTable = useDatabaseStore((s) => s.selectedTableName);
   const databases = useDatabaseStore((s) => s.databases);
   const columns = useDatabaseStore((s) => s.columns);
   const rows = useDatabaseStore((s) => s.rows);
@@ -51,8 +51,12 @@ export function DataGrid({
   const selectedRow = useDatabaseStore((s) => s.selectedRow);
   const setSelectedRow = useDatabaseStore((s) => s.setSelectedRow);
   const isLoadingTable = useDatabaseStore((s) => s.isLoadingTable);
+  const page = useDatabaseStore((s) => s.page);
+  const pageSize = useDatabaseStore((s) => s.pageSize);
 
   const workspaceMode = useConnectionManagerStore((s) => s.workspaceMode);
+  const remoteSelectedTable = useConnectionManagerStore((s) => s.selectedTable);
+  const selectedTable = workspaceMode === 'remote' ? (remoteSelectedTable || mobileSelectedTable) : mobileSelectedTable;
   const activeSession = useConnectionManagerStore((s) => s.activeSession);
   const activeRemoteView = useConnectionManagerStore((s) => s.activeRemoteView);
   const tableSchema = useConnectionManagerStore((s) => s.tableSchema);
@@ -179,7 +183,7 @@ export function DataGrid({
           </div>
           <h3 className="font-semibold text-foreground text-sm">Remote Database Studio</h3>
           <p className="text-xs text-muted-foreground mt-1 max-w-sm mb-4">
-            Connect to PostgreSQL, MySQL, Redis, or open a local .sqlite file with TablePlus-grade inspection.
+            Connect to PostgreSQL, MySQL, Redis, or open a local .sqlite file with professional-grade inspection.
           </p>
           <div className="flex items-center gap-2">
             <Button
@@ -543,7 +547,7 @@ export function DataGrid({
                         }`}
                       >
                         <td className="px-3 py-1.5 text-center text-muted-foreground/40 text-[10px] border-r border-border/30 select-none">
-                          {idx + 1}
+                          {(page - 1) * (pageSize || 50) + idx + 1}
                         </td>
                         {tableColumns.map((col) => {
                           const isStaged = pendingChanges.some(

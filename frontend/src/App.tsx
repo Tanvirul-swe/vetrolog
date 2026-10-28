@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { SplitLayout } from './components/layout/SplitLayout';
 import { useWailsEvent } from './hooks/useWailsEvent';
 import { EVENTS } from './constants/events';
@@ -95,43 +95,68 @@ export function App() {
     setLatestQueryResult(result);
   });
 
-  // 4. Request table data on selection or page change
-  const handleRequestTableData = useCallback((targetPage = page) => {
-    if (!selectedTableName) return;
+  const lastLoadedTableRef = useRef<string | null>(null);
+  const lastLoadedDbRef = useRef<string | null>(null);
 
-    if (useConnectionManagerStore.getState().workspaceMode === 'remote') {
+  const selectedRemoteTable = useConnectionManagerStore((s) => s.selectedTable);
+  const workspaceMode = useConnectionManagerStore((s) => s.workspaceMode);
+  const activeTable = workspaceMode === 'remote' ? (selectedRemoteTable || selectedTableName) : selectedTableName;
+
+  // 4. Request table data on selection or page change
+  const handleRequestTableData = useCallback((targetPage?: number) => {
+    const isRemote = useConnectionManagerStore.getState().workspaceMode === 'remote';
+    const remoteActiveTable = useConnectionManagerStore.getState().selectedTable;
+    const currentTable = isRemote ? (remoteActiveTable || selectedTableName) : selectedTableName;
+    const currentPage = useDatabaseStore.getState().page;
+    const effectivePage = targetPage !== undefined ? targetPage : currentPage;
+
+    if (!currentTable) return;
+
+    if (isRemote) {
       const activeSession = useConnectionManagerStore.getState().activeSession;
       if (activeSession) {
-        useConnectionManagerStore.getState().loadTableData(selectedTableName, targetPage, pageSize);
+        useConnectionManagerStore.getState().loadTableData(currentTable, effectivePage, pageSize);
       }
       return;
     }
 
     if (useAdbStore.getState().isAdbMode) {
-      useAdbStore.getState().loadTableData(selectedTableName, targetPage, pageSize);
+      useAdbStore.getState().loadTableData(currentTable, effectivePage, pageSize);
       return;
     }
 
-    if (selectedDbId && selectedTableName) {
+    if (selectedDbId && currentTable) {
       try {
         if (
           typeof window !== 'undefined' &&
           // @ts-expect-error window.go may be undefined
           window?.go?.app?.App?.RequestTableData
         ) {
-          AppBindings.RequestTableData(selectedDbId, selectedTableName, targetPage, pageSize);
+          AppBindings.RequestTableData(selectedDbId, currentTable, effectivePage, pageSize);
         }
       } catch {
         // Safe fallback
       }
     }
-  }, [page, pageSize, selectedDbId, selectedTableName]);
+  }, [pageSize, selectedDbId, selectedTableName]);
 
   useEffect(() => {
-    if (selectedTableName) {
+    if (workspaceMode === 'remote') {
+      if (selectedRemoteTable) {
+        lastLoadedTableRef.current = selectedRemoteTable;
+      }
+      return;
+    }
+
+    if (
+      selectedTableName &&
+      (selectedTableName !== lastLoadedTableRef.current || selectedDbId !== lastLoadedDbRef.current)
+    ) {
+      lastLoadedTableRef.current = selectedTableName;
+      lastLoadedDbRef.current = selectedDbId;
       handleRequestTableData(1);
     }
-  }, [selectedDbId, selectedTableName, handleRequestTableData]);
+  }, [workspaceMode, selectedRemoteTable, selectedTableName, selectedDbId, handleRequestTableData]);
 
   // 5. Query execution trigger
   const handleExecuteQuery = (query: string) => {
@@ -283,7 +308,7 @@ export function App() {
 
   return (
     <SplitLayout
-      onRefresh={() => handleRequestTableData(page)}
+      onRefresh={() => handleRequestTableData(useDatabaseStore.getState().page)}
       onRequestPage={(p) => handleRequestTableData(p)}
       onExecuteQuery={handleExecuteQuery}
       onUpdateRow={handleUpdateRow}

@@ -9,6 +9,7 @@ import { apiBridge } from '@/services/apiBridge';
 import { formatSqlIdentifier } from '@/features/playground/services/sqlIdentifier';
 import { useAdbStore } from './useAdbStore';
 import { useDatabaseStore } from './useDatabaseStore';
+import { useConnectionManagerStore } from './useConnectionManagerStore';
 import { telemetry } from '@/features/telemetry/telemetryService';
 
 export type PlaygroundTab = 'results' | 'plan' | 'profiler' | 'advisor' | 'history';
@@ -573,6 +574,51 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
   },
 
   loadExtendedSchema: async () => {
+    const isRemote = useConnectionManagerStore.getState().workspaceMode === 'remote';
+    if (isRemote) {
+      const activeSession = useConnectionManagerStore.getState().activeSession;
+      const remoteTables = useConnectionManagerStore.getState().remoteTables;
+      const curTableSchema = useConnectionManagerStore.getState().tableSchema;
+      const databases = useDatabaseStore.getState().databases;
+      const activeDb = databases[0];
+
+      if (remoteTables && remoteTables.length > 0) {
+        const tables = remoteTables.map((t) => {
+          if (curTableSchema && curTableSchema.name.toLowerCase() === t.name.toLowerCase()) {
+            return curTableSchema;
+          }
+          const matchDbTable = activeDb?.tables.find(
+            (dt) => dt.name.toLowerCase() === t.name.toLowerCase()
+          );
+          return {
+            tableName: t.name,
+            name: t.name,
+            schema: t.schema || 'public',
+            type: t.type || 'table',
+            rowCount: t.rowCount || 0,
+            columns: (t.columns && t.columns.length > 0 ? t.columns : matchDbTable?.columns || []).map((c: any) => ({
+              name: c.name,
+              type: c.type || 'TEXT',
+              isPrimaryKey: !!c.isPrimaryKey,
+              isNullable: !!c.isNullable,
+            })),
+            primaryKeys: [],
+            indexes: [],
+            foreignKeys: [],
+          };
+        });
+
+        set({
+          extendedSchema: {
+            databaseName: activeSession?.config.database || 'remote',
+            tables,
+            relations: [],
+          } as any,
+        });
+      }
+      return;
+    }
+
     const deviceId = useAdbStore.getState().selectedDeviceId;
     const packageName = useAdbStore.getState().selectedPackageName;
     const selectedDbId = useDatabaseStore.getState().selectedDatabaseId;
@@ -610,7 +656,15 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
     const startTime = performance.now();
 
     try {
-      const result = await useAdbStore.getState().executeQuery(sql);
+      const isRemote = useConnectionManagerStore.getState().workspaceMode === 'remote';
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let result: any = null;
+
+      if (isRemote) {
+        result = await useConnectionManagerStore.getState().executeRemoteQuery(sql);
+      } else {
+        result = await useAdbStore.getState().executeQuery(sql);
+      }
       const elapsed = performance.now() - startTime;
 
       if (result) {
@@ -618,20 +672,26 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
         const totalRowsEstimate = useDatabaseStore.getState().totalRows || rowsReturned || 1;
         const selectivity = Math.min(100, Math.round((rowsReturned / totalRowsEstimate) * 100));
 
+        const hasExplicitLimit = /\bLIMIT\s+\d+/i.test(sql);
+        const isSelectQuery = /^\s*SELECT\b/i.test(sql);
+        const defaultLimitApplied = Boolean(result.defaultLimitApplied) || (isSelectQuery && !hasExplicitLimit);
+
         const tabResult: QueryResultData = {
-          requestId: `adb_${Date.now()}`,
-          databaseId: useDatabaseStore.getState().selectedDatabaseId || '',
+          requestId: result.requestId || `query_${Date.now()}`,
+          databaseId: result.databaseId || useDatabaseStore.getState().selectedDatabaseId || '',
           query: sql,
-          columns: (result.columns || []).map((col: string) => ({
-            name: col,
-            type: 'TEXT',
-          })),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          columns: (result.columns || []).map((col: any) =>
+            typeof col === 'string'
+              ? { name: col, type: 'TEXT' }
+              : { name: col.name, type: col.type || 'TEXT' }
+          ),
           rows: result.rows || [],
           affected: result.affected || 0,
           durationMs: result.durationMs || elapsed,
           success: result.success,
           error: result.error,
-          defaultLimitApplied: Boolean(result.defaultLimitApplied),
+          defaultLimitApplied,
         };
 
         set((state) => ({
@@ -737,6 +797,32 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
   runDryRun: async (overrideSql) => {
     const sql = overrideSql || get().query;
     if (!sql.trim()) return;
+
+    const isRemote = useConnectionManagerStore.getState().workspaceMode === 'remote';
+    if (isRemote) {
+      const activeSession = useConnectionManagerStore.getState().activeSession;
+      if (!activeSession) return;
+
+      set({ isSimulating: true });
+      try {
+        const sim = await useConnectionManagerStore.getState().simulateRemoteQuery(sql);
+        set({ simulation: sim });
+      } catch (e: any) {
+        set({
+          simulation: {
+            query: sql,
+            isMutation: true,
+            affectedRows: 0,
+            durationMs: 0,
+            success: false,
+            error: e.message || 'Dry-run simulation failed',
+          },
+        });
+      } finally {
+        set({ isSimulating: false });
+      }
+      return;
+    }
 
     const deviceId = useAdbStore.getState().selectedDeviceId;
     const packageName = useAdbStore.getState().selectedPackageName;

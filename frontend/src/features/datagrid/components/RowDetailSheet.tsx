@@ -47,9 +47,19 @@ export function RowDetailSheet({ row, onClose, onUpdateRow, onDeleteRow }: RowDe
   const handleSave = () => {
     const updated: Record<string, unknown> = {};
     Object.entries(editValues).forEach(([k, v]) => {
+      if (k === pkField) return;
+
       const original = row[k];
+      const origStr =
+        typeof original === 'object' && original !== null
+          ? JSON.stringify(original)
+          : String(original ?? '');
+
+      if (origStr === v) return;
+
       if (typeof original === 'number') {
-        updated[k] = Number(v);
+        const num = Number(v);
+        updated[k] = isNaN(num) ? v : num;
       } else if (typeof original === 'boolean') {
         updated[k] = v.toLowerCase() === 'true';
       } else if (typeof original === 'object' && original !== null) {
@@ -58,12 +68,16 @@ export function RowDetailSheet({ row, onClose, onUpdateRow, onDeleteRow }: RowDe
         } catch {
           updated[k] = v;
         }
+      } else if ((original === null || original === undefined) && v === '') {
+        return;
       } else {
         updated[k] = v;
       }
     });
 
-    onUpdateRow?.(pkField, pkValue, updated);
+    if (Object.keys(updated).length > 0) {
+      onUpdateRow?.(pkField, pkValue, updated);
+    }
     setIsEditing(false);
   };
 

@@ -48,6 +48,7 @@ export function AutocompletePopup({
           return (
             <div
               key={`${item.type}_${item.label}_${idx}`}
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => onSelect(item)}
               className={`flex items-center justify-between gap-3 px-2.5 py-1.5 rounded-md cursor-pointer transition-colors ${
                 isSelected

@@ -1,10 +1,12 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { SplitLayout } from './components/layout/SplitLayout';
 import { useWailsEvent } from './hooks/useWailsEvent';
 import { EVENTS } from './constants/events';
 import { useConnectionStore } from './stores/useConnectionStore';
 import { useDatabaseStore } from './stores/useDatabaseStore';
 import { useAdbStore } from './stores/useAdbStore';
+import { useConnectionManagerStore } from './stores/useConnectionManagerStore';
+import { useStagedChangesStore } from './stores/useStagedChangesStore';
 import * as AppBindings from '../wailsjs/go/app/App';
 
 export function App() {
@@ -93,38 +95,89 @@ export function App() {
     setLatestQueryResult(result);
   });
 
-  // 4. Request table data on selection or page change
-  const handleRequestTableData = useCallback((targetPage = page) => {
-    if (!selectedTableName) return;
+  const lastLoadedTableRef = useRef<string | null>(null);
+  const lastLoadedDbRef = useRef<string | null>(null);
 
-    if (useAdbStore.getState().isAdbMode) {
-      useAdbStore.getState().loadTableData(selectedTableName, targetPage, pageSize);
+  const selectedRemoteTable = useConnectionManagerStore((s) => s.selectedTable);
+  const workspaceMode = useConnectionManagerStore((s) => s.workspaceMode);
+  const activeTable = workspaceMode === 'remote' ? (selectedRemoteTable || selectedTableName) : selectedTableName;
+
+  // 4. Request table data on selection or page change
+  const handleRequestTableData = useCallback((targetPage?: number) => {
+    const isRemote = useConnectionManagerStore.getState().workspaceMode === 'remote';
+    const remoteActiveTable = useConnectionManagerStore.getState().selectedTable;
+    const currentTable = isRemote ? (remoteActiveTable || selectedTableName) : selectedTableName;
+    const currentPage = useDatabaseStore.getState().page;
+    const effectivePage = targetPage !== undefined ? targetPage : currentPage;
+
+    if (!currentTable) return;
+
+    if (isRemote) {
+      const activeSession = useConnectionManagerStore.getState().activeSession;
+      if (activeSession) {
+        useConnectionManagerStore.getState().loadTableData(currentTable, effectivePage, pageSize);
+      }
       return;
     }
 
-    if (selectedDbId && selectedTableName) {
+    if (useAdbStore.getState().isAdbMode) {
+      const adbDbs = useDatabaseStore.getState().databases;
+      const isValid = adbDbs.some((db) => db.tables.some((t) => t.name.toLowerCase() === currentTable.toLowerCase()));
+      if (!isValid) return;
+      useAdbStore.getState().loadTableData(currentTable, effectivePage, pageSize);
+      return;
+    }
+
+    if (selectedDbId && currentTable) {
       try {
         if (
           typeof window !== 'undefined' &&
           // @ts-expect-error window.go may be undefined
           window?.go?.app?.App?.RequestTableData
         ) {
-          AppBindings.RequestTableData(selectedDbId, selectedTableName, targetPage, pageSize);
+          AppBindings.RequestTableData(selectedDbId, currentTable, effectivePage, pageSize);
         }
       } catch {
         // Safe fallback
       }
     }
-  }, [page, pageSize, selectedDbId, selectedTableName]);
+  }, [pageSize, selectedDbId, selectedTableName]);
+
+  // Clear last loaded references on mode switch so stale tables are not loaded
+  useEffect(() => {
+    lastLoadedTableRef.current = null;
+    lastLoadedDbRef.current = null;
+  }, [workspaceMode]);
 
   useEffect(() => {
-    if (selectedTableName) {
-      handleRequestTableData(1);
+    if (workspaceMode === 'remote') {
+      if (selectedRemoteTable) {
+        lastLoadedTableRef.current = selectedRemoteTable;
+      }
+      return;
     }
-  }, [selectedDbId, selectedTableName, handleRequestTableData]);
+
+    if (
+      selectedTableName &&
+      (selectedTableName !== lastLoadedTableRef.current || selectedDbId !== lastLoadedDbRef.current)
+    ) {
+      const adbDbs = useDatabaseStore.getState().databases;
+      const isValid = adbDbs.some((db) => db.tables.some((t) => t.name.toLowerCase() === selectedTableName.toLowerCase()));
+      if (isValid) {
+        lastLoadedTableRef.current = selectedTableName;
+        lastLoadedDbRef.current = selectedDbId;
+        handleRequestTableData(1);
+      }
+    }
+  }, [workspaceMode, selectedRemoteTable, selectedTableName, selectedDbId, handleRequestTableData]);
 
   // 5. Query execution trigger
   const handleExecuteQuery = (query: string) => {
+    if (useConnectionManagerStore.getState().workspaceMode === 'remote') {
+      useConnectionManagerStore.getState().executeRemoteQuery(query);
+      return;
+    }
+
     if (useAdbStore.getState().isAdbMode) {
       useAdbStore.getState().executeQuery(query);
       return;
@@ -148,6 +201,26 @@ export function App() {
   // 6. Data Editing / Mutation from Desktop
   const handleUpdateRow = (pkField: string, pkValue: unknown, newValues: Record<string, unknown>) => {
     if (!selectedTableName) return;
+
+    if (useConnectionManagerStore.getState().workspaceMode === 'remote') {
+      const selectedSchema = useConnectionManagerStore.getState().selectedSchema || 'public';
+      const rows = useDatabaseStore.getState().rows;
+      const currentRow = rows.find((r) => r[pkField] === pkValue);
+      Object.entries(newValues).forEach(([col, newVal]) => {
+        const oldVal = currentRow ? currentRow[col] : undefined;
+        useStagedChangesStore.getState().stageCellUpdate(
+          selectedSchema,
+          selectedTableName,
+          pkField,
+          pkValue,
+          col,
+          oldVal,
+          newVal
+        );
+      });
+      updateRowLocally(pkField, pkValue, newValues);
+      return;
+    }
 
     if (useAdbStore.getState().isAdbMode) {
       useAdbStore.getState().updateRow(selectedTableName, { [pkField]: pkValue }, newValues);
@@ -196,6 +269,21 @@ export function App() {
   const handleDeleteRow = (pkField: string, pkValue: unknown) => {
     if (!selectedTableName) return;
 
+    if (useConnectionManagerStore.getState().workspaceMode === 'remote') {
+      const selectedSchema = useConnectionManagerStore.getState().selectedSchema || 'public';
+      const rows = useDatabaseStore.getState().rows;
+      const currentRow = rows.find((r) => r[pkField] === pkValue);
+      useStagedChangesStore.getState().stageRowDelete(
+        selectedSchema,
+        selectedTableName,
+        pkField,
+        pkValue,
+        currentRow
+      );
+      deleteRowLocally(pkField, pkValue);
+      return;
+    }
+
     if (useAdbStore.getState().isAdbMode) {
       useAdbStore.getState().deleteRow(selectedTableName, { [pkField]: pkValue });
       return;
@@ -233,7 +321,7 @@ export function App() {
 
   return (
     <SplitLayout
-      onRefresh={() => handleRequestTableData(page)}
+      onRefresh={() => handleRequestTableData(useDatabaseStore.getState().page)}
       onRequestPage={(p) => handleRequestTableData(p)}
       onExecuteQuery={handleExecuteQuery}
       onUpdateRow={handleUpdateRow}

@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { SimulationResult } from '@/types/database';
 import { formatDuration } from '@/lib/formatters';
 import { CellRenderer } from '@/features/datagrid/components/CellRenderer';
+import { useConnectionManagerStore } from '@/stores/useConnectionManagerStore';
 
 interface DryRunModalProps {
   isOpen: boolean;
@@ -14,6 +15,8 @@ interface DryRunModalProps {
 }
 
 export function DryRunModal({ isOpen, onClose, simulation, onCommit }: DryRunModalProps) {
+  const isRemote = useConnectionManagerStore((s) => s.workspaceMode === 'remote');
+
   if (!isOpen || !simulation) return null;
 
   const isDestructive =
@@ -52,7 +55,7 @@ export function DryRunModal({ isOpen, onClose, simulation, onCommit }: DryRunMod
             <span>Sandbox Rollback Simulation Complete</span>
           </div>
           <p className="text-[11px] text-muted-foreground font-sans">
-            This statement was executed inside an isolated SQLite transaction. Changes were inspected and immediately rolled back. Your mobile device database remains untouched.
+            This statement was executed inside an isolated transaction sandbox. Changes were inspected and immediately rolled back. {isRemote ? 'Your remote database' : 'Your mobile device database'} remains untouched.
           </p>
 
           {noWhereClause && (
@@ -133,7 +136,7 @@ export function DryRunModal({ isOpen, onClose, simulation, onCommit }: DryRunMod
             className="h-8 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium shadow-sm"
           >
             <Play className="size-3 fill-white" />
-            <span>Commit & Apply to Device</span>
+            <span>{isRemote ? 'Commit & Apply to Remote DB' : 'Commit & Apply to Device'}</span>
           </Button>
         </div>
       </div>

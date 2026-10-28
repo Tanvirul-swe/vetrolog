@@ -3,6 +3,7 @@
 import {adb} from '../models';
 import {updater} from '../models';
 import {models} from '../models';
+import {types} from '../models';
 
 export function AdbCreateIndex(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
 
@@ -34,6 +35,10 @@ export function CancelUpdate():Promise<void>;
 
 export function CheckForUpdate():Promise<updater.UpdateInfo>;
 
+export function CloseConnection(arg1:string):Promise<void>;
+
+export function DeleteConnection(arg1:string):Promise<void>;
+
 export function DeleteRow(arg1:string,arg2:string,arg3:string):Promise<boolean>;
 
 export function DisconnectActiveDevice():Promise<boolean>;
@@ -44,15 +49,55 @@ export function GetConnectionState():Promise<models.ConnectionState>;
 
 export function GetLocalIPAddresses():Promise<Array<string>>;
 
+export function GetSavedConnection(arg1:string):Promise<string>;
+
 export function GetTelemetryStatus():Promise<Record<string, any>>;
+
+export function ListSavedConnections():Promise<Array<types.ConnectionSummary>>;
+
+export function OpenConnection(arg1:string):Promise<types.ConnectionSession>;
+
+export function OpenLocalSQLiteFile(arg1:string):Promise<types.ConnectionSession>;
+
+export function RedisDel(arg1:string,arg2:string):Promise<void>;
+
+export function RedisGet(arg1:string,arg2:string):Promise<types.RedisValueResult>;
+
+export function RedisScan(arg1:string,arg2:string,arg3:number,arg4:number):Promise<types.RedisScanResult>;
+
+export function RedisSet(arg1:string,arg2:string,arg3:string,arg4:string,arg5:number):Promise<void>;
+
+export function RemoteApplyPendingChanges(arg1:string,arg2:string):Promise<types.ChangeResult>;
+
+export function RemoteExecuteQuery(arg1:string,arg2:string,arg3:number):Promise<types.QueryResult>;
+
+export function RemoteExplainQuery(arg1:string,arg2:string):Promise<types.QueryPlanResult>;
+
+export function RemoteGetTableData(arg1:string,arg2:string,arg3:string,arg4:number,arg5:number,arg6:string,arg7:string,arg8:string):Promise<types.TableDataResult>;
+
+export function RemoteGetTableSchema(arg1:string,arg2:string,arg3:string,arg4:string):Promise<types.ExtendedTableSchema>;
+
+export function RemoteListDatabases(arg1:string):Promise<Array<string>>;
+
+export function RemoteListSchemas(arg1:string,arg2:string):Promise<Array<string>>;
+
+export function RemoteListTables(arg1:string,arg2:string,arg3:string):Promise<Array<types.TableSummary>>;
+
+export function RemoteSimulateQuery(arg1:string,arg2:string):Promise<types.SimulationResult>;
 
 export function RequestTableData(arg1:string,arg2:string,arg3:number,arg4:number):Promise<boolean>;
 
+export function SaveConnection(arg1:string):Promise<types.ConnectionSummary>;
+
 export function SaveExportFile(arg1:string,arg2:string,arg3:string):Promise<string>;
+
+export function SelectLocalSQLiteDialog():Promise<string>;
 
 export function SetTelemetryEnabled(arg1:boolean):Promise<boolean>;
 
 export function StartDownloadUpdate(arg1:string,arg2:string):Promise<void>;
+
+export function TestConnection(arg1:string):Promise<types.ConnectionTestResult>;
 
 export function TrackTelemetryEvent(arg1:string,arg2:string):Promise<boolean>;
 

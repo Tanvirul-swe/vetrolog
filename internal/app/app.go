@@ -6,6 +6,7 @@ import (
 
 	"vetrolog/internal/broadcaster"
 	"vetrolog/internal/config"
+	"vetrolog/internal/db"
 	"vetrolog/internal/discovery"
 	"vetrolog/internal/server"
 	"vetrolog/internal/telemetry"
@@ -23,6 +24,7 @@ type App struct {
 	mdns        *discovery.MDNSService
 	updater     *updater.Service
 	telemetry   *telemetry.Service
+	dbManager   *db.ConnectionManager
 }
 
 // NewApp creates a new App struct with initialized subsystems
@@ -33,6 +35,7 @@ func NewApp() *App {
 	srv := server.NewServer(cfg, b, batcher)
 	upd := updater.NewService()
 	tel := telemetry.NewService("desktop")
+	dbMgr, _ := db.NewConnectionManager()
 
 	return &App{
 		config:      cfg,
@@ -41,5 +44,6 @@ func NewApp() *App {
 		server:      srv,
 		updater:     upd,
 		telemetry:   tel,
+		dbManager:   dbMgr,
 	}
 }

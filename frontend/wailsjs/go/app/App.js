@@ -62,6 +62,14 @@ export function CheckForUpdate() {
   return window['go']['app']['App']['CheckForUpdate']();
 }
 
+export function CloseConnection(arg1) {
+  return window['go']['app']['App']['CloseConnection'](arg1);
+}
+
+export function DeleteConnection(arg1) {
+  return window['go']['app']['App']['DeleteConnection'](arg1);
+}
+
 export function DeleteRow(arg1, arg2, arg3) {
   return window['go']['app']['App']['DeleteRow'](arg1, arg2, arg3);
 }
@@ -82,16 +90,92 @@ export function GetLocalIPAddresses() {
   return window['go']['app']['App']['GetLocalIPAddresses']();
 }
 
+export function GetSavedConnection(arg1) {
+  return window['go']['app']['App']['GetSavedConnection'](arg1);
+}
+
 export function GetTelemetryStatus() {
   return window['go']['app']['App']['GetTelemetryStatus']();
+}
+
+export function ListSavedConnections() {
+  return window['go']['app']['App']['ListSavedConnections']();
+}
+
+export function OpenConnection(arg1) {
+  return window['go']['app']['App']['OpenConnection'](arg1);
+}
+
+export function OpenLocalSQLiteFile(arg1) {
+  return window['go']['app']['App']['OpenLocalSQLiteFile'](arg1);
+}
+
+export function RedisDel(arg1, arg2) {
+  return window['go']['app']['App']['RedisDel'](arg1, arg2);
+}
+
+export function RedisGet(arg1, arg2) {
+  return window['go']['app']['App']['RedisGet'](arg1, arg2);
+}
+
+export function RedisScan(arg1, arg2, arg3, arg4) {
+  return window['go']['app']['App']['RedisScan'](arg1, arg2, arg3, arg4);
+}
+
+export function RedisSet(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['app']['App']['RedisSet'](arg1, arg2, arg3, arg4, arg5);
+}
+
+export function RemoteApplyPendingChanges(arg1, arg2) {
+  return window['go']['app']['App']['RemoteApplyPendingChanges'](arg1, arg2);
+}
+
+export function RemoteExecuteQuery(arg1, arg2, arg3) {
+  return window['go']['app']['App']['RemoteExecuteQuery'](arg1, arg2, arg3);
+}
+
+export function RemoteExplainQuery(arg1, arg2) {
+  return window['go']['app']['App']['RemoteExplainQuery'](arg1, arg2);
+}
+
+export function RemoteGetTableData(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8) {
+  return window['go']['app']['App']['RemoteGetTableData'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+}
+
+export function RemoteGetTableSchema(arg1, arg2, arg3, arg4) {
+  return window['go']['app']['App']['RemoteGetTableSchema'](arg1, arg2, arg3, arg4);
+}
+
+export function RemoteListDatabases(arg1) {
+  return window['go']['app']['App']['RemoteListDatabases'](arg1);
+}
+
+export function RemoteListSchemas(arg1, arg2) {
+  return window['go']['app']['App']['RemoteListSchemas'](arg1, arg2);
+}
+
+export function RemoteListTables(arg1, arg2, arg3) {
+  return window['go']['app']['App']['RemoteListTables'](arg1, arg2, arg3);
+}
+
+export function RemoteSimulateQuery(arg1, arg2) {
+  return window['go']['app']['App']['RemoteSimulateQuery'](arg1, arg2);
 }
 
 export function RequestTableData(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['RequestTableData'](arg1, arg2, arg3, arg4);
 }
 
+export function SaveConnection(arg1) {
+  return window['go']['app']['App']['SaveConnection'](arg1);
+}
+
 export function SaveExportFile(arg1, arg2, arg3) {
   return window['go']['app']['App']['SaveExportFile'](arg1, arg2, arg3);
+}
+
+export function SelectLocalSQLiteDialog() {
+  return window['go']['app']['App']['SelectLocalSQLiteDialog']();
 }
 
 export function SetTelemetryEnabled(arg1) {
@@ -100,6 +184,10 @@ export function SetTelemetryEnabled(arg1) {
 
 export function StartDownloadUpdate(arg1, arg2) {
   return window['go']['app']['App']['StartDownloadUpdate'](arg1, arg2);
+}
+
+export function TestConnection(arg1) {
+  return window['go']['app']['App']['TestConnection'](arg1);
 }
 
 export function TrackTelemetryEvent(arg1, arg2) {

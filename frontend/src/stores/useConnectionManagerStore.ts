@@ -214,7 +214,12 @@ export const useConnectionManagerStore = create<ConnectionManagerState>((set, ge
                 name: t.name,
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 type: (t.type === 'VIEW' ? 'view' : 'table') as any,
-                columns: [],
+                columns: (t.columns || []).map((col) => ({
+                  name: col.name,
+                  type: col.type || 'TEXT',
+                  isPrimaryKey: !!col.isPrimaryKey,
+                  isNullable: !!col.isNullable,
+                })),
                 rowCount: t.rowCount,
               })),
               sizeBytes: 0,
@@ -310,7 +315,12 @@ export const useConnectionManagerStore = create<ConnectionManagerState>((set, ge
               name: t.name,
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               type: (t.type === 'VIEW' ? 'view' : 'table') as any,
-              columns: [],
+              columns: (t.columns || []).map((col) => ({
+                name: col.name,
+                type: col.type || 'TEXT',
+                isPrimaryKey: !!col.isPrimaryKey,
+                isNullable: !!col.isNullable,
+              })),
               rowCount: t.rowCount,
             })),
             sizeBytes: 0,
@@ -357,7 +367,32 @@ export const useConnectionManagerStore = create<ConnectionManagerState>((set, ge
       set({ remoteSchemas: schemas || [defaultSchema], selectedSchema: defaultSchema });
 
       const tables = await AppBindings.RemoteListTables(session.sessionId, dbName, defaultSchema);
-      set({ remoteTables: (tables as unknown as TableSummary[]) || [] });
+      const rawTables = (tables as unknown as TableSummary[]) || [];
+      set({ remoteTables: rawTables });
+
+      useDatabaseStore.getState().setDatabases([
+        {
+          id: dbName,
+          name: session.config.name,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          type: session.config.engine === 'sqlite' ? 'sqlite' : (session.config.engine as any),
+          path: session.config.filePath || `${session.config.host}:${session.config.port}`,
+          tables: rawTables.map((t) => ({
+            name: t.name,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            type: (t.type === 'VIEW' ? 'view' : 'table') as any,
+            columns: (t.columns || []).map((col) => ({
+              name: col.name,
+              type: col.type || 'TEXT',
+              isPrimaryKey: !!col.isPrimaryKey,
+              isNullable: !!col.isNullable,
+            })),
+            rowCount: t.rowCount,
+          })),
+          sizeBytes: 0,
+          updatedAt: Date.now(),
+        },
+      ]);
 
       if (tables && tables.length > 0) {
         await get().selectTable(tables[0].name);
@@ -376,7 +411,32 @@ export const useConnectionManagerStore = create<ConnectionManagerState>((set, ge
 
     try {
       const tables = await AppBindings.RemoteListTables(session.sessionId, get().selectedDatabase, schemaName);
-      set({ remoteTables: (tables as unknown as TableSummary[]) || [] });
+      const rawTables = (tables as unknown as TableSummary[]) || [];
+      set({ remoteTables: rawTables });
+
+      useDatabaseStore.getState().setDatabases([
+        {
+          id: get().selectedDatabase || 'remote',
+          name: session.config.name,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          type: session.config.engine === 'sqlite' ? 'sqlite' : (session.config.engine as any),
+          path: session.config.filePath || `${session.config.host}:${session.config.port}`,
+          tables: rawTables.map((t) => ({
+            name: t.name,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            type: (t.type === 'VIEW' ? 'view' : 'table') as any,
+            columns: (t.columns || []).map((col) => ({
+              name: col.name,
+              type: col.type || 'TEXT',
+              isPrimaryKey: !!col.isPrimaryKey,
+              isNullable: !!col.isNullable,
+            })),
+            rowCount: t.rowCount,
+          })),
+          sizeBytes: 0,
+          updatedAt: Date.now(),
+        },
+      ]);
 
       if (tables && tables.length > 0) {
         await get().selectTable(tables[0].name);
@@ -490,21 +550,47 @@ export const useConnectionManagerStore = create<ConnectionManagerState>((set, ge
           })),
         };
         set({ tableSchema: normalized });
+
+        // Sync columns to useDatabaseStore for this specific table
+        const currentDbs = useDatabaseStore.getState().databases;
+        if (currentDbs && currentDbs.length > 0) {
+          const updatedDbs = currentDbs.map((db) => ({
+            ...db,
+            tables: db.tables.map((t) =>
+              t.name.toLowerCase() === tableName.toLowerCase()
+                ? {
+                    ...t,
+                    columns: normalized.columns.map((c) => ({
+                      name: c.name,
+                      type: c.type || 'TEXT',
+                      isPrimaryKey: c.isPrimaryKey,
+                      isNullable: c.isNullable,
+                    })),
+                  }
+                : t
+            ),
+          }));
+          useDatabaseStore.getState().setDatabases(updatedDbs);
+        }
       }
     } catch {
       // Ignored
     }
   },
 
-  executeRemoteQuery: async (query: string, maxRows = 1000) => {
+  executeRemoteQuery: async (query: string, maxRows = 100) => {
     const session = get().activeSession;
     if (!session) return null;
 
     try {
       const res = await AppBindings.RemoteExecuteQuery(session.sessionId, query, maxRows);
-      return res as unknown as QueryResult;
+      const typed = res as unknown as QueryResult;
+      if (typed) {
+        useDatabaseStore.getState().setLatestQueryResult(typed);
+      }
+      return typed;
     } catch (err) {
-      return {
+      const errRes: QueryResult = {
         requestId: `req_${Date.now()}`,
         databaseId: session.config.database || 'remote',
         query,
@@ -515,6 +601,8 @@ export const useConnectionManagerStore = create<ConnectionManagerState>((set, ge
         success: false,
         error: String(err),
       };
+      useDatabaseStore.getState().setLatestQueryResult(errRes);
+      return errRes;
     }
   },
 
@@ -523,7 +611,17 @@ export const useConnectionManagerStore = create<ConnectionManagerState>((set, ge
     if (!session) return null;
 
     try {
-      const res = await AppBindings.RemoteApplyPendingChanges(session.sessionId, changesJSON);
+      let payload = changesJSON;
+      try {
+        const parsed = JSON.parse(changesJSON);
+        if (Array.isArray(parsed)) {
+          payload = JSON.stringify({ changes: parsed });
+        }
+      } catch {
+        // use raw changesJSON
+      }
+
+      const res = await AppBindings.RemoteApplyPendingChanges(session.sessionId, payload);
       return res as unknown as ChangeResult;
     } catch (err) {
       return {

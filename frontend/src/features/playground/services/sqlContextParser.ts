@@ -185,3 +185,117 @@ export function filterTableColumns(
     return aLow.localeCompare(bLow);
   });
 }
+
+/**
+ * Extracts all table names referenced in FROM, JOIN, UPDATE, or INTO clauses.
+ * Handles aliases, quotes, commas, multiline queries, and SELECT* without spaces.
+ */
+export function extractReferencedTables(sql: string): string[] {
+  if (!sql) return [];
+  const tableNames = new Set<string>();
+
+  // 1. Match FROM/JOIN/UPDATE/INTO <table> [[AS] <alias>]
+  const regex = /\b(?:FROM|JOIN|UPDATE|INTO)\s+(["`[a-zA-Z0-9_\]`"]+)/gi;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(sql)) !== null) {
+    const rawTable = match[1];
+    const cleanTable = rawTable.replace(/["`[\]]/g, '').trim();
+    if (cleanTable && !NON_ALIAS_KEYWORDS.has(cleanTable.toUpperCase())) {
+      tableNames.add(cleanTable.toLowerCase());
+    }
+  }
+
+  // 2. Also match comma-separated FROM table1, table2
+  const fromMatch = sql.match(/\bFROM\s+([^;]+?)(?:\s+(?:WHERE|JOIN|GROUP|ORDER|LIMIT|HAVING|UNION)|$)/i);
+  if (fromMatch) {
+    const parts = fromMatch[1].split(',');
+    for (const part of parts) {
+      const trimmed = part.trim();
+      const firstTokenMatch = trimmed.match(/^(["`[a-zA-Z0-9_\]`"]+)/);
+      if (firstTokenMatch) {
+        const cleanT = firstTokenMatch[1].replace(/["`[\]]/g, '').trim();
+        if (cleanT && !NON_ALIAS_KEYWORDS.has(cleanT.toUpperCase())) {
+          tableNames.add(cleanT.toLowerCase());
+        }
+      }
+    }
+  }
+
+  return Array.from(tableNames);
+}
+
+export type ClauseType =
+  | 'WHERE'
+  | 'SELECT'
+  | 'FROM'
+  | 'JOIN'
+  | 'ORDER_BY'
+  | 'GROUP_BY'
+  | 'HAVING'
+  | 'SET'
+  | 'ON'
+  | 'NONE';
+
+export interface SqlClauseContext {
+  isFromOrJoin: boolean;
+  isColumnClause: boolean;
+  clauseType: ClauseType;
+  currentWord: string;
+}
+
+/**
+ * Detects the active SQL clause at cursor position.
+ * Distinguishes whether the user is typing table names (FROM/JOIN) or column names (WHERE/SELECT/ORDER BY/etc.).
+ */
+export function detectSqlClauseContext(textBeforeCursor: string): SqlClauseContext {
+  if (!textBeforeCursor) {
+    return { isFromOrJoin: false, isColumnClause: false, clauseType: 'NONE', currentWord: '' };
+  }
+
+  const lastWordMatch = textBeforeCursor.match(/([a-zA-Z0-9_]+)$/);
+  const currentWord = lastWordMatch ? lastWordMatch[1].toLowerCase() : '';
+
+  // 1. Check FROM / JOIN context (e.g. "FROM ", "FROM users", "JOIN ", "JOIN orders")
+  const isFromOrJoin = /(?:FROM|JOIN|INTO|UPDATE)\s+([a-zA-Z0-9_]*)$/i.test(textBeforeCursor);
+  if (isFromOrJoin) {
+    const isJoin = /JOIN\s+([a-zA-Z0-9_]*)$/i.test(textBeforeCursor);
+    return {
+      isFromOrJoin: true,
+      isColumnClause: false,
+      clauseType: isJoin ? 'JOIN' : 'FROM',
+      currentWord,
+    };
+  }
+
+  // 2. Column-heavy clauses:
+  // WHERE, HAVING, AND, OR
+  if (/(?:WHERE|HAVING)\s+([^;]*)$/i.test(textBeforeCursor)) {
+    return { isFromOrJoin: false, isColumnClause: true, clauseType: 'WHERE', currentWord };
+  }
+  if (/\b(?:AND|OR)\s+([a-zA-Z0-9_]*)$/i.test(textBeforeCursor)) {
+    return { isFromOrJoin: false, isColumnClause: true, clauseType: 'WHERE', currentWord };
+  }
+  if (/\bON\s+([a-zA-Z0-9_.]*)$/i.test(textBeforeCursor)) {
+    return { isFromOrJoin: false, isColumnClause: true, clauseType: 'ON', currentWord };
+  }
+  if (/\bSET\s+([^;]*)$/i.test(textBeforeCursor)) {
+    return { isFromOrJoin: false, isColumnClause: true, clauseType: 'SET', currentWord };
+  }
+  if (/ORDER\s+BY\s+([^;]*)$/i.test(textBeforeCursor)) {
+    return { isFromOrJoin: false, isColumnClause: true, clauseType: 'ORDER_BY', currentWord };
+  }
+  if (/GROUP\s+BY\s+([^;]*)$/i.test(textBeforeCursor)) {
+    return { isFromOrJoin: false, isColumnClause: true, clauseType: 'GROUP_BY', currentWord };
+  }
+
+  // SELECT list (between SELECT and FROM, e.g. "SELECT ", "SELECT id, ")
+  const lastSelectIdx = textBeforeCursor.toUpperCase().lastIndexOf('SELECT');
+  if (lastSelectIdx !== -1) {
+    const textAfterSelect = textBeforeCursor.slice(lastSelectIdx);
+    if (!/\bFROM\b/i.test(textAfterSelect)) {
+      return { isFromOrJoin: false, isColumnClause: true, clauseType: 'SELECT', currentWord };
+    }
+  }
+
+  return { isFromOrJoin: false, isColumnClause: false, clauseType: 'NONE', currentWord };
+}

@@ -574,6 +574,51 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
   },
 
   loadExtendedSchema: async () => {
+    const isRemote = useConnectionManagerStore.getState().workspaceMode === 'remote';
+    if (isRemote) {
+      const activeSession = useConnectionManagerStore.getState().activeSession;
+      const remoteTables = useConnectionManagerStore.getState().remoteTables;
+      const curTableSchema = useConnectionManagerStore.getState().tableSchema;
+      const databases = useDatabaseStore.getState().databases;
+      const activeDb = databases[0];
+
+      if (remoteTables && remoteTables.length > 0) {
+        const tables = remoteTables.map((t) => {
+          if (curTableSchema && curTableSchema.name.toLowerCase() === t.name.toLowerCase()) {
+            return curTableSchema;
+          }
+          const matchDbTable = activeDb?.tables.find(
+            (dt) => dt.name.toLowerCase() === t.name.toLowerCase()
+          );
+          return {
+            tableName: t.name,
+            name: t.name,
+            schema: t.schema || 'public',
+            type: t.type || 'table',
+            rowCount: t.rowCount || 0,
+            columns: (t.columns && t.columns.length > 0 ? t.columns : matchDbTable?.columns || []).map((c: any) => ({
+              name: c.name,
+              type: c.type || 'TEXT',
+              isPrimaryKey: !!c.isPrimaryKey,
+              isNullable: !!c.isNullable,
+            })),
+            primaryKeys: [],
+            indexes: [],
+            foreignKeys: [],
+          };
+        });
+
+        set({
+          extendedSchema: {
+            databaseName: activeSession?.config.database || 'remote',
+            tables,
+            relations: [],
+          } as any,
+        });
+      }
+      return;
+    }
+
     const deviceId = useAdbStore.getState().selectedDeviceId;
     const packageName = useAdbStore.getState().selectedPackageName;
     const selectedDbId = useDatabaseStore.getState().selectedDatabaseId;
@@ -627,6 +672,10 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
         const totalRowsEstimate = useDatabaseStore.getState().totalRows || rowsReturned || 1;
         const selectivity = Math.min(100, Math.round((rowsReturned / totalRowsEstimate) * 100));
 
+        const hasExplicitLimit = /\bLIMIT\s+\d+/i.test(sql);
+        const isSelectQuery = /^\s*SELECT\b/i.test(sql);
+        const defaultLimitApplied = Boolean(result.defaultLimitApplied) || (isSelectQuery && !hasExplicitLimit);
+
         const tabResult: QueryResultData = {
           requestId: result.requestId || `query_${Date.now()}`,
           databaseId: result.databaseId || useDatabaseStore.getState().selectedDatabaseId || '',
@@ -642,7 +691,7 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
           durationMs: result.durationMs || elapsed,
           success: result.success,
           error: result.error,
-          defaultLimitApplied: Boolean(result.defaultLimitApplied),
+          defaultLimitApplied,
         };
 
         set((state) => ({

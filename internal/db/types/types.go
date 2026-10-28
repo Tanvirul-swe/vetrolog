@@ -1,6 +1,10 @@
 package types
 
-import "time"
+import (
+	"encoding/json"
+	"fmt"
+	"time"
+)
 
 // EngineType represents the database engine
 type EngineType string
@@ -86,11 +90,12 @@ type ConnectionSession struct {
 
 // TableSummary describes a table, view, or collection
 type TableSummary struct {
-	Name      string `json:"name"`
-	Schema    string `json:"schema"`
-	Type      string `json:"type"` // "table" | "view" | "materialized_view" | "key"
-	RowCount  int64  `json:"rowCount"`
-	SizeBytes int64  `json:"sizeBytes,omitempty"`
+	Name      string       `json:"name"`
+	Schema    string       `json:"schema"`
+	Type      string       `json:"type"` // "table" | "view" | "materialized_view" | "key"
+	RowCount  int64        `json:"rowCount"`
+	SizeBytes int64        `json:"sizeBytes,omitempty"`
+	Columns   []ColumnInfo `json:"columns,omitempty"`
 }
 
 // ColumnInfo holds details about a specific table column
@@ -161,14 +166,15 @@ type TableDataResult struct {
 
 // QueryResult represents executed SQL outcome
 type QueryResult struct {
-	RequestID  string                   `json:"requestId"`
-	Query      string                   `json:"query"`
-	Columns    []ColumnInfo             `json:"columns"`
-	Rows       []map[string]interface{} `json:"rows"`
-	Affected   int64                    `json:"affected"`
-	DurationMs float64                  `json:"durationMs"`
-	Success    bool                     `json:"success"`
-	Error      string                   `json:"error,omitempty"`
+	RequestID           string                   `json:"requestId"`
+	Query               string                   `json:"query"`
+	Columns             []ColumnInfo             `json:"columns"`
+	Rows                []map[string]interface{} `json:"rows"`
+	Affected            int64                    `json:"affected"`
+	DurationMs          float64                  `json:"durationMs"`
+	Success             bool                     `json:"success"`
+	Error               string                   `json:"error,omitempty"`
+	DefaultLimitApplied bool                     `json:"defaultLimitApplied,omitempty"`
 }
 
 // PendingChangeType signifies the kind of mutation
@@ -193,6 +199,26 @@ type PendingChange struct {
 // PendingChanges payload for atomic transaction commit
 type PendingChanges struct {
 	Changes []PendingChange `json:"changes"`
+}
+
+// UnmarshalJSON supports unmarshaling both { "changes": [...] } and direct array [ ... ]
+func (p *PendingChanges) UnmarshalJSON(data []byte) error {
+	// 1. Try unmarshaling as object with "changes" field
+	type Alias PendingChanges
+	var aux Alias
+	if err := json.Unmarshal(data, &aux); err == nil && aux.Changes != nil {
+		p.Changes = aux.Changes
+		return nil
+	}
+
+	// 2. Try unmarshaling as direct array []PendingChange
+	var list []PendingChange
+	if err := json.Unmarshal(data, &list); err == nil {
+		p.Changes = list
+		return nil
+	}
+
+	return fmt.Errorf("cannot unmarshal JSON into PendingChanges: expected JSON array or object with 'changes'")
 }
 
 // ChangeResult returns results of committed batch

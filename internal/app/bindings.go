@@ -462,7 +462,13 @@ func (a *App) RemoteApplyPendingChanges(sessionID string, changesJSON string) (*
 	}
 	var changes types.PendingChanges
 	if err := json.Unmarshal([]byte(changesJSON), &changes); err != nil {
-		return nil, fmt.Errorf("invalid pending changes json: %w", err)
+		// Explicit fallback: check if caller sent raw []types.PendingChange
+		var changeList []types.PendingChange
+		if err2 := json.Unmarshal([]byte(changesJSON), &changeList); err2 == nil {
+			changes = types.PendingChanges{Changes: changeList}
+		} else {
+			return nil, fmt.Errorf("invalid pending changes json: %w", err)
+		}
 	}
 	res, err := session.Engine.ApplyPendingChanges(context.Background(), changes)
 	if err == nil && a.telemetry != nil {

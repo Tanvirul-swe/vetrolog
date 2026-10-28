@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -149,6 +150,9 @@ func TestLocalSQLiteEngineOperations(t *testing.T) {
 	if tables[0].RowCount != 3 {
 		t.Fatalf("Expected 3 rows, got %d", tables[0].RowCount)
 	}
+	if len(tables[0].Columns) == 0 {
+		t.Fatalf("Expected table 'users' to have columns populated, got 0")
+	}
 
 	// 2. Test GetTableData
 	data, err := active.Engine.GetTableData(ctx, types.TableDataRequest{
@@ -192,6 +196,17 @@ func TestLocalSQLiteEngineOperations(t *testing.T) {
 	if len(queryRes.Rows) != 1 || queryRes.Rows[0]["username"] != "alice_updated" {
 		t.Fatalf("Expected alice_updated, got %v", queryRes.Rows[0]["username"])
 	}
+	if !queryRes.DefaultLimitApplied {
+		t.Fatalf("Expected DefaultLimitApplied to be true for query without explicit limit")
+	}
+
+	queryWithLimit, err := active.Engine.ExecuteQuery(ctx, "SELECT username FROM users LIMIT 10;", 10)
+	if err != nil || !queryWithLimit.Success {
+		t.Fatalf("ExecuteQuery with limit failed: %v", err)
+	}
+	if queryWithLimit.DefaultLimitApplied {
+		t.Fatalf("Expected DefaultLimitApplied to be false for query with explicit LIMIT")
+	}
 
 	// Close session
 	if err := mgr.CloseConnection(session.SessionID); err != nil {
@@ -210,4 +225,26 @@ func searchSub(s, sub string) bool {
 		}
 	}
 	return false
+}
+
+func TestPendingChangesUnmarshal(t *testing.T) {
+	// 1. Test unmarshaling from object format
+	objectJSON := `{"changes":[{"type":"UPDATE","table":"users","primaryKey":{"id":1},"newValues":{"username":"bob"}}]}`
+	var changesObj types.PendingChanges
+	if err := json.Unmarshal([]byte(objectJSON), &changesObj); err != nil {
+		t.Fatalf("Failed to unmarshal object format: %v", err)
+	}
+	if len(changesObj.Changes) != 1 || changesObj.Changes[0].Table != "users" {
+		t.Fatalf("Unexpected unmarshaled object: %+v", changesObj)
+	}
+
+	// 2. Test unmarshaling from direct array format
+	arrayJSON := `[{"type":"UPDATE","table":"users","primaryKey":{"id":1},"newValues":{"username":"bob"}}]`
+	var changesArr types.PendingChanges
+	if err := json.Unmarshal([]byte(arrayJSON), &changesArr); err != nil {
+		t.Fatalf("Failed to unmarshal array format: %v", err)
+	}
+	if len(changesArr.Changes) != 1 || changesArr.Changes[0].Table != "users" {
+		t.Fatalf("Unexpected unmarshaled array: %+v", changesArr)
+	}
 }

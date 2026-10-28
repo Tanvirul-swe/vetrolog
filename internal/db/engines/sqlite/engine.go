@@ -6,12 +6,15 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
 	"vetrolog/internal/db/types"
 )
+
+var limitRegex = regexp.MustCompile(`(?i)\bLIMIT\s+\d+`)
 
 // Engine implements types.DatabaseEngine for local SQLite files
 type Engine struct {
@@ -142,11 +145,32 @@ func (e *Engine) ListTables(ctx context.Context, _ string, _ string) ([]types.Ta
 			var rowCount int64
 			_ = e.dbInstance.QueryRowContext(ctx, fmt.Sprintf(`SELECT COUNT(*) FROM "%s"`, name)).Scan(&rowCount)
 
+			// Populate columns via PRAGMA table_info
+			var cols []types.ColumnInfo
+			if colRows, colErr := e.dbInstance.QueryContext(ctx, fmt.Sprintf(`PRAGMA table_info("%s");`, name)); colErr == nil {
+				for colRows.Next() {
+					var cid, notnull, pk int
+					var cName, colType string
+					var dfltValue sql.NullString
+					if err := colRows.Scan(&cid, &cName, &colType, &notnull, &dfltValue, &pk); err == nil {
+						cols = append(cols, types.ColumnInfo{
+							Name:         cName,
+							Type:         colType,
+							IsPrimaryKey: pk > 0,
+							IsNullable:   notnull == 0,
+							DefaultValue: dfltValue.String,
+						})
+					}
+				}
+				colRows.Close()
+			}
+
 			summaries = append(summaries, types.TableSummary{
 				Name:     name,
 				Schema:   "main",
 				Type:     tableType,
 				RowCount: rowCount,
+				Columns:  cols,
 			})
 		}
 	}
@@ -385,14 +409,31 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query string, maxRows int) (*
 		}, nil
 	}
 
-	rows, err := e.dbInstance.QueryContext(ctx, query)
+	queryToRun := query
+	defaultLimitApplied := false
+
+	// Apply safe default limit of 100 rows for SELECT queries lacking an explicit LIMIT
+	if strings.HasPrefix(strings.ToUpper(trimmed), "SELECT") && !limitRegex.MatchString(trimmed) {
+		cleanSQL := strings.TrimRight(trimmed, ";")
+		queryToRun = fmt.Sprintf("SELECT * FROM (%s) LIMIT 100", cleanSQL)
+		defaultLimitApplied = true
+		maxRows = 100
+	}
+
+	rows, err := e.dbInstance.QueryContext(ctx, queryToRun)
+	if err != nil && defaultLimitApplied {
+		// Fallback to raw query if wrapped subquery has syntax limitations
+		queryToRun = query
+		rows, err = e.dbInstance.QueryContext(ctx, queryToRun)
+	}
 	duration := float64(time.Since(start).Microseconds()) / 1000.0
 	if err != nil {
 		return &types.QueryResult{
-			Query:      query,
-			Success:    false,
-			Error:      err.Error(),
-			DurationMs: duration,
+			Query:               query,
+			Success:             false,
+			Error:               err.Error(),
+			DurationMs:          duration,
+			DefaultLimitApplied: defaultLimitApplied,
 		}, nil
 	}
 	defer rows.Close()
@@ -415,17 +456,20 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query string, maxRows int) (*
 		return nil, err
 	}
 
-	if len(dataRows) > maxRows {
+	if defaultLimitApplied && len(dataRows) > 100 {
+		dataRows = dataRows[:100]
+	} else if len(dataRows) > maxRows {
 		dataRows = dataRows[:maxRows]
 	}
 
 	return &types.QueryResult{
-		Query:      query,
-		Columns:    columns,
-		Rows:       dataRows,
-		Affected:   int64(len(dataRows)),
-		DurationMs: float64(time.Since(start).Microseconds()) / 1000.0,
-		Success:    true,
+		Query:               query,
+		Columns:             columns,
+		Rows:                dataRows,
+		Affected:            int64(len(dataRows)),
+		DurationMs:          float64(time.Since(start).Microseconds()) / 1000.0,
+		Success:             true,
+		DefaultLimitApplied: defaultLimitApplied,
 	}, nil
 }
 

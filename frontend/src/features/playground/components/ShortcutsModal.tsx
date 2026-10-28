@@ -26,6 +26,8 @@ const SHORTCUTS: ShortcutItem[] = [
     : []),
 
   // Editing
+  { keys: ['↵'], description: 'Smart auto-indent new line', category: 'Editing' },
+  { keys: ['(', "'", '"', '`'], description: 'Auto-pair quotes & brackets (or wrap selection)', category: 'Editing' },
   { keys: ['⌘', '/'], description: 'Toggle line or block comment (-- )', category: 'Editing' },
   { keys: ['Tab'], description: 'Indent line or block by 2 spaces', category: 'Editing' },
   { keys: ['⇧', 'Tab'], description: 'Outdent line or block by 2 spaces', category: 'Editing' },
@@ -48,6 +50,7 @@ const SHORTCUTS: ShortcutItem[] = [
   { keys: ['⌘', '1-9'], description: 'Jump directly to tab index', category: 'Tabs & Navigation' },
 
   // Autocomplete
+  { keys: ['Ctrl', 'Space'], description: 'Trigger autocomplete suggestions', category: 'Smart Autocomplete' },
   { keys: ['.'], description: 'Dot after table/alias: auto-suggest columns', category: 'Smart Autocomplete' },
   { keys: ['↑', '↓'], description: 'Navigate suggestion list', category: 'Smart Autocomplete' },
   { keys: ['Tab', '↵'], description: 'Accept active suggestion', category: 'Smart Autocomplete' },

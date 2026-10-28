@@ -76,6 +76,7 @@ export interface TableSummary {
   type: string;
   rowCount: number;
   sizeBytes?: number;
+  columns?: ColumnInfo[];
 }
 
 export interface TableDataResult {

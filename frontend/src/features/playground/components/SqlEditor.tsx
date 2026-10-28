@@ -22,7 +22,12 @@ import { ShortcutsModal } from './ShortcutsModal';
 import { predictJoins } from '../services/joinPredictor';
 import { highlightSql } from '../services/sqlHighlighter';
 import { formatSqlIdentifier } from '../services/sqlIdentifier';
-import { parseDotContext, filterTableColumns } from '../services/sqlContextParser';
+import {
+  parseDotContext,
+  filterTableColumns,
+  extractReferencedTables,
+  detectSqlClauseContext,
+} from '../services/sqlContextParser';
 import {
   toggleComment,
   indentLines,
@@ -32,6 +37,7 @@ import {
 import { usePlaygroundStore } from '@/stores/usePlaygroundStore';
 import { useDatabaseStore } from '@/stores/useDatabaseStore';
 import { useAdbStore } from '@/stores/useAdbStore';
+import { useConnectionManagerStore } from '@/stores/useConnectionManagerStore';
 
 const SQL_KEYWORDS = [
   'SELECT',
@@ -206,14 +212,72 @@ export function SqlEditor({
   };
 
   const activeDb = useMemo(() => databases.find((d) => d.id === selectedDbId), [databases, selectedDbId]);
+  const remoteTables = useConnectionManagerStore((s) => s.remoteTables);
+  const tableSchema = useConnectionManagerStore((s) => s.tableSchema);
+  const activeSession = useConnectionManagerStore((s) => s.activeSession);
+  const loadTableSchema = useConnectionManagerStore((s) => s.loadTableSchema);
 
-  // Combine extendedSchema with activeDb.tables to guarantee all tables are always available
+  // Combine extendedSchema with activeDb.tables, remoteTables, and tableSchema to guarantee all tables and columns are always available
   const availableTables = useMemo(() => {
-    if (extendedSchema?.tables && extendedSchema.tables.length > 0) {
-      return extendedSchema.tables;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tableMap = new Map<string, any>();
+
+    // 1. From database store
+    if (activeDb?.tables) {
+      for (const t of activeDb.tables) {
+        tableMap.set(t.name.toLowerCase(), t);
+      }
     }
-    return activeDb?.tables || [];
-  }, [extendedSchema, activeDb]);
+
+    // 2. From remoteTables
+    if (remoteTables) {
+      for (const t of remoteTables) {
+        const existing = tableMap.get(t.name.toLowerCase());
+        if (!existing || (!existing.columns?.length && t.columns?.length)) {
+          tableMap.set(t.name.toLowerCase(), {
+            name: t.name,
+            tableName: t.name,
+            schema: t.schema || 'public',
+            type: t.type || 'table',
+            rowCount: t.rowCount || 0,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            columns: (t.columns || []).map((c: any) => ({
+              name: c.name,
+              type: c.type || 'TEXT',
+              isPrimaryKey: !!c.isPrimaryKey,
+              isNullable: !!c.isNullable,
+            })),
+          });
+        }
+      }
+    }
+
+    // 3. From currently inspected tableSchema
+    if (tableSchema) {
+      tableMap.set(tableSchema.name.toLowerCase(), tableSchema);
+    }
+
+    // 4. From extendedSchema (Mobile ADB)
+    if (extendedSchema?.tables && extendedSchema.tables.length > 0) {
+      for (const t of extendedSchema.tables) {
+        tableMap.set(t.name.toLowerCase(), t);
+      }
+    }
+
+    return Array.from(tableMap.values());
+  }, [extendedSchema, activeDb, remoteTables, tableSchema]);
+
+  // Proactively fetch columns for referenced tables in remote mode if missing
+  useEffect(() => {
+    if (!activeSession) return;
+    const refTableNames = extractReferencedTables(query);
+    for (const tbl of refTableNames) {
+      const match = availableTables.find((t) => t.name.toLowerCase() === tbl);
+      if (!match || !match.columns || match.columns.length === 0) {
+        loadTableSchema(tbl);
+      }
+    }
+  }, [query, activeSession, availableTables, loadTableSchema]);
 
   // Pre-index known table and column names for instant syntax highlighting
   const { tableSet, columnSet } = useMemo(() => {
@@ -236,6 +300,7 @@ export function SqlEditor({
   const [hasSelection, setHasSelection] = useState<boolean>(false);
   const [popupPos, setPopupPos] = useState<{ top: number; left: number } | null>(null);
   const [selectedAutoIndex, setSelectedAutoIndex] = useState(0);
+  const [isTypingTriggered, setIsTypingTriggered] = useState<boolean>(false);
 
   // Undo / Redo History Stack per query tab
   const historyRef = useRef<{ text: string; cursorStart: number; cursorEnd: number }[]>([
@@ -275,7 +340,7 @@ export function SqlEditor({
       if (recordHistory) {
         const newHistory = historyRef.current.slice(0, historyIdxRef.current + 1);
         newHistory.push({ text: newText, cursorStart: newStart, cursorEnd: newEnd });
-        if (newHistory.length > 100) newHistory.shift();
+        if (newHistory.length > 200) newHistory.shift();
         historyRef.current = newHistory;
         historyIdxRef.current = newHistory.length - 1;
       }
@@ -313,6 +378,8 @@ export function SqlEditor({
       prevTabIdRef.current = activeTabId;
       historyRef.current = [{ text: query, cursorStart: 0, cursorEnd: 0 }];
       historyIdxRef.current = 0;
+      setIsTypingTriggered(false);
+      setPopupPos(null);
     }
   }, [activeTabId, query]);
 
@@ -323,16 +390,26 @@ export function SqlEditor({
     setQuery(val);
     setHasSelection(start !== end);
     setCursorPos(start);
+    setIsTypingTriggered(true);
 
     if (!isUndoRedoActionRef.current) {
       if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
-      typingTimerRef.current = setTimeout(() => {
+      const isBoundary = val.endsWith(' ') || val.endsWith('\n') || val.length === 0;
+      if (isBoundary) {
         const newHistory = historyRef.current.slice(0, historyIdxRef.current + 1);
         newHistory.push({ text: val, cursorStart: start, cursorEnd: end });
-        if (newHistory.length > 100) newHistory.shift();
+        if (newHistory.length > 200) newHistory.shift();
         historyRef.current = newHistory;
         historyIdxRef.current = newHistory.length - 1;
-      }, 350);
+      } else {
+        typingTimerRef.current = setTimeout(() => {
+          const newHistory = historyRef.current.slice(0, historyIdxRef.current + 1);
+          newHistory.push({ text: val, cursorStart: start, cursorEnd: end });
+          if (newHistory.length > 200) newHistory.shift();
+          historyRef.current = newHistory;
+          historyIdxRef.current = newHistory.length - 1;
+        }, 180);
+      }
     }
   };
 
@@ -355,8 +432,25 @@ export function SqlEditor({
     }
   };
 
+  const handleTextareaMouseDown = () => {
+    // When clicking or dragging, immediately dismiss autocomplete suggestions
+    setIsTypingTriggered(false);
+    setPopupPos(null);
+  };
+
+  const handleTextareaClick = () => {
+    setIsTypingTriggered(false);
+    setPopupPos(null);
+    updateSelectionState();
+  };
+
   // Split lines for line numbers
   const lines = useMemo(() => query.split('\n'), [query]);
+
+  // Active line index for line highlight and gutter highlight (VS Code style)
+  const currentLineIndex = useMemo(() => {
+    return query.slice(0, cursorPos).split('\n').length - 1;
+  }, [query, cursorPos]);
 
   // Real-time SQL syntax highlighting
   const highlightedTokens = useMemo(() => {
@@ -365,6 +459,9 @@ export function SqlEditor({
 
   // Contextual autocomplete calculation
   const autocompleteItems = useMemo<AutocompleteItem[]>(() => {
+    // Only calculate if user is actively typing (never on mouse click)
+    if (!isTypingTriggered) return [];
+
     const textBefore = query.slice(0, cursorPos);
 
     // 0. Dot Context Autocomplete (e.g. table.col or alias.col)
@@ -381,16 +478,38 @@ export function SqlEditor({
       }));
     }
 
-    const lastWordMatch = textBefore.match(/([a-zA-Z0-9_]+)$/);
-    const currentWord = lastWordMatch ? lastWordMatch[1].toLowerCase() : '';
+    // 1. Parse active SQL clause context and word at cursor
+    const clauseContext = detectSqlClauseContext(textBefore);
+    const { isFromOrJoin, isColumnClause, clauseType, currentWord } = clauseContext;
 
-    // Check if typing after JOIN or FROM
-    const isJoinContext = /(?:JOIN|FROM)\s+([a-zA-Z0-9_]*)$/i.test(textBefore);
     const isOnContext = /JOIN\s+([a-zA-Z0-9_]+)\s+ON\s+([a-zA-Z0-9_.]*)$/i.test(textBefore);
+    const isDotContext = /\.\s*([a-zA-Z0-9_]*)$/.test(textBefore);
+
+    // If not typing a word, dot, or in an active SQL clause context, do NOT pop up suggestions
+    if (!currentWord && !isFromOrJoin && !isOnContext && !isDotContext && !isColumnClause) {
+      return [];
+    }
 
     const items: AutocompleteItem[] = [];
 
-    // 1. Join Predictor (Typing after JOIN table ON)
+    // 2. Identify tables referenced in the query (e.g. FROM dns_query_logs)
+    const refTableNames = extractReferencedTables(query);
+    const referencedTables = availableTables.filter((t) =>
+      refTableNames.includes(t.name.toLowerCase())
+    );
+
+    // Fallback: if no tables found in query yet, use active database/selected table
+    const activeSelectedTable =
+      useDatabaseStore.getState().selectedTableName ||
+      useConnectionManagerStore.getState().selectedTable;
+    const fallbackTable = activeSelectedTable
+      ? availableTables.find((t) => t.name.toLowerCase() === activeSelectedTable.toLowerCase())
+      : availableTables[0];
+
+    const primaryTables =
+      referencedTables.length > 0 ? referencedTables : fallbackTable ? [fallbackTable] : [];
+
+    // 3. Join Predictor (Typing after JOIN table ON)
     if (isOnContext) {
       const match = textBefore.match(/FROM\s+([a-zA-Z0-9_]+)[\s\S]*?JOIN\s+([a-zA-Z0-9_]+)\s+ON/i);
       if (match) {
@@ -409,8 +528,77 @@ export function SqlEditor({
       }
     }
 
-    // 2. Tables Suggestion (all available tables with relevance sorting)
-    if (isJoinContext || currentWord.length > 0) {
+    // 4. Intelligent Column Suggestions:
+    // If user is in WHERE, SELECT, ORDER BY, GROUP BY, SET, HAVING, or ON, or typing a word outside FROM/JOIN:
+    if (isColumnClause || (currentWord.length > 0 && !isFromOrJoin)) {
+      // Prioritize columns of the referenced table(s) (e.g. dns_query_logs)
+      for (const t of primaryTables) {
+        const filteredCols = filterTableColumns(t.columns || [], currentWord);
+        for (const c of filteredCols) {
+          items.push({
+            label: c.name,
+            insertText: formatSqlIdentifier(c.name),
+            type: 'column',
+            detail: `${t.name}.${c.name}`,
+            meta: c.isPrimaryKey ? 'PK' : c.type || 'COLUMN',
+            isPk: c.isPrimaryKey,
+          });
+        }
+      }
+
+      // If in WHERE, ON, or HAVING, suggest operators matching currentWord
+      if (['WHERE', 'ON', 'HAVING'].includes(clauseType) && currentWord.length > 0) {
+        const operators = ['IS NULL', 'IS NOT NULL', 'LIKE', 'IN', 'BETWEEN', 'AND', 'OR', 'NOT'];
+        for (const op of operators) {
+          if (op.toLowerCase().startsWith(currentWord) && op.toLowerCase() !== currentWord) {
+            items.push({
+              label: op,
+              insertText: `${op} `,
+              type: 'keyword',
+              meta: 'OPERATOR',
+            });
+          }
+        }
+      }
+
+      // If in SELECT list, suggest aggregate functions if typing
+      if (clauseType === 'SELECT' && currentWord.length > 0) {
+        const aggFuncs = ['COUNT(*)', 'COUNT()', 'SUM()', 'AVG()', 'MIN()', 'MAX()', 'DISTINCT '];
+        for (const fn of aggFuncs) {
+          if (fn.toLowerCase().startsWith(currentWord)) {
+            items.push({
+              label: fn,
+              insertText: fn.includes('()') ? fn.replace(')', '') : `${fn} `,
+              type: 'keyword',
+              meta: 'FUNCTION',
+            });
+          }
+        }
+      }
+
+      // If few results, also add columns from other available tables matching currentWord
+      if (items.length < 50 && currentWord.length > 0) {
+        for (const t of availableTables) {
+          if (primaryTables.some((pt) => pt.name.toLowerCase() === t.name.toLowerCase())) {
+            continue;
+          }
+          const filteredCols = filterTableColumns(t.columns || [], currentWord);
+          for (const c of filteredCols) {
+            items.push({
+              label: c.name,
+              insertText: formatSqlIdentifier(c.name),
+              type: 'column',
+              detail: `${t.name}.${c.name}`,
+              meta: c.isPrimaryKey ? 'PK' : c.type || 'COLUMN',
+              isPk: c.isPrimaryKey,
+            });
+          }
+        }
+      }
+    }
+
+    // 5. Tables Suggestion (typing after FROM/JOIN, or searching for tables)
+    if (isFromOrJoin || (!isColumnClause && currentWord.length > 0)) {
       const matchingTables = availableTables.filter(
         (t) => !currentWord || t.name.toLowerCase().includes(currentWord)
       );
@@ -439,25 +627,7 @@ export function SqlEditor({
       }
     }
 
-    // 3. Columns Suggestion (Match all columns across active tables)
-    if (currentWord.length > 0) {
-      for (const t of availableTables) {
-        for (const c of t.columns || []) {
-          if (c.name.toLowerCase().includes(currentWord)) {
-            items.push({
-              label: `${c.name}`,
-              insertText: formatSqlIdentifier(c.name),
-              type: 'column',
-              detail: `${t.name}.${c.name}`,
-              meta: c.type,
-              isPk: c.isPrimaryKey,
-            });
-          }
-        }
-      }
-    }
-
-    // 4. SQL Keywords
+    // 6. SQL Keywords (matching currentWord)
     if (currentWord.length > 0) {
       for (const kw of SQL_KEYWORDS) {
         if (kw.toLowerCase().startsWith(currentWord) && kw.toLowerCase() !== currentWord) {
@@ -471,26 +641,29 @@ export function SqlEditor({
       }
     }
 
-    // Return up to 100 suggestions so all tables can be scrolled and explored
+    // Return up to 100 suggestions so all tables and columns can be scrolled and explored
     return items.slice(0, 100);
-  }, [query, cursorPos, availableTables, extendedSchema]);
+  }, [isTypingTriggered, query, cursorPos, availableTables, extendedSchema]);
 
   // Update popup coordinates based on cursor
   useEffect(() => {
-    if (autocompleteItems.length > 0 && textareaRef.current) {
+    if (isTypingTriggered && autocompleteItems.length > 0 && textareaRef.current) {
       const linesBefore = query.slice(0, cursorPos).split('\n');
       const currentLine = linesBefore.length;
       const currentCol = linesBefore[linesBefore.length - 1].length;
 
-      const top = Math.min(220, currentLine * 20 + 35);
-      const left = Math.min(400, Math.max(50, currentCol * 7 + 40));
+      const scrollTop = textareaRef.current.scrollTop;
+      const scrollLeft = textareaRef.current.scrollLeft;
+
+      const top = Math.max(10, currentLine * 22 + 10 - scrollTop);
+      const left = Math.max(50, currentCol * 7.8 + 48 - scrollLeft);
 
       setPopupPos({ top, left });
       setSelectedAutoIndex(0);
     } else {
       setPopupPos(null);
     }
-  }, [autocompleteItems.length, cursorPos, query]);
+  }, [isTypingTriggered, autocompleteItems.length, cursorPos, query]);
 
   const handleSelectAutocomplete = (item: AutocompleteItem) => {
     if (!textareaRef.current) return;
@@ -505,12 +678,20 @@ export function SqlEditor({
     const newQuery = query.slice(0, start) + item.insertText + query.slice(cursorPos);
     const newPos = start + item.insertText.length;
 
+    setIsTypingTriggered(false);
     setPopupPos(null);
     applyTextEdit(newQuery, newPos, newPos, true);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const isMod = e.metaKey || e.ctrlKey;
+
+    // 0. Manual Autocomplete Trigger: Ctrl+Space (VS Code standard)
+    if (e.ctrlKey && e.code === 'Space') {
+      e.preventDefault();
+      setIsTypingTriggered(true);
+      return;
+    }
 
     // 1. Autocomplete Navigation
     if (popupPos && autocompleteItems.length > 0) {
@@ -532,6 +713,7 @@ export function SqlEditor({
       if (e.key === 'Escape') {
         e.preventDefault();
         setPopupPos(null);
+        setIsTypingTriggered(false);
         return;
       }
     }
@@ -564,7 +746,114 @@ export function SqlEditor({
       return;
     }
 
-    // 5. Toggle Line Comment: ⌘/ or Ctrl+/
+    // 5. Smart Enter with Auto-Indentation (VS Code style)
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const start = e.currentTarget.selectionStart;
+      const end = e.currentTarget.selectionEnd;
+      const linesBefore = query.slice(0, start).split('\n');
+      const currentLine = linesBefore[linesBefore.length - 1];
+      const match = currentLine.match(/^(\s+)/);
+      const indent = match ? match[1] : '';
+
+      // Check if cursor is between brackets e.g. ( | )
+      const prevChar = query[start - 1];
+      const nextChar = query[start];
+      let extraIndent = '';
+      let closingNewline = '';
+      if (
+        (prevChar === '(' && nextChar === ')') ||
+        (prevChar === '[' && nextChar === ']') ||
+        (prevChar === '{' && nextChar === '}')
+      ) {
+        extraIndent = '  ';
+        closingNewline = `\n${indent}`;
+      }
+
+      const insertion = `\n${indent}${extraIndent}${closingNewline}`;
+      const newQuery = query.slice(0, start) + insertion + query.slice(end);
+      const newPos = start + 1 + indent.length + extraIndent.length;
+
+      applyTextEdit(newQuery, newPos, newPos, true);
+      setIsTypingTriggered(false);
+      return;
+    }
+
+    // 6. Smart Bracket & Quote Auto-Closing (VS Code style)
+    const PAIR_MAP: Record<string, string> = {
+      '(': ')',
+      '[': ']',
+      '{': '}',
+      "'": "'",
+      '"': '"',
+      '`': '`',
+    };
+
+    if (PAIR_MAP[e.key]) {
+      const start = e.currentTarget.selectionStart;
+      const end = e.currentTarget.selectionEnd;
+      const closeChar = PAIR_MAP[e.key];
+
+      // If text is selected, wrap the selection!
+      if (start !== end) {
+        e.preventDefault();
+        const selectedText = query.slice(start, end);
+        const wrapped = `${e.key}${selectedText}${closeChar}`;
+        const newQuery = query.slice(0, start) + wrapped + query.slice(end);
+        applyTextEdit(newQuery, start + 1, end + 1, true);
+        return;
+      }
+
+      // If typing quote when cursor is immediately before the same quote, just step over it
+      if (start === end && (e.key === "'" || e.key === '"' || e.key === '`') && query[start] === e.key) {
+        e.preventDefault();
+        const nextPos = start + 1;
+        setCursorPos(nextPos);
+        if (textareaRef.current) textareaRef.current.setSelectionRange(nextPos, nextPos);
+        return;
+      }
+
+      // Auto-insert closing pair
+      e.preventDefault();
+      const newQuery = query.slice(0, start) + e.key + closeChar + query.slice(end);
+      applyTextEdit(newQuery, start + 1, start + 1, true);
+      setIsTypingTriggered(true);
+      return;
+    }
+
+    // Step over closing bracket if typed
+    if ((e.key === ')' || e.key === ']' || e.key === '}') && query[e.currentTarget.selectionStart] === e.key) {
+      e.preventDefault();
+      const nextPos = e.currentTarget.selectionStart + 1;
+      setCursorPos(nextPos);
+      if (textareaRef.current) textareaRef.current.setSelectionRange(nextPos, nextPos);
+      return;
+    }
+
+    // 7. Smart Backspace: delete closing pair together
+    if (e.key === 'Backspace') {
+      const start = e.currentTarget.selectionStart;
+      const end = e.currentTarget.selectionEnd;
+      if (start === end && start > 0) {
+        const prev = query[start - 1];
+        const next = query[start];
+        if (
+          (prev === '(' && next === ')') ||
+          (prev === '[' && next === ']') ||
+          (prev === '{' && next === '}') ||
+          (prev === "'" && next === "'") ||
+          (prev === '"' && next === '"') ||
+          (prev === '`' && next === '`')
+        ) {
+          e.preventDefault();
+          const newQuery = query.slice(0, start - 1) + query.slice(start + 1);
+          applyTextEdit(newQuery, start - 1, start - 1, true);
+          return;
+        }
+      }
+    }
+
+    // 8. Toggle Line Comment: ⌘/ or Ctrl+/
     if (isMod && (e.key === '/' || e.code === 'Slash')) {
       e.preventDefault();
       const start = e.currentTarget.selectionStart;
@@ -574,17 +863,22 @@ export function SqlEditor({
       return;
     }
 
-    // 6. Indentation (Tab) and Outdentation (Shift+Tab)
+    // 9. Indentation (Tab: 2 spaces or Indent) / Shift+Tab (Outdent)
     if (e.key === 'Tab') {
       e.preventDefault();
       const start = e.currentTarget.selectionStart;
       const end = e.currentTarget.selectionEnd;
-      const res = indentLines(query, start, end, e.shiftKey);
-      applyTextEdit(res.text, res.newStart, res.newEnd);
+      if (start === end && !e.shiftKey) {
+        const newQuery = query.slice(0, start) + '  ' + query.slice(end);
+        applyTextEdit(newQuery, start + 2, start + 2, true);
+      } else {
+        const res = indentLines(query, start, end, e.shiftKey);
+        applyTextEdit(res.text, res.newStart, res.newEnd, true);
+      }
       return;
     }
 
-    // 7. Format SQL: ⌘Shift+F, Ctrl+Shift+F, or Alt+Shift+F
+    // 10. Format SQL: ⌘Shift+F, Ctrl+Shift+F, or Alt+Shift+F
     if (
       (isMod && e.shiftKey && e.key.toLowerCase() === 'f') ||
       (e.altKey && e.shiftKey && e.key.toLowerCase() === 'f')
@@ -594,7 +888,7 @@ export function SqlEditor({
       return;
     }
 
-    // 8. Duplicate Line or Selection: ⌘D or Ctrl+D, or Shift+Alt+ArrowDown
+    // 11. Duplicate Line or Selection: ⌘D or Ctrl+D, or Shift+Alt+ArrowDown
     if (
       (isMod && e.key.toLowerCase() === 'd' && !e.shiftKey) ||
       (e.shiftKey && e.altKey && e.key === 'ArrowDown')
@@ -607,7 +901,7 @@ export function SqlEditor({
       return;
     }
 
-    // 9. Move Line Up: Alt+ArrowUp / Option+ArrowUp
+    // 12. Move Line Up: Alt+ArrowUp / Option+ArrowUp
     if (e.altKey && !e.shiftKey && e.key === 'ArrowUp') {
       e.preventDefault();
       const start = e.currentTarget.selectionStart;
@@ -617,7 +911,7 @@ export function SqlEditor({
       return;
     }
 
-    // 10. Move Line Down: Alt+ArrowDown / Option+ArrowDown
+    // 13. Move Line Down: Alt+ArrowDown / Option+ArrowDown
     if (e.altKey && !e.shiftKey && e.key === 'ArrowDown') {
       e.preventDefault();
       const start = e.currentTarget.selectionStart;
@@ -627,13 +921,13 @@ export function SqlEditor({
       return;
     }
 
-    // 11. Select All: ⌘A or Ctrl+A (explicit fallback)
+    // 14. Select All: ⌘A or Ctrl+A (explicit fallback)
     if (isMod && e.key.toLowerCase() === 'a' && !e.shiftKey && !e.altKey) {
       e.currentTarget.select();
       return;
     }
 
-    // 12. Explain Plan: ⌘E or Ctrl+E (when Visual Plan is enabled)
+    // 15. Explain Plan: ⌘E or Ctrl+E (when Visual Plan is enabled)
     if (SHOW_VISUAL_PLAN && isMod && e.key.toLowerCase() === 'e' && !e.shiftKey && !e.altKey) {
       e.preventDefault();
       onRunExplain(getExecutableQuery());
@@ -981,24 +1275,41 @@ export function SqlEditor({
       </div>
 
       {/* Code Textarea & Gutter with Overlaid Real-Time Syntax Highlighting */}
-      <div className="flex flex-1 min-h-[90px] overflow-hidden relative font-mono text-xs">
-        {/* Line Numbers Gutter */}
+      <div className="flex flex-1 min-h-[140px] overflow-hidden relative font-mono text-[13px] bg-background">
+        {/* Line Numbers Gutter (VS Code style) */}
         <div
           ref={gutterRef}
-          className="w-10 select-none py-2 bg-muted/30 border-r border-border/40 text-muted-foreground/40 text-right pr-2 text-[11px] leading-5 shrink-0 overflow-hidden font-mono"
+          className="w-11 select-none py-2 bg-muted/20 border-r border-border/50 text-right pr-2.5 text-[12px] shrink-0 overflow-hidden font-mono"
         >
           {lines.map((_, i) => (
-            <div key={i}>{i + 1}</div>
+            <div
+              key={i}
+              className={`h-[22px] leading-[22px] transition-colors ${
+                i === currentLineIndex ? 'text-foreground font-bold' : 'text-muted-foreground/35'
+              }`}
+            >
+              {i + 1}
+            </div>
           ))}
         </div>
 
         {/* Textarea & Highlighting Stack */}
         <div className="flex-1 relative overflow-hidden h-full">
+          {/* Active Line Background Highlight (VS Code style) */}
+          <div
+            className="absolute left-0 right-0 pointer-events-none bg-primary/[0.04] border-y border-primary/10 transition-all duration-75"
+            style={{
+              top: `${currentLineIndex * 22 + 8}px`,
+              height: '22px',
+            }}
+          />
+
           {/* Syntax Highlighting Background Layer */}
           <pre
             ref={preRef}
             aria-hidden="true"
-            className="absolute inset-0 p-2 m-0 bg-transparent pointer-events-none font-mono text-xs leading-5 whitespace-pre-wrap break-words overflow-hidden select-none"
+            className="absolute inset-0 p-[8px_12px] m-0 bg-transparent pointer-events-none font-mono text-[13px] leading-[22px] whitespace-pre overflow-hidden select-none"
+            style={{ tabSize: 2 }}
           >
             <code>
               {highlightedTokens}
@@ -1012,13 +1323,15 @@ export function SqlEditor({
             value={query}
             onChange={handleTextareaChange}
             onScroll={handleScroll}
-            onClick={updateSelectionState}
+            onMouseDown={handleTextareaMouseDown}
+            onClick={handleTextareaClick}
             onKeyUp={updateSelectionState}
             onSelect={updateSelectionState}
             onKeyDown={handleKeyDown}
             placeholder="Enter SQL statement (e.g. SELECT * FROM users WHERE active = 1 ORDER BY id DESC LIMIT 50;)"
             spellCheck={false}
-            className="absolute inset-0 p-2 m-0 w-full h-full bg-transparent text-transparent caret-sky-400 selection:bg-sky-500/30 selection:text-transparent placeholder:text-muted-foreground/40 resize-none outline-none font-mono text-xs leading-5 whitespace-pre-wrap break-words select-text z-10"
+            className="absolute inset-0 p-[8px_12px] m-0 w-full h-full bg-transparent text-transparent caret-sky-400 selection:bg-sky-500/30 selection:text-transparent placeholder:text-muted-foreground/40 resize-none outline-none font-mono text-[13px] leading-[22px] whitespace-pre select-text z-10"
+            style={{ tabSize: 2 }}
           />
 
           {/* Autocomplete Popup */}

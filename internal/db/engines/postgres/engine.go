@@ -4,12 +4,15 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"vetrolog/internal/db/types"
 )
+
+var limitRegex = regexp.MustCompile(`(?i)\bLIMIT\s+\d+`)
 
 // Engine implements db.DatabaseEngine for PostgreSQL
 type Engine struct {
@@ -209,6 +212,35 @@ func (e *Engine) ListTables(ctx context.Context, _ string, schema string) ([]typ
 			})
 		}
 	}
+
+	// Populate column metadata for each table to empower smart query autocompletion
+	colQuery := `
+		SELECT table_name, column_name, data_type, is_nullable, COALESCE(column_default, '')
+		FROM information_schema.columns
+		WHERE table_schema = $1
+		ORDER BY table_name, ordinal_position;
+	`
+	if colRows, err := e.pool.Query(ctx, colQuery, schema); err == nil {
+		defer colRows.Close()
+		colsByTable := make(map[string][]types.ColumnInfo)
+		for colRows.Next() {
+			var tbl, col, dtype, isNull, defVal string
+			if err := colRows.Scan(&tbl, &col, &dtype, &isNull, &defVal); err == nil {
+				colsByTable[tbl] = append(colsByTable[tbl], types.ColumnInfo{
+					Name:         col,
+					Type:         dtype,
+					IsNullable:   strings.ToUpper(isNull) == "YES",
+					DefaultValue: defVal,
+				})
+			}
+		}
+		for i := range summaries {
+			if cols, ok := colsByTable[summaries[i].Name]; ok {
+				summaries[i].Columns = cols
+			}
+		}
+	}
+
 	return summaries, nil
 }
 
@@ -515,14 +547,31 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query string, maxRows int) (*
 		}, nil
 	}
 
-	rows, err := e.pool.Query(ctx, query)
+	queryToRun := query
+	defaultLimitApplied := false
+
+	// Apply safe default limit of 100 rows for SELECT queries lacking an explicit LIMIT
+	if strings.HasPrefix(strings.ToUpper(trimmed), "SELECT") && !limitRegex.MatchString(trimmed) {
+		cleanSQL := strings.TrimRight(trimmed, ";")
+		queryToRun = fmt.Sprintf("SELECT * FROM (%s) AS _sub LIMIT 100", cleanSQL)
+		defaultLimitApplied = true
+		maxRows = 100
+	}
+
+	rows, err := e.pool.Query(ctx, queryToRun)
+	if err != nil && defaultLimitApplied {
+		// Fallback to raw query if wrapped subquery has dialect limitations
+		queryToRun = query
+		rows, err = e.pool.Query(ctx, queryToRun)
+	}
 	duration := float64(time.Since(start).Microseconds()) / 1000.0
 	if err != nil {
 		return &types.QueryResult{
-			Query:      query,
-			Success:    false,
-			Error:      err.Error(),
-			DurationMs: duration,
+			Query:               query,
+			Success:             false,
+			Error:               err.Error(),
+			DurationMs:          duration,
+			DefaultLimitApplied: defaultLimitApplied,
 		}, nil
 	}
 	defer rows.Close()
@@ -550,12 +599,13 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query string, maxRows int) (*
 	}
 
 	return &types.QueryResult{
-		Query:      query,
-		Columns:    columns,
-		Rows:       dataRows,
-		Affected:   int64(len(dataRows)),
-		DurationMs: float64(time.Since(start).Microseconds()) / 1000.0,
-		Success:    true,
+		Query:               query,
+		Columns:             columns,
+		Rows:                dataRows,
+		Affected:            int64(len(dataRows)),
+		DurationMs:          float64(time.Since(start).Microseconds()) / 1000.0,
+		Success:             true,
+		DefaultLimitApplied: defaultLimitApplied,
 	}, nil
 }
 

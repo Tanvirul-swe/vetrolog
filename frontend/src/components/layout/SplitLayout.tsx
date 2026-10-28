@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { AppHeader } from './AppHeader';
 import { AppSidebar } from './AppSidebar';
 import { AppStatusBar } from './AppStatusBar';
@@ -24,7 +24,6 @@ export function SplitLayout({
   onUpdateRow,
   onDeleteRow,
 }: SplitLayoutProps) {
-  const searchInputRef = useRef<HTMLInputElement>(null);
   const [isConnectionManagerOpen, setIsConnectionManagerOpen] = useState(false);
 
   const activeWorkspaceView = usePlaygroundStore((s) => s.activeWorkspaceView);
@@ -32,16 +31,12 @@ export function SplitLayout({
   const activeRemoteView = useConnectionManagerStore((s) => s.activeRemoteView);
   const selectLocalFileDialog = useConnectionManagerStore((s) => s.selectLocalFileDialog);
 
-  useKeyboardShortcuts(
-    () => searchInputRef.current?.focus(),
-    onRefresh
-  );
+  useKeyboardShortcuts(onRefresh);
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-background text-foreground relative">
       {/* Top Header */}
       <AppHeader
-        searchInputRef={searchInputRef}
         onRefresh={onRefresh}
         isConnectionManagerOpen={isConnectionManagerOpen}
         setIsConnectionManagerOpen={setIsConnectionManagerOpen}

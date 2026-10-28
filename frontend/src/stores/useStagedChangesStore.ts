@@ -202,7 +202,7 @@ export const useStagedChangesStore = create<StagedChangesState>((set, get) => ({
 
     set({ isCommitting: true, commitError: null });
     try {
-      const payload = JSON.stringify(changes);
+      const payload = JSON.stringify({ changes });
       const res = await applyFn(payload);
       if (!res || !res.success) {
         const errMsg = res?.error || 'Failed to commit staged changes';

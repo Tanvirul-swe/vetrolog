@@ -39,6 +39,7 @@ const DEFAULT_PORTS: Record<EngineType, number> = {
   mariadb: 3306,
   redis: 6379,
   sqlite: 0,
+  mssql: 1433,
 };
 
 const DEFAULT_CONFIG: ConnectionConfig = {
@@ -172,7 +173,9 @@ export function ConnectionManagerModal({ isOpen, onClose }: ConnectionManagerMod
       ...prev,
       engine,
       port: DEFAULT_PORTS[engine] || prev.port,
-      database: engine === 'postgres' ? 'postgres' : engine === 'mysql' ? 'mysql' : engine === 'redis' ? '0' : '',
+      user: engine === 'mssql' ? 'sa' : engine === 'postgres' ? 'postgres' : engine === 'mysql' ? 'root' : prev.user,
+      database: engine === 'postgres' ? 'postgres' : engine === 'mysql' ? 'mysql' : engine === 'mssql' ? 'master' : engine === 'redis' ? '0' : '',
+      schema: engine === 'mssql' ? 'dbo' : engine === 'postgres' ? 'public' : '',
     }));
   };
 
@@ -450,10 +453,11 @@ export function ConnectionManagerModal({ isOpen, onClose }: ConnectionManagerMod
               <label className="text-xs font-semibold text-muted-foreground block mb-2">
                 DATABASE ENGINE
               </label>
-              <div className="grid grid-cols-4 gap-2.5">
+              <div className="grid grid-cols-5 gap-2">
                 {[
                   { engine: 'postgres', label: 'PostgreSQL', port: 5432, desc: 'Pure Go pgx' },
                   { engine: 'mysql', label: 'MySQL / MariaDB', port: 3306, desc: 'Pure Go MySQL' },
+                  { engine: 'mssql', label: 'SQL Server', port: 1433, desc: 'MSSQL / Azure' },
                   { engine: 'redis', label: 'Redis Studio', port: 6379, desc: 'Key-Value Engine' },
                   { engine: 'sqlite', label: 'Local SQLite', port: 0, desc: 'Desktop .db file' },
                 ].map((item) => {

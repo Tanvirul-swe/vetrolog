@@ -272,3 +272,17 @@ func TestPendingChangesUnmarshal(t *testing.T) {
 		t.Fatalf("Unexpected unmarshaled array: %+v", changesArr)
 	}
 }
+
+func TestCreateEngineMSSQL(t *testing.T) {
+	mgr := &ConnectionManager{}
+	eng, err := mgr.CreateEngine(types.EngineMSSQL)
+	if err != nil {
+		t.Fatalf("Failed to create MSSQL engine: %v", err)
+	}
+	if eng.Type() != types.EngineMSSQL {
+		t.Fatalf("Expected engine type mssql, got %s", eng.Type())
+	}
+	if port := defaultPortForEngine(types.EngineMSSQL); port != 1433 {
+		t.Fatalf("Expected port 1433 for MSSQL, got %d", port)
+	}
+}

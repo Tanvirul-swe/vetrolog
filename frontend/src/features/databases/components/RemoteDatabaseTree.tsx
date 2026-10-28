@@ -30,6 +30,7 @@ const ENGINE_LABELS: Record<string, string> = {
   mariadb: 'MariaDB',
   redis: 'Redis',
   sqlite: 'SQLite',
+  mssql: 'SQL Server',
 };
 
 export function RemoteDatabaseTree({

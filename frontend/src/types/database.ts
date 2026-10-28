@@ -1,6 +1,6 @@
-export type DatabaseType = 'sqlite' | 'hive' | 'shared_preferences' | 'postgres' | 'mysql' | 'mariadb' | 'redis' | 'sqlite_file';
+export type DatabaseType = 'sqlite' | 'hive' | 'shared_preferences' | 'postgres' | 'mysql' | 'mariadb' | 'redis' | 'mssql' | 'sqlite_file';
 
-export type EngineType = 'postgres' | 'mysql' | 'mariadb' | 'sqlite' | 'redis';
+export type EngineType = 'postgres' | 'mysql' | 'mariadb' | 'sqlite' | 'redis' | 'mssql';
 export type EnvironmentType = 'production' | 'staging' | 'development' | 'local';
 export type ColorTag = 'red' | 'amber' | 'blue' | 'green' | 'purple';
 

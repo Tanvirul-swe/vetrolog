@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"vetrolog/internal/db/engines/mssql"
 	"vetrolog/internal/db/engines/mysql"
 	"vetrolog/internal/db/engines/postgres"
 	"vetrolog/internal/db/engines/redis"
@@ -60,6 +61,8 @@ func (m *ConnectionManager) CreateEngine(engineType types.EngineType) (types.Dat
 		return postgres.NewEngine(), nil
 	case string(types.EngineMySQL), string(types.EngineMariaDB):
 		return mysql.NewEngine(), nil
+	case string(types.EngineMSSQL), "sqlserver":
+		return mssql.NewEngine(), nil
 	case string(types.EngineSQLite):
 		return sqlite.NewEngine(), nil
 	case string(types.EngineRedis):
@@ -328,6 +331,8 @@ func defaultPortForEngine(t types.EngineType) int {
 		return 5432
 	case types.EngineMySQL, types.EngineMariaDB:
 		return 3306
+	case types.EngineMSSQL:
+		return 1433
 	case types.EngineRedis:
 		return 6379
 	default:

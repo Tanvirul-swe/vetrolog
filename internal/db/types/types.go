@@ -16,6 +16,7 @@ const (
 	EngineMariaDB  EngineType = "mariadb"
 	EngineSQLite   EngineType = "sqlite"
 	EngineRedis    EngineType = "redis"
+	EngineMSSQL    EngineType = "mssql"
 )
 
 // SSHTunnelConfig holds bastion / jump host parameters

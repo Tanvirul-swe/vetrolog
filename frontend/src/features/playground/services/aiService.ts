@@ -163,6 +163,9 @@ export function getDialectName(engine?: string): string {
       return 'MySQL';
     case 'mariadb':
       return 'MariaDB';
+    case 'mssql':
+    case 'sqlserver':
+      return 'T-SQL';
     case 'sqlite':
     default:
       return 'SQLite';
@@ -213,7 +216,7 @@ ${schemaContext}
 Translate the user's natural language request into a valid, optimized ${dialect} query.
 Rules:
 1. Output ONLY the raw SQL query. Do not wrap in markdown quotes (\`\`\`), do not provide introductory chit-chat.
-2. Use standard ${dialect} syntax and dialect-specific functions (e.g. for PostgreSQL use NOW() - INTERVAL '15 days', for MySQL use NOW() - INTERVAL 15 DAY, for SQLite use datetime('now', '-15 days')).
+2. Use standard ${dialect} syntax and dialect-specific functions (e.g. for PostgreSQL use NOW() - INTERVAL '15 days', for MySQL use NOW() - INTERVAL 15 DAY, for T-SQL use DATEADD(day, -15, GETDATE()) and [schema].[table] syntax, for SQLite use datetime('now', '-15 days')).
 3. Only reference table names and column names that exist in the provided schema.
 4. Keep queries performant and safe.`;
 

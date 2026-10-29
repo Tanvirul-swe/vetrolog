@@ -138,16 +138,16 @@ export function RemoteExplainQuery(arg1, arg2) {
   return window['go']['app']['App']['RemoteExplainQuery'](arg1, arg2);
 }
 
+export function RemoteGetDatabaseSchemaExtended(arg1, arg2, arg3) {
+  return window['go']['app']['App']['RemoteGetDatabaseSchemaExtended'](arg1, arg2, arg3);
+}
+
 export function RemoteGetTableData(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8) {
   return window['go']['app']['App']['RemoteGetTableData'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
 }
 
 export function RemoteGetTableSchema(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['RemoteGetTableSchema'](arg1, arg2, arg3, arg4);
-}
-
-export function RemoteGetDatabaseSchemaExtended(arg1, arg2, arg3) {
-  return window['go']['app']['App']['RemoteGetDatabaseSchemaExtended'](arg1, arg2, arg3);
 }
 
 export function RemoteListDatabases(arg1) {

@@ -109,3 +109,4 @@ export function DiagramMinimap({ containerWidth, containerHeight }: DiagramMinim
     </div>
   );
 }
+

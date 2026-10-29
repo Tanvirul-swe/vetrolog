@@ -15,6 +15,7 @@ import { generateDBML, generateMermaid, generateSQL } from './services/dbmlGener
 import { Button } from '@/components/ui/button';
 import { useDatabaseStore } from '@/stores/useDatabaseStore';
 import { useConnectionManagerStore } from '@/stores/useConnectionManagerStore';
+import { useAdbStore } from '@/stores/useAdbStore';
 
 interface DatabaseDiagramViewProps {
   onOpenConnectionManager?: () => void;
@@ -41,9 +42,21 @@ export function DatabaseDiagramView({ onOpenConnectionManager }: DatabaseDiagram
 
   const selectedDbId = useDatabaseStore((s) => s.selectedDatabaseId);
   const databases = useDatabaseStore((s) => s.databases);
+  const databasesCount = useDatabaseStore((s) => s.databases?.length || 0);
+  const currentDbTablesCount = useDatabaseStore(
+    (s) =>
+      s.databases.find((d) => d.id === s.selectedDatabaseId)?.tables?.length ||
+      s.databases[0]?.tables?.length ||
+      0
+  );
+
   const workspaceMode = useConnectionManagerStore((s) => s.workspaceMode);
   const activeSession = useConnectionManagerStore((s) => s.activeSession);
+  const selectedRemoteDb = useConnectionManagerStore((s) => s.selectedDatabase);
+  const selectedRemoteSchema = useConnectionManagerStore((s) => s.selectedSchema);
+  const remoteTablesCount = useConnectionManagerStore((s) => s.remoteTables?.length || 0);
   const selectLocalFileDialog = useConnectionManagerStore((s) => s.selectLocalFileDialog);
+  const setActiveRemoteView = useConnectionManagerStore((s) => s.setActiveRemoteView);
 
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [isPanning, setIsPanning] = useState(false);
@@ -65,10 +78,27 @@ export function DatabaseDiagramView({ onOpenConnectionManager }: DatabaseDiagram
     content: '',
   });
 
-  // 1. Initial Load and Auto-Sync on Database / Connection switch
+  const handleRefresh = useCallback(async () => {
+    if (workspaceMode === 'mobile') {
+      await useAdbStore.getState().refreshDatabases();
+    }
+    await loadCurrentDatabaseSchema();
+  }, [workspaceMode, loadCurrentDatabaseSchema]);
+
+  // 1. Initial Load and Auto-Sync on Database / Connection / Schema switch
   useEffect(() => {
     loadCurrentDatabaseSchema();
-  }, [selectedDbId, activeSession?.sessionId, workspaceMode, loadCurrentDatabaseSchema]);
+  }, [
+    selectedDbId,
+    databasesCount,
+    currentDbTablesCount,
+    activeSession?.sessionId,
+    selectedRemoteDb,
+    selectedRemoteSchema,
+    remoteTablesCount,
+    workspaceMode,
+    loadCurrentDatabaseSchema,
+  ]);
 
   // 2. Track Container Dimensions for Fit-to-screen & Minimap
   useEffect(() => {
@@ -201,26 +231,41 @@ export function DatabaseDiagramView({ onOpenConnectionManager }: DatabaseDiagram
 
   // If no tables or empty database
   if (nodes.length === 0 && !isLoading) {
+    const isRedis = workspaceMode === 'remote' && activeSession?.config.engine === 'redis';
+
     return (
       <div className="flex-1 flex flex-col overflow-hidden bg-background">
         <DiagramToolbar
           onExport={handleExport}
-          onRefresh={loadCurrentDatabaseSchema}
+          onRefresh={handleRefresh}
           onFitToScreen={handleFitToScreen}
         />
         <div className="flex-1 flex flex-col items-center justify-center p-6 text-center select-none bg-background relative">
           <div className="size-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary mb-3 shadow-md shadow-primary/10">
             <Network className="size-6" />
           </div>
-          <h3 className="font-semibold text-foreground text-sm sm:text-base">No Database Tables Found</h3>
+          <h3 className="font-semibold text-foreground text-sm sm:text-base">
+            {isRedis ? 'Redis Key-Value Store' : 'No Database Tables Found'}
+          </h3>
           <p className="text-xs text-muted-foreground mt-1 max-w-md leading-relaxed">
-            {workspaceMode === 'remote'
-              ? 'Connect to a remote PostgreSQL, MySQL, MSSQL, or open a local .sqlite database to visualize real-time relationships.'
-              : 'Connect an Android device with a debug app running SQLite or Hive to map table schemas automatically.'}
+            {isRedis
+              ? 'Redis is an in-memory key-value data structure store and does not contain relational schemas or foreign key relations. Use the Redis Key Browser to inspect keys and values.'
+              : workspaceMode === 'remote'
+                ? 'Connect to a remote PostgreSQL, MySQL, MSSQL, or open a local .sqlite database to visualize real-time relationships.'
+                : 'Connect an Android device with a debug app running SQLite or Hive to map table schemas automatically.'}
           </p>
 
           <div className="flex items-center gap-2 mt-4">
-            {workspaceMode === 'remote' ? (
+            {isRedis ? (
+              <Button
+                size="sm"
+                onClick={() => setActiveRemoteView('redis')}
+                className="h-8 text-xs gap-1.5"
+              >
+                <Server className="size-3.5" />
+                <span>Open Redis Key Browser</span>
+              </Button>
+            ) : workspaceMode === 'remote' ? (
               <>
                 {onOpenConnectionManager && (
                   <Button
@@ -245,7 +290,7 @@ export function DatabaseDiagramView({ onOpenConnectionManager }: DatabaseDiagram
             ) : (
               <Button
                 size="sm"
-                onClick={loadCurrentDatabaseSchema}
+                onClick={handleRefresh}
                 className="h-8 text-xs gap-1.5"
               >
                 <RefreshCw className="size-3.5" />
@@ -263,7 +308,7 @@ export function DatabaseDiagramView({ onOpenConnectionManager }: DatabaseDiagram
       {/* Top Toolbar */}
       <DiagramToolbar
         onExport={handleExport}
-        onRefresh={loadCurrentDatabaseSchema}
+        onRefresh={handleRefresh}
         onFitToScreen={handleFitToScreen}
       />
 

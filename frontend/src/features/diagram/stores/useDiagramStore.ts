@@ -167,7 +167,12 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
 
   syncSchema: (_databaseId, rawTables) => {
     if (!rawTables || rawTables.length === 0) {
-      set({ nodes: [], edges: [], isLoading: false });
+      // If we already have nodes rendered, don't wipe them out with empty response
+      if (get().nodes.length === 0) {
+        set({ nodes: [], edges: [], isLoading: false });
+      } else {
+        set({ isLoading: false });
+      }
       return;
     }
 
@@ -281,16 +286,65 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
 
     try {
       if (isRemote) {
-        const session = useConnectionManagerStore.getState().activeSession;
+        const connState = useConnectionManagerStore.getState();
+        const session = connState.activeSession;
+
         if (!session) {
+          // Check if databases exist in useDatabaseStore (e.g. from local file opened or fallback)
+          const dbs = useDatabaseStore.getState().databases;
+          if (dbs && dbs.length > 0 && dbs[0].tables && dbs[0].tables.length > 0) {
+            const fallbackSchemas: ExtendedTableSchema[] = dbs[0].tables.map((t) => ({
+              name: t.name,
+              type: t.type,
+              rowCount: t.rowCount || 0,
+              columns: (t.columns || []).map((c) => ({
+                name: c.name,
+                type: c.type || 'TEXT',
+                isPrimaryKey: Boolean(c.isPrimaryKey),
+                isNullable: Boolean(c.isNullable),
+              })),
+              foreignKeys: [],
+              indexes: [],
+            }));
+            get().syncSchema(dbs[0].id, fallbackSchemas);
+            return;
+          }
           set({ isLoading: false, nodes: [], edges: [] });
           return;
         }
 
-        const selectedDb = useConnectionManagerStore.getState().selectedDatabase;
-        const selectedSchema = useConnectionManagerStore.getState().selectedSchema;
+        const selectedDb =
+          connState.selectedDatabase ||
+          session.currentDatabase ||
+          session.config.database ||
+          '';
+        const selectedSchema =
+          connState.selectedSchema ||
+          session.currentSchema ||
+          (session.config.engine === 'postgres' ? 'public' : '') ||
+          '';
 
-        // Try single batch fetch from Go backend
+        // 1. Instant optimistic sync if remoteTables already exist in memory
+        const existingRemoteTables = connState.remoteTables;
+        if (existingRemoteTables && existingRemoteTables.length > 0) {
+          const initialSchemas: ExtendedTableSchema[] = existingRemoteTables.map((t) => ({
+            name: t.name,
+            schema: t.schema || selectedSchema,
+            type: t.type,
+            rowCount: t.rowCount || 0,
+            columns: (t.columns || []).map((col) => ({
+              name: col.name,
+              type: col.type || 'TEXT',
+              isPrimaryKey: Boolean(col.isPrimaryKey),
+              isNullable: Boolean(col.isNullable),
+            })),
+            foreignKeys: [],
+            indexes: [],
+          }));
+          get().syncSchema(selectedDb || 'remote', initialSchemas);
+        }
+
+        // 2. Try single batch fetch from Go backend
         try {
           if (
             typeof window !== 'undefined' &&
@@ -311,8 +365,8 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
           // Fallback to table-by-table fetching below
         }
 
-        // Fallback: iterate remoteTables and load each schema
-        let tablesToFetch = useConnectionManagerStore.getState().remoteTables || [];
+        // 3. Fallback: iterate remoteTables and load each schema
+        let tablesToFetch = connState.remoteTables || [];
         if (tablesToFetch.length === 0) {
           try {
             // @ts-expect-error window.go may be undefined
@@ -328,68 +382,98 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
             // Safe fallback
           }
         }
-        const schemaPromises = tablesToFetch.map(async (t) => {
-          try {
-            // @ts-expect-error window.go may be undefined
-            if (window?.go?.app?.App?.RemoteGetTableSchema) {
-              const res = await AppBindings.RemoteGetTableSchema(
-                session.sessionId,
-                selectedDb,
-                selectedSchema,
-                t.name
-              );
-              if (res) return res as any;
-            }
-          } catch {
-            // Ignore individual table fail
-          }
-          return {
-            name: t.name,
-            schema: t.schema,
-            type: t.type,
-            rowCount: t.rowCount,
-            columns: t.columns || [],
-            foreignKeys: [],
-            indexes: [],
-          };
-        });
 
-        const fetchedSchemas = await Promise.all(schemaPromises);
-        get().syncSchema(selectedDb || 'remote', fetchedSchemas);
+        if (tablesToFetch.length > 0) {
+          const schemaPromises = tablesToFetch.map(async (t) => {
+            try {
+              // @ts-expect-error window.go may be undefined
+              if (window?.go?.app?.App?.RemoteGetTableSchema) {
+                const res = await AppBindings.RemoteGetTableSchema(
+                  session.sessionId,
+                  selectedDb,
+                  t.schema || selectedSchema,
+                  t.name
+                );
+                if (res) return res as any;
+              }
+            } catch {
+              // Ignore individual table fail
+            }
+            return {
+              name: t.name,
+              schema: t.schema || selectedSchema,
+              type: t.type,
+              rowCount: t.rowCount || 0,
+              columns: (t.columns || []).map((col) => ({
+                name: col.name,
+                type: col.type || 'TEXT',
+                isPrimaryKey: Boolean(col.isPrimaryKey),
+                isNullable: Boolean(col.isNullable),
+              })),
+              foreignKeys: [],
+              indexes: [],
+            };
+          });
+
+          const fetchedSchemas = await Promise.all(schemaPromises);
+          get().syncSchema(selectedDb || 'remote', fetchedSchemas);
+          return;
+        }
+
+        set({ isLoading: false });
         return;
       }
 
-      // Mobile Mode (Android SQLite)
-      const deviceId = useAdbStore.getState().selectedDeviceId;
-      const packageName = useAdbStore.getState().selectedPackageName;
-      const selectedDbId = useDatabaseStore.getState().selectedDatabaseId;
-      const databases = useDatabaseStore.getState().databases;
+      // Mobile Mode (Android SQLite / Mobile databases)
+      const dbState = useDatabaseStore.getState();
+      const adbState = useAdbStore.getState();
 
-      const currentDb = databases.find((d) => d.id === selectedDbId);
-      const remotePath = currentDb?.path || useAdbStore.getState().selectedDbRemotePath;
+      const selectedDbId = dbState.selectedDatabaseId;
+      const databases = dbState.databases;
+
+      // Find current db, or fallback to first database in list
+      const currentDb =
+        (selectedDbId ? databases.find((d) => d.id === selectedDbId) : null) ||
+        (databases.length > 0 ? databases[0] : null);
+
+      // Instant optimistic sync from currentDb tables in memory (0ms delay!)
+      if (currentDb && currentDb.tables && currentDb.tables.length > 0) {
+        const initialSchemas: ExtendedTableSchema[] = currentDb.tables.map((t) => ({
+          name: t.name,
+          type: t.type,
+          rowCount: t.rowCount || 0,
+          columns: (t.columns || []).map((c) => ({
+            name: c.name,
+            type: c.type || 'TEXT',
+            isPrimaryKey: Boolean(c.isPrimaryKey),
+            isNullable: Boolean(c.isNullable),
+          })),
+          foreignKeys: [],
+          indexes: [],
+        }));
+        get().syncSchema(currentDb.id, initialSchemas);
+      }
+
+      const deviceId = adbState.selectedDeviceId;
+      const packageName = adbState.selectedPackageName;
+      const remotePath = currentDb?.path || adbState.selectedDbRemotePath;
 
       if (!deviceId || !packageName || !remotePath) {
-        // If databases list exists, fallback to database store tables
-        if (currentDb && currentDb.tables && currentDb.tables.length > 0) {
-          const fallbackSchemas: ExtendedTableSchema[] = currentDb.tables.map((t) => ({
-            name: t.name,
-            type: t.type,
-            rowCount: t.rowCount || 0,
-            columns: t.columns || [],
-            foreignKeys: [],
-            indexes: [],
-          }));
-          get().syncSchema(currentDb.id, fallbackSchemas);
-        } else {
-          set({ isLoading: false });
-        }
+        set({ isLoading: false });
         return;
       }
 
-      const res = await apiBridge.getExtendedSchema(deviceId, packageName, remotePath);
-      if (res && res.tables) {
-        get().syncSchema(res.databaseId || remotePath, res.tables);
+      try {
+        const res = await apiBridge.getExtendedSchema(deviceId, packageName, remotePath);
+        if (res && res.tables && res.tables.length > 0) {
+          get().syncSchema(res.databaseId || currentDb?.id || remotePath, res.tables);
+          return;
+        }
+      } catch (err) {
+        console.warn('apiBridge.getExtendedSchema failed, keeping optimistic schema:', err);
       }
+
+      set({ isLoading: false });
     } catch (err: any) {
       set({
         isLoading: false,

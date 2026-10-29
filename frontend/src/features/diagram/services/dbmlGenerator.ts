@@ -105,3 +105,4 @@ export function generateSQL(nodes: DiagramNode[], edges: DiagramEdge[]): string 
 
   return lines.join('\n');
 }
+

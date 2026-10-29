@@ -149,3 +149,4 @@ export function computeAutoLayout(
 
   return positions;
 }
+

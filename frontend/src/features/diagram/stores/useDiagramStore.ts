@@ -20,6 +20,7 @@ interface DiagramState {
   searchQuery: string;
   showInferredRelationships: boolean;
   showColumnTypes: boolean;
+  animateRelationFlow: boolean;
   isLoading: boolean;
   error: string | null;
 
@@ -38,6 +39,7 @@ interface DiagramState {
   setSearchQuery: (query: string) => void;
   toggleInferredRelationships: () => void;
   toggleColumnTypes: () => void;
+  toggleRelationFlow: () => void;
   autoArrange: () => void;
   syncSchema: (databaseId: string, schemas: ExtendedTableSchema[]) => void;
   loadCurrentDatabaseSchema: () => Promise<void>;
@@ -57,6 +59,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   searchQuery: '',
   showInferredRelationships: true,
   showColumnTypes: true,
+  animateRelationFlow: true,
   isLoading: false,
   error: null,
 
@@ -148,6 +151,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   toggleInferredRelationships: () =>
     set((s) => ({ showInferredRelationships: !s.showInferredRelationships })),
   toggleColumnTypes: () => set((s) => ({ showColumnTypes: !s.showColumnTypes })),
+  toggleRelationFlow: () => set((s) => ({ animateRelationFlow: !s.animateRelationFlow })),
 
   autoArrange: () => {
     const { nodes, edges } = get();

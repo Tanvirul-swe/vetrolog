@@ -18,6 +18,7 @@ export function RelationshipEdge({
 }: RelationshipEdgeProps) {
   const [isHovered, setIsHovered] = useState(false);
   const setHoveredEdgeId = useDiagramStore((s) => s.setHoveredEdgeId);
+  const animateRelationFlow = useDiagramStore((s) => s.animateRelationFlow);
 
   // 1. Find vertical column offsets
   const sourceColIdx = Math.max(
@@ -139,6 +140,92 @@ export function RelationshipEdge({
         strokeLinecap="round"
       />
 
+      {/* Animated flowing stream dashed line */}
+      {animateRelationFlow && (
+        <path
+          d={pathData}
+          fill="none"
+          stroke={
+            active
+              ? 'var(--color-primary, #3b82f6)'
+              : edge.isInferred
+              ? 'var(--color-sky-400, #38bdf8)'
+              : 'var(--color-primary, #3b82f6)'
+          }
+          strokeWidth={active ? '2.5' : '1.75'}
+          strokeDasharray="5 7"
+          strokeLinecap="round"
+          className={`pointer-events-none ${active ? 'animate-relation-flow-fast' : 'animate-relation-flow'}`}
+          style={{
+            opacity: active ? 1 : 0.7,
+          }}
+        />
+      )}
+
+      {/* Traveling Directional Flow Chevron & Glowing Data Packets */}
+      {animateRelationFlow && (
+        <g className="pointer-events-none select-none">
+          {/* Main traveling forward chevron indicator */}
+          <polygon
+            points="-6,-3.5 3,0 -6,3.5"
+            fill={
+              active
+                ? 'var(--color-primary, #3b82f6)'
+                : edge.isInferred
+                ? 'var(--color-sky-400, #38bdf8)'
+                : 'var(--color-primary, #3b82f6)'
+            }
+            opacity={active ? 1 : 0.85}
+          >
+            <animateMotion
+              path={pathData}
+              dur={active ? '1.5s' : '2.6s'}
+              repeatCount="indefinite"
+              rotate="auto"
+            />
+          </polygon>
+
+          {/* Glowing pulse particle packet */}
+          <circle
+            r={active ? '3.5' : '2.5'}
+            fill={
+              active
+                ? 'var(--color-primary, #3b82f6)'
+                : edge.isInferred
+                ? 'var(--color-sky-400, #38bdf8)'
+                : 'var(--color-primary, #3b82f6)'
+            }
+            opacity={0.8}
+          >
+            <animateMotion
+              path={pathData}
+              dur={active ? '1.5s' : '2.6s'}
+              repeatCount="indefinite"
+            />
+          </circle>
+
+          {/* Secondary trailing packet for fluid visual continuity */}
+          <circle
+            r={active ? '2.5' : '1.8'}
+            fill={
+              active
+                ? 'var(--color-primary, #3b82f6)'
+                : edge.isInferred
+                ? 'var(--color-sky-400, #38bdf8)'
+                : 'var(--color-primary, #3b82f6)'
+            }
+            opacity={0.6}
+          >
+            <animateMotion
+              path={pathData}
+              dur={active ? '1.5s' : '2.6s'}
+              begin={active ? '0.75s' : '1.3s'}
+              repeatCount="indefinite"
+            />
+          </circle>
+        </g>
+      )}
+
       {/* Source Anchor: Small circle dot representing the foreign key end (N) */}
       <circle
         cx={sourceX}
@@ -159,7 +246,7 @@ export function RelationshipEdge({
       <circle
         cx={targetX}
         cy={targetY}
-        r={active ? '4.5' : '3.5'}
+        r={active ? '5' : '3.5'}
         fill={
           active
             ? 'var(--color-primary, #3b82f6)'
@@ -170,6 +257,20 @@ export function RelationshipEdge({
         stroke="var(--color-card, #ffffff)"
         strokeWidth="1.5"
       />
+
+      {/* Target Anchor Ring pulse indicator when active */}
+      {active && (
+        <circle
+          cx={targetX}
+          cy={targetY}
+          r="8"
+          fill="none"
+          stroke="var(--color-amber-500, #f59e0b)"
+          strokeWidth="1.5"
+          strokeOpacity="0.6"
+          className="animate-ping"
+        />
+      )}
 
       {/* Cardinality labels on endpoints */}
       {active && (

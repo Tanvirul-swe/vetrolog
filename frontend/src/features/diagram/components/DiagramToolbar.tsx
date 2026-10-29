@@ -14,6 +14,7 @@ import {
   Code2,
   FileCode,
   Sparkles,
+  Activity,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useDiagramStore } from '../stores/useDiagramStore';
@@ -40,6 +41,8 @@ export function DiagramToolbar({
   const toggleInferred = useDiagramStore((s) => s.toggleInferredRelationships);
   const showTypes = useDiagramStore((s) => s.showColumnTypes);
   const toggleTypes = useDiagramStore((s) => s.toggleColumnTypes);
+  const animateFlow = useDiagramStore((s) => s.animateRelationFlow);
+  const toggleFlow = useDiagramStore((s) => s.toggleRelationFlow);
   const nodes = useDiagramStore((s) => s.nodes);
   const edges = useDiagramStore((s) => s.edges);
   const isLoading = useDiagramStore((s) => s.isLoading);
@@ -141,6 +144,20 @@ export function DiagramToolbar({
         >
           <FileCode className="size-3" />
           <span className="hidden sm:inline">Types</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={toggleFlow}
+          className={`h-7 px-2.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer border ${
+            animateFlow
+              ? 'bg-primary/10 border-primary/30 text-primary'
+              : 'bg-muted/40 border-border/60 text-muted-foreground hover:text-foreground'
+          }`}
+          title="Toggle animated data flow along relationship curves"
+        >
+          <Activity className={`size-3 ${animateFlow ? 'text-primary animate-pulse' : 'text-muted-foreground'}`} />
+          <span className="hidden sm:inline">Flow Animation</span>
         </button>
       </div>
 

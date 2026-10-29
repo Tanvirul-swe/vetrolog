@@ -220,9 +220,9 @@ export function TableNodeCard({
                     <Key className="size-3 text-amber-500 dark:text-amber-400 shrink-0" />
                   </span>
                 )}
-                {!isPk && col.name.toLowerCase().endsWith('_id') && (
-                  <span title="Reference Column" className="shrink-0 flex items-center">
-                    <Link2 className="size-2.5 text-sky-500 dark:text-sky-400 shrink-0 opacity-70" />
+                {!isPk && (col.name.toLowerCase().endsWith('_id') || (col.name.toLowerCase().endsWith('id') && col.name.length > 2) || col.name.toLowerCase().endsWith('_uuid')) && (
+                  <span title="Reference Column (FK / Inferred)" className="shrink-0 flex items-center">
+                    <Link2 className="size-2.5 text-sky-500 dark:text-sky-400 shrink-0 opacity-80" />
                   </span>
                 )}
                 <span

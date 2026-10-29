@@ -116,7 +116,8 @@ export function RelationshipEdge({
         <path
           d={pathData}
           fill="none"
-          stroke="oklch(0.55 0.22 255 / 0.35)"
+          stroke="var(--color-primary, #3b82f6)"
+          strokeOpacity="0.25"
           strokeWidth="7"
           strokeLinecap="round"
         />
@@ -128,13 +129,13 @@ export function RelationshipEdge({
         fill="none"
         stroke={
           active
-            ? 'oklch(0.55 0.22 255)'
+            ? 'var(--color-primary, #3b82f6)'
             : edge.isInferred
-            ? 'oklch(0.65 0.04 240 / 0.5)'
-            : 'oklch(0.50 0.05 240 / 0.7)'
+            ? 'color-mix(in srgb, var(--color-primary, #3b82f6) 70%, var(--color-muted-foreground, #64748b) 30%)'
+            : 'var(--color-primary, #3b82f6)'
         }
-        strokeWidth={active ? '2.5' : '1.5'}
-        strokeDasharray={edge.isInferred ? '4 3' : undefined}
+        strokeWidth={active ? '2.5' : edge.isInferred ? '1.75' : '1.5'}
+        strokeDasharray={edge.isInferred ? '5 4' : undefined}
         strokeLinecap="round"
       />
 
@@ -143,18 +144,30 @@ export function RelationshipEdge({
         cx={sourceX}
         cy={sourceY}
         r={active ? '4.5' : '3.5'}
-        fill={active ? 'oklch(0.55 0.22 255)' : 'oklch(0.65 0.04 240)'}
-        stroke="var(--color-card)"
+        fill={
+          active
+            ? 'var(--color-primary, #3b82f6)'
+            : edge.isInferred
+            ? 'var(--color-sky-500, #0ea5e9)'
+            : 'var(--color-primary, #3b82f6)'
+        }
+        stroke="var(--color-card, #ffffff)"
         strokeWidth="1.5"
       />
 
-      {/* Target Anchor: Diamond representing primary key referenced (1) */}
+      {/* Target Anchor: Circle representing primary key referenced (1) */}
       <circle
         cx={targetX}
         cy={targetY}
         r={active ? '4.5' : '3.5'}
-        fill={active ? 'oklch(0.55 0.22 255)' : 'oklch(0.70 0.15 240)'}
-        stroke="var(--color-card)"
+        fill={
+          active
+            ? 'var(--color-primary, #3b82f6)'
+            : edge.isInferred
+            ? 'var(--color-amber-500, #f59e0b)'
+            : 'var(--color-primary, #3b82f6)'
+        }
+        stroke="var(--color-card, #ffffff)"
         strokeWidth="1.5"
       />
 
@@ -184,9 +197,9 @@ export function RelationshipEdge({
       {active && (
         <g transform={`translate(${midX}, ${midY})`} className="pointer-events-none select-none">
           <rect
-            x="-90"
+            x={edge.isInferred ? '-110' : '-90'}
             y="-16"
-            width="180"
+            width={edge.isInferred ? '220' : '180'}
             height="24"
             rx="6"
             className="fill-popover stroke-border"
@@ -200,6 +213,7 @@ export function RelationshipEdge({
             className="fill-foreground font-mono text-[10px] font-medium"
           >
             {edge.sourceTable}.{edge.sourceColumn} → {edge.targetTable}.{edge.targetColumn}
+            {edge.isInferred ? ' (inferred)' : ''}
           </text>
         </g>
       )}

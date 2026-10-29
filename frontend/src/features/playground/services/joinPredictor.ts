@@ -12,8 +12,56 @@ export interface JoinPrediction {
   confidence: number;
 }
 
+function getTableKeyVariants(tableName: string): string[] {
+  const lower = tableName.toLowerCase();
+  const variants = new Set<string>();
+
+  // Base names
+  variants.add(lower);
+
+  // Plural -> Singular transformations
+  if (lower.endsWith('ies')) {
+    variants.add(lower.slice(0, -3) + 'y'); // categories -> category
+  } else if (lower.endsWith('es')) {
+    variants.add(lower.slice(0, -2)); // statuses -> status, branches -> branch
+  } else if (lower.endsWith('s') && !lower.endsWith('ss')) {
+    variants.add(lower.slice(0, -1)); // users -> user, orders -> order
+  }
+
+  const result: string[] = [];
+  variants.forEach((v) => {
+    // snake_case
+    result.push(`${v}_id`);
+    // camelCase
+    result.push(`${v}id`);
+    // uuid variants
+    result.push(`${v}_uuid`);
+    result.push(`${v}uuid`);
+  });
+
+  return result;
+}
+
+function findTargetPrimaryKey(target: ExtendedTableSchema): string {
+  // 1. Explicit primary key
+  const pkCol = (target.columns || []).find((c) => c.isPrimaryKey);
+  if (pkCol) return pkCol.name;
+
+  // 2. Column named 'id' (case-insensitive)
+  const idCol = (target.columns || []).find((c) => c.name.toLowerCase() === 'id');
+  if (idCol) return idCol.name;
+
+  // 3. Column named '<table_singular>_id' or '<table_singular>id'
+  const variants = getTableKeyVariants(target.name);
+  const selfFkCol = (target.columns || []).find((c) => variants.includes(c.name.toLowerCase()));
+  if (selfFkCol) return selfFkCol.name;
+
+  // 4. Fallback to first column
+  return target.columns?.[0]?.name || 'id';
+}
+
 /**
- * Predicts join conditions between tables using SQLite foreign keys and naming conventions.
+ * Predicts join conditions between tables using foreign keys and naming conventions.
  */
 export function predictJoins(
   currentTable: string,
@@ -32,16 +80,20 @@ export function predictJoins(
 
   // 1. Direct Foreign Key: currentTable -> targetTable
   for (const fk of current.foreignKeys || []) {
-    if (fk.toTable.toLowerCase() === target.name.toLowerCase()) {
-      const fromCol = formatSqlIdentifier(fk.fromCol);
-      const toCol = formatSqlIdentifier(fk.toCol || 'id');
+    const toTable = (fk.toTable || fk.refTable || '').toLowerCase();
+    const fromCol = fk.fromCol || fk.column || '';
+    const toCol = fk.toCol || fk.refColumn || 'id';
+
+    if (toTable && toTable === target.name.toLowerCase() && fromCol) {
+      const fromColFmt = formatSqlIdentifier(fromCol);
+      const toColFmt = formatSqlIdentifier(toCol);
       predictions.push({
         targetTable: target.name,
         sourceTable: current.name,
-        sourceCol: fk.fromCol,
-        targetCol: fk.toCol || 'id',
-        onClause: `${curT}.${fromCol} = ${tgtT}.${toCol}`,
-        joinStatement: `JOIN ${tgtT} ON ${curT}.${fromCol} = ${tgtT}.${toCol}`,
+        sourceCol: fromCol,
+        targetCol: toCol,
+        onClause: `${curT}.${fromColFmt} = ${tgtT}.${toColFmt}`,
+        joinStatement: `JOIN ${tgtT} ON ${curT}.${fromColFmt} = ${tgtT}.${toColFmt}`,
         isForeignKey: true,
         confidence: 1.0,
       });
@@ -50,59 +102,65 @@ export function predictJoins(
 
   // 2. Reverse Foreign Key: targetTable -> currentTable
   for (const fk of target.foreignKeys || []) {
-    if (fk.toTable.toLowerCase() === current.name.toLowerCase()) {
-      const fromCol = formatSqlIdentifier(fk.fromCol);
-      const toCol = formatSqlIdentifier(fk.toCol || 'id');
+    const toTable = (fk.toTable || fk.refTable || '').toLowerCase();
+    const fromCol = fk.fromCol || fk.column || '';
+    const toCol = fk.toCol || fk.refColumn || 'id';
+
+    if (toTable && toTable === current.name.toLowerCase() && fromCol) {
+      const fromColFmt = formatSqlIdentifier(fromCol);
+      const toColFmt = formatSqlIdentifier(toCol);
       predictions.push({
         targetTable: target.name,
         sourceTable: current.name,
-        sourceCol: fk.toCol || 'id',
-        targetCol: fk.fromCol,
-        onClause: `${curT}.${toCol} = ${tgtT}.${fromCol}`,
-        joinStatement: `JOIN ${tgtT} ON ${curT}.${toCol} = ${tgtT}.${fromCol}`,
+        sourceCol: toCol,
+        targetCol: fromCol,
+        onClause: `${curT}.${toColFmt} = ${tgtT}.${fromColFmt}`,
+        joinStatement: `JOIN ${tgtT} ON ${curT}.${toColFmt} = ${tgtT}.${fromColFmt}`,
         isForeignKey: true,
         confidence: 0.95,
       });
     }
   }
 
-  // 3. Naming Convention: <target_singular>_id in currentTable
-  const targetSingular = target.name.endsWith('s') ? target.name.slice(0, -1) : target.name;
-  const targetIdPattern = `${targetSingular.toLowerCase()}_id`;
-  const matchingFromCol = current.columns.find((c) => c.name.toLowerCase() === targetIdPattern);
+  // 3. Naming Convention: target key variants in currentTable
+  const targetVariants = getTableKeyVariants(target.name);
+  const matchingFromCol = (current.columns || []).find((c) =>
+    targetVariants.includes(c.name.toLowerCase())
+  );
 
   if (matchingFromCol) {
-    const targetPk = target.columns.find((c) => c.isPrimaryKey)?.name || 'id';
-    const fromCol = formatSqlIdentifier(matchingFromCol.name);
-    const toCol = formatSqlIdentifier(targetPk);
+    const targetPk = findTargetPrimaryKey(target);
+    const fromColFmt = formatSqlIdentifier(matchingFromCol.name);
+    const toColFmt = formatSqlIdentifier(targetPk);
     predictions.push({
       targetTable: target.name,
       sourceTable: current.name,
       sourceCol: matchingFromCol.name,
       targetCol: targetPk,
-      onClause: `${curT}.${fromCol} = ${tgtT}.${toCol}`,
-      joinStatement: `JOIN ${tgtT} ON ${curT}.${fromCol} = ${tgtT}.${toCol}`,
+      onClause: `${curT}.${fromColFmt} = ${tgtT}.${toColFmt}`,
+      joinStatement: `JOIN ${tgtT} ON ${curT}.${fromColFmt} = ${tgtT}.${toColFmt}`,
       isForeignKey: false,
       confidence: 0.85,
     });
   }
 
-  // 4. Reverse Naming Convention: <current_singular>_id in targetTable
-  const currentSingular = current.name.endsWith('s') ? current.name.slice(0, -1) : current.name;
-  const currentIdPattern = `${currentSingular.toLowerCase()}_id`;
-  const matchingToCol = target.columns.find((c) => c.name.toLowerCase() === currentIdPattern);
+  // 4. Reverse Naming Convention: current key variants in targetTable
+  const currentVariants = getTableKeyVariants(current.name);
+  const matchingToCol = (target.columns || []).find((c) =>
+    currentVariants.includes(c.name.toLowerCase())
+  );
 
   if (matchingToCol) {
-    const currentPk = current.columns.find((c) => c.isPrimaryKey)?.name || 'id';
-    const fromCol = formatSqlIdentifier(currentPk);
-    const toCol = formatSqlIdentifier(matchingToCol.name);
+    const currentPk = findTargetPrimaryKey(current);
+    const fromColFmt = formatSqlIdentifier(currentPk);
+    const toColFmt = formatSqlIdentifier(matchingToCol.name);
     predictions.push({
       targetTable: target.name,
       sourceTable: current.name,
       sourceCol: currentPk,
       targetCol: matchingToCol.name,
-      onClause: `${curT}.${fromCol} = ${tgtT}.${toCol}`,
-      joinStatement: `JOIN ${tgtT} ON ${curT}.${fromCol} = ${tgtT}.${toCol}`,
+      onClause: `${curT}.${fromColFmt} = ${tgtT}.${toColFmt}`,
+      joinStatement: `JOIN ${tgtT} ON ${curT}.${fromColFmt} = ${tgtT}.${toColFmt}`,
       isForeignKey: false,
       confidence: 0.8,
     });

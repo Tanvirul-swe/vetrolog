@@ -254,7 +254,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
                 sourceColumn: p.sourceCol,
                 targetTable: p.targetTable,
                 targetColumn: p.targetCol,
-                isInferred: true,
+                isInferred: !p.isForeignKey,
               });
             }
           });

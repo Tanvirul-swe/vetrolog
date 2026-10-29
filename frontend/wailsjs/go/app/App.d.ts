@@ -77,6 +77,8 @@ export function RemoteGetTableData(arg1:string,arg2:string,arg3:string,arg4:numb
 
 export function RemoteGetTableSchema(arg1:string,arg2:string,arg3:string,arg4:string):Promise<types.ExtendedTableSchema>;
 
+export function RemoteGetDatabaseSchemaExtended(arg1:string,arg2:string,arg3:string):Promise<Array<types.ExtendedTableSchema>>;
+
 export function RemoteListDatabases(arg1:string):Promise<Array<string>>;
 
 export function RemoteListSchemas(arg1:string,arg2:string):Promise<Array<string>>;

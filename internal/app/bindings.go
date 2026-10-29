@@ -413,6 +413,39 @@ func (a *App) RemoteGetTableSchema(sessionID string, dbName string, schema strin
 	return session.Engine.GetTableSchema(context.Background(), dbName, schema, table)
 }
 
+// RemoteGetDatabaseSchemaExtended returns extended metadata for all tables in the remote database/schema
+func (a *App) RemoteGetDatabaseSchemaExtended(sessionID string, dbName string, schema string) ([]types.ExtendedTableSchema, error) {
+	if a.dbManager == nil {
+		return nil, fmt.Errorf("database manager not initialized")
+	}
+	session, err := a.dbManager.GetSession(sessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	tables, err := session.Engine.ListTables(context.Background(), dbName, schema)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]types.ExtendedTableSchema, 0, len(tables))
+	for _, t := range tables {
+		schemaInfo, err := session.Engine.GetTableSchema(context.Background(), dbName, schema, t.Name)
+		if err == nil && schemaInfo != nil {
+			result = append(result, *schemaInfo)
+		} else {
+			result = append(result, types.ExtendedTableSchema{
+				Name:     t.Name,
+				Schema:   t.Schema,
+				Type:     t.Type,
+				RowCount: t.RowCount,
+				Columns:  t.Columns,
+			})
+		}
+	}
+	return result, nil
+}
+
 // RemoteGetTableData fetches paginated rows from the remote table
 func (a *App) RemoteGetTableData(sessionID string, schema string, table string, page int, pageSize int, sortCol string, sortDir string, filter string) (*types.TableDataResult, error) {
 	if a.dbManager == nil {

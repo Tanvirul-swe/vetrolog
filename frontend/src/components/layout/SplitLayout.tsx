@@ -5,6 +5,7 @@ import { AppStatusBar } from './AppStatusBar';
 import { DataGrid } from '@/features/datagrid/components/DataGrid';
 import { SqlPlayground } from '@/features/playground/SqlPlayground';
 import { RedisKeyViewer } from '@/features/redis/RedisKeyViewer';
+import { DatabaseDiagramView } from '@/features/diagram/DatabaseDiagramView';
 import { PendingChangesBar } from '@/features/datagrid/components/PendingChangesBar';
 import { usePlaygroundStore } from '@/stores/usePlaygroundStore';
 import { useConnectionManagerStore } from '@/stores/useConnectionManagerStore';
@@ -55,6 +56,8 @@ export function SplitLayout({
         <div className="flex-1 flex flex-col overflow-hidden">
           {activeWorkspaceView === 'playground' ? (
             <SqlPlayground />
+          ) : activeWorkspaceView === 'diagram' ? (
+            <DatabaseDiagramView onOpenConnectionManager={() => setIsConnectionManagerOpen(true)} />
           ) : workspaceMode === 'remote' && activeRemoteView === 'redis' ? (
             <RedisKeyViewer />
           ) : (

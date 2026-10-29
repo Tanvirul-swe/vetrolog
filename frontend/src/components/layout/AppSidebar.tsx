@@ -5,6 +5,7 @@ import { useDatabaseStore } from '@/stores/useDatabaseStore';
 import { usePlaygroundStore } from '@/stores/usePlaygroundStore';
 import { useAdbStore } from '@/stores/useAdbStore';
 import { useConnectionManagerStore } from '@/stores/useConnectionManagerStore';
+import { useDiagramStore } from '@/features/diagram/stores/useDiagramStore';
 
 interface AppSidebarProps {
   onRefresh?: () => void;
@@ -36,6 +37,8 @@ export function AppSidebar({
     selectTable(tableName);
     if (activeWorkspaceView === 'playground') {
       openTableInPlayground(tableName);
+    } else if (activeWorkspaceView === 'diagram') {
+      useDiagramStore.getState().setSelectedTable(tableName);
     }
   };
 

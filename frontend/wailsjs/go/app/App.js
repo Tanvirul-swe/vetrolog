@@ -146,6 +146,10 @@ export function RemoteGetTableSchema(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['RemoteGetTableSchema'](arg1, arg2, arg3, arg4);
 }
 
+export function RemoteGetDatabaseSchemaExtended(arg1, arg2, arg3) {
+  return window['go']['app']['App']['RemoteGetDatabaseSchemaExtended'](arg1, arg2, arg3);
+}
+
 export function RemoteListDatabases(arg1) {
   return window['go']['app']['App']['RemoteListDatabases'](arg1);
 }

@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useConnectionManagerStore } from '@/stores/useConnectionManagerStore';
 import { usePlaygroundStore } from '@/stores/usePlaygroundStore';
+import { useDiagramStore } from '@/features/diagram/stores/useDiagramStore';
 
 interface RemoteDatabaseTreeProps {
   onOpenConnectionManager: () => void;
@@ -73,6 +74,8 @@ export function RemoteDatabaseTree({
     selectTable(tableName);
     if (activeWorkspaceView === 'playground') {
       openTableInPlayground(tableName);
+    } else if (activeWorkspaceView === 'diagram') {
+      useDiagramStore.getState().setSelectedTable(tableName);
     }
   };
 

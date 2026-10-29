@@ -10,6 +10,7 @@ import {
   FolderOpen,
   Power,
   Globe,
+  Network,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useDatabaseStore } from '@/stores/useDatabaseStore';
@@ -137,6 +138,22 @@ export function AppHeader({
               <span>Inspector</span>
               {activeWorkspaceView === 'grid' && (
                 <span className="size-1.5 rounded-full bg-sky-400 shadow-xs shadow-sky-400/50" />
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveWorkspaceView('diagram')}
+              className={`h-7 px-3.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer select-none active:scale-[0.98] ${
+                activeWorkspaceView === 'diagram'
+                  ? 'bg-background text-foreground font-semibold shadow-xs border border-border/80 ring-1 ring-black/5 dark:ring-white/5'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-background/60 hover:shadow-2xs border border-transparent hover:border-border/50'
+              }`}
+              title="ER Diagram: Interactive schema visualizer, relationships, and foreign keys"
+            >
+              <Network className={`size-3.5 ${activeWorkspaceView === 'diagram' ? 'text-purple-400' : 'text-muted-foreground'}`} />
+              <span>ER Diagram</span>
+              {activeWorkspaceView === 'diagram' && (
+                <span className="size-1.5 rounded-full bg-purple-400 shadow-xs shadow-purple-400/50" />
               )}
             </button>
             <button

@@ -17,11 +17,11 @@ import { Input } from '@/components/ui/input';
 import { useConnectionManagerStore } from '@/stores/useConnectionManagerStore';
 
 const TYPE_COLORS: Record<string, string> = {
-  string: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
-  hash: 'bg-sky-500/15 text-sky-400 border-sky-500/30',
-  list: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
-  set: 'bg-purple-500/15 text-purple-400 border-purple-500/30',
-  zset: 'bg-rose-500/15 text-rose-400 border-rose-500/30',
+  string: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30',
+  hash: 'bg-sky-500/15 text-sky-700 dark:text-sky-400 border-sky-500/30',
+  list: 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30',
+  set: 'bg-purple-500/15 text-purple-700 dark:text-purple-400 border-purple-500/30',
+  zset: 'bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/30',
 };
 
 export function RedisKeyViewer() {

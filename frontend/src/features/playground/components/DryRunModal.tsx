@@ -37,9 +37,9 @@ export function DryRunModal({ isOpen, onClose, simulation, onCommit }: DryRunMod
         {/* Header */}
         <div className="h-12 px-4 border-b border-border flex items-center justify-between bg-muted/20">
           <div className="flex items-center gap-2">
-            <ShieldCheck className="size-4 text-amber-400" />
+            <ShieldCheck className="size-4 text-amber-500 dark:text-amber-400" />
             <h3 className="font-semibold text-sm text-foreground">Safe Dry-Run Transaction Simulation</h3>
-            <Badge variant="outline" className="text-[10px] font-mono border-amber-500/40 text-amber-400">
+            <Badge variant="outline" className="text-[10px] font-mono border-amber-500/40 text-amber-700 dark:text-amber-400">
               0 Disk Writes
             </Badge>
           </div>
@@ -50,8 +50,8 @@ export function DryRunModal({ isOpen, onClose, simulation, onCommit }: DryRunMod
 
         {/* Safety Information Banner */}
         <div className="p-3 border-b border-border/60 bg-amber-500/5 flex flex-col gap-1.5">
-          <div className="flex items-center gap-2 text-xs font-semibold text-amber-400">
-            <ShieldCheck className="size-4 text-amber-400 shrink-0" />
+          <div className="flex items-center gap-2 text-xs font-semibold text-amber-700 dark:text-amber-400">
+            <ShieldCheck className="size-4 text-amber-500 dark:text-amber-400 shrink-0" />
             <span>Sandbox Rollback Simulation Complete</span>
           </div>
           <p className="text-[11px] text-muted-foreground font-sans">
@@ -59,7 +59,7 @@ export function DryRunModal({ isOpen, onClose, simulation, onCommit }: DryRunMod
           </p>
 
           {noWhereClause && (
-            <div className="p-2 rounded bg-destructive/10 border border-destructive/30 text-red-400 text-xs flex items-center gap-2 mt-1">
+            <div className="p-2 rounded bg-destructive/10 border border-destructive/30 text-red-600 dark:text-red-400 text-xs flex items-center gap-2 mt-1">
               <AlertTriangle className="size-4 shrink-0" />
               <span>
                 <strong>CRITICAL WARNING:</strong> No WHERE clause detected. Executing this will modify or delete <strong>ALL {simulation.affectedRows} rows</strong> in the table!

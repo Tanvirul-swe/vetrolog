@@ -214,7 +214,7 @@ export function IndexAdvisor() {
                     </span>
                   </div>
 
-                  <Badge variant="outline" className="text-[10px] px-2 border-emerald-500/40 text-emerald-400 bg-emerald-500/10 font-medium">
+                  <Badge variant="outline" className="text-[10px] px-2 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 font-medium">
                     {rec.estimatedSpeedup}
                   </Badge>
                 </div>
@@ -225,16 +225,16 @@ export function IndexAdvisor() {
                 <div className="grid grid-cols-2 gap-2 text-xs font-mono">
                   <div className="p-2 rounded-lg bg-red-500/10 border border-red-500/30 flex items-center justify-between">
                     <span className="text-muted-foreground text-[11px]">Before Index:</span>
-                    <span className="text-red-400 font-semibold">{rec.beforeEstimate}</span>
+                    <span className="text-red-600 dark:text-red-400 font-semibold">{rec.beforeEstimate}</span>
                   </div>
                   <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between">
                     <span className="text-muted-foreground text-[11px]">After Index:</span>
-                    <span className="text-emerald-400 font-semibold">{rec.afterEstimate}</span>
+                    <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{rec.afterEstimate}</span>
                   </div>
                 </div>
 
                 {/* Generated DDL Statement */}
-                <div className="p-2.5 rounded-lg bg-black/50 border border-border/70 font-mono text-xs text-foreground select-text overflow-x-auto">
+                <div className="p-2.5 rounded-lg bg-muted/40 dark:bg-black/50 border border-border/70 font-mono text-xs text-foreground select-text overflow-x-auto">
                   {rec.createSql}
                 </div>
 

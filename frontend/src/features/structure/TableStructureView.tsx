@@ -179,13 +179,13 @@ export function TableStructureView({ schema, tableName }: TableStructureViewProp
                     <tr key={col.name || idx} className="hover:bg-muted/30 transition-colors">
                       <td className="py-2 px-4 text-center text-muted-foreground text-[10px]">{idx + 1}</td>
                       <td className="py-2 px-4 font-semibold text-foreground flex items-center gap-1.5">
-                        {isPk && <Key className="size-3 text-amber-400 shrink-0" />}
+                        {isPk && <Key className="size-3 text-amber-500 dark:text-amber-400 shrink-0" />}
                         <span>{col.name}</span>
                       </td>
-                      <td className="py-2 px-4 text-sky-400">{col.type}</td>
+                      <td className="py-2 px-4 text-sky-600 dark:text-sky-400 font-mono font-medium">{col.type}</td>
                       <td className="py-2 px-4">
                         {isPk && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30">
                             PRIMARY KEY
                           </span>
                         )}
@@ -198,12 +198,12 @@ export function TableStructureView({ schema, tableName }: TableStructureViewProp
                       <td className="py-2 px-4">
                         {col.isNullable ? (
                           <span className="text-muted-foreground text-[11px] flex items-center gap-1">
-                            <CheckCircle2 className="size-3 text-emerald-400" />
+                            <CheckCircle2 className="size-3 text-emerald-600 dark:text-emerald-400" />
                             <span>NULL</span>
                           </span>
                         ) : (
                           <span className="text-foreground text-[11px] font-semibold flex items-center gap-1">
-                            <XCircle className="size-3 text-rose-400" />
+                            <XCircle className="size-3 text-rose-600 dark:text-rose-400" />
                             <span>NOT NULL</span>
                           </span>
                         )}

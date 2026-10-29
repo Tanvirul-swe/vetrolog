@@ -68,14 +68,14 @@ export function PendingChangesBar({ onCommitted }: PendingChangesBarProps) {
       {/* Floating Action Bar */}
       <div className="fixed bottom-7 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-4 py-2.5 rounded-xl border border-amber-500/40 bg-card/95 shadow-2xl backdrop-blur-md animate-in fade-in slide-in-from-bottom-3 duration-200">
         <div className="flex items-center gap-2 pr-2 border-r border-border/80">
-          <span className="size-2 rounded-full bg-amber-400 animate-ping" />
-          <span className="text-xs font-semibold text-amber-400">
+          <span className="size-2 rounded-full bg-amber-500 dark:bg-amber-400 animate-ping" />
+          <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">
             {pendingChanges.length} {pendingChanges.length === 1 ? 'change' : 'changes'} pending
           </span>
         </div>
 
         {commitError && (
-          <div className="flex items-center gap-1.5 text-xs text-rose-400 max-w-xs truncate" title={commitError}>
+          <div className="flex items-center gap-1.5 text-xs text-rose-600 dark:text-rose-400 max-w-xs truncate" title={commitError}>
             <AlertTriangle className="size-3.5 shrink-0" />
             <span className="truncate">{commitError}</span>
           </div>

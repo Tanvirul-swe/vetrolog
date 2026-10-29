@@ -1403,7 +1403,7 @@ export function SqlEditor({
             onKeyDown={handleKeyDown}
             placeholder="Enter SQL statement (e.g. SELECT * FROM users WHERE active = 1 ORDER BY id DESC LIMIT 50;)"
             spellCheck={false}
-            className="absolute inset-0 p-[8px_12px] m-0 w-full h-full bg-transparent text-transparent caret-sky-400 selection:bg-sky-500/30 selection:text-transparent placeholder:text-muted-foreground/40 resize-none outline-none font-mono text-[13px] leading-[22px] whitespace-pre select-text z-10"
+            className="absolute inset-0 p-[8px_12px] m-0 w-full h-full bg-transparent text-transparent caret-sky-600 dark:caret-sky-400 selection:bg-sky-500/25 selection:text-transparent placeholder:text-muted-foreground/40 resize-none outline-none font-mono text-[13px] leading-[22px] whitespace-pre select-text z-10"
             style={{ tabSize: 2 }}
           />
 

@@ -251,8 +251,8 @@ export function DataExporterModal({ isOpen, onClose, rows, tableName = 'result_s
         </div>
 
         {/* Code Preview */}
-        <div className="h-64 p-3 overflow-auto bg-black/50 font-mono text-xs select-text leading-5">
-          <pre className="text-muted-foreground whitespace-pre-wrap">{formattedContent}</pre>
+        <div className="h-64 p-3 overflow-auto bg-muted/40 dark:bg-black/50 border-t border-border font-mono text-xs select-text leading-5">
+          <pre className="text-foreground/90 whitespace-pre-wrap">{formattedContent}</pre>
         </div>
       </div>
     </div>

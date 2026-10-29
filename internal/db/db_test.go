@@ -120,10 +120,11 @@ func TestLocalSQLiteEngineOperations(t *testing.T) {
 	}
 	_ = dbConn.Close()
 
-	mgr, err := NewConnectionManager()
+	store, err := NewStoreWithPath(filepath.Join(tmpDir, "connections.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
+	mgr := NewConnectionManagerWithStore(store)
 	defer mgr.CloseAll()
 
 	ctx := context.Background()

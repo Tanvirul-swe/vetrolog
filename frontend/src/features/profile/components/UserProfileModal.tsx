@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { User, Sparkles, Shield, Cloud, Laptop, CheckCircle2, X } from 'lucide-react';
+import { User, Sparkles, Shield, Cloud, Laptop, CheckCircle2, X, Sun, Moon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { useThemeStore } from '@/stores/useThemeStore';
 
 interface UserProfileModalProps {
   isOpen: boolean;
@@ -10,6 +11,9 @@ interface UserProfileModalProps {
 
 export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
   const [activeTab, setActiveTab] = useState<'profile' | 'upcoming'>('profile');
+  const theme = useThemeStore((s) => s.theme);
+  const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
+  const setTheme = useThemeStore((s) => s.setTheme);
 
   if (!isOpen) return null;
 
@@ -93,6 +97,60 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-muted-foreground">App Version</span>
                   <span className="font-mono text-foreground font-semibold">v1.4.0</span>
+                </div>
+              </div>
+
+              {/* Theme & Appearance Preference */}
+              <div className="p-3.5 rounded-xl border border-border/70 bg-muted/25 space-y-2.5">
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-1.5 font-medium text-foreground">
+                    <Sun className="size-3.5 text-amber-500" />
+                    <span>Appearance & Theme</span>
+                  </div>
+                  <span className="text-[10px] text-muted-foreground font-mono capitalize">
+                    {theme} {theme === 'system' ? `(${resolvedTheme})` : ''}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setTheme('light')}
+                    className={`p-2 rounded-lg border text-xs flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
+                      theme === 'light'
+                        ? 'bg-background border-primary text-foreground shadow-xs ring-1 ring-primary/40 font-semibold'
+                        : 'bg-card/60 border-border/70 text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                    }`}
+                  >
+                    <Sun className="size-4 text-amber-500" />
+                    <span>Light</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setTheme('dark')}
+                    className={`p-2 rounded-lg border text-xs flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
+                      theme === 'dark'
+                        ? 'bg-background border-primary text-foreground shadow-xs ring-1 ring-primary/40 font-semibold'
+                        : 'bg-card/60 border-border/70 text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                    }`}
+                  >
+                    <Moon className="size-4 text-sky-400" />
+                    <span>Dark</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setTheme('system')}
+                    className={`p-2 rounded-lg border text-xs flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
+                      theme === 'system'
+                        ? 'bg-background border-primary text-foreground shadow-xs ring-1 ring-primary/40 font-semibold'
+                        : 'bg-card/60 border-border/70 text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                    }`}
+                  >
+                    <Laptop className="size-4 text-primary" />
+                    <span>System</span>
+                  </button>
                 </div>
               </div>
 

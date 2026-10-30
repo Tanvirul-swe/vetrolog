@@ -92,20 +92,20 @@ export function PerformanceProfiler() {
   // 60 FPS frame budget = 16.6ms, 120 FPS frame budget = 8.3ms
   let frameSafety = {
     label: 'Ultra Fast (< 2ms)',
-    badge: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
+    badge: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30',
     desc: 'Safe for 60/120 FPS UI threads without frame drop.',
   };
 
   if (currentDuration > 16.6) {
     frameSafety = {
       label: 'Frame Drop Hazard (> 16.6ms)',
-      badge: 'bg-red-500/10 text-red-400 border-red-500/30',
+      badge: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30',
       desc: 'Exceeds 60 FPS frame budget. Will drop frames on main UI thread; use an isolate or background thread.',
     };
   } else if (currentDuration > 8.3) {
     frameSafety = {
       label: '60 FPS Budget Notice (8.3–16.6ms)',
-      badge: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+      badge: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30',
       desc: 'Within 60 FPS limit, but will stutter on 120 Hz ProMotion displays. Consider adding indexes.',
     };
   }

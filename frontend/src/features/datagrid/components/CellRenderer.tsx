@@ -26,7 +26,9 @@ export function CellRenderer({ value }: CellRendererProps) {
       <Badge
         variant="outline"
         className={`text-[10px] font-mono px-1.5 py-0 ${
-          value ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-red-500/10 text-red-400 border-red-500/30'
+          value
+            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+            : 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30'
         }`}
       >
         {value ? 'TRUE' : 'FALSE'}
@@ -35,14 +37,14 @@ export function CellRenderer({ value }: CellRendererProps) {
   }
 
   if (typeof value === 'number') {
-    return <span className="font-mono text-sky-400 font-medium">{value.toLocaleString()}</span>;
+    return <span className="font-mono text-sky-600 dark:text-sky-400 font-medium">{value.toLocaleString()}</span>;
   }
 
   if (typeof value === 'object') {
     const jsonStr = JSON.stringify(value);
     return (
       <div className="flex items-center gap-1.5 max-w-xs group">
-        <span className="font-mono text-[11px] text-amber-300 truncate bg-amber-500/10 px-1 rounded border border-amber-500/20">
+        <span className="font-mono text-[11px] text-amber-700 dark:text-amber-300 truncate bg-amber-500/10 px-1 rounded border border-amber-500/20">
           {jsonStr}
         </span>
         <button
@@ -51,7 +53,7 @@ export function CellRenderer({ value }: CellRendererProps) {
           className="opacity-0 group-hover:opacity-100 p-0.5 text-muted-foreground hover:text-foreground"
           title="Copy JSON"
         >
-          {copied ? <Check className="size-3 text-emerald-400" /> : <Copy className="size-3" />}
+          {copied ? <Check className="size-3 text-emerald-600 dark:text-emerald-400" /> : <Copy className="size-3" />}
         </button>
       </div>
     );
@@ -64,9 +66,9 @@ export function CellRenderer({ value }: CellRendererProps) {
     return (
       <Badge
         variant="outline"
-        className="text-[10px] font-mono px-1.5 py-0 bg-purple-500/10 text-purple-400 border-purple-500/30 gap-1 inline-flex items-center select-none"
+        className="text-[10px] font-mono px-1.5 py-0 bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/30 gap-1 inline-flex items-center select-none"
       >
-        <Binary className="size-2.5 text-purple-400" />
+        <Binary className="size-2.5 text-purple-600 dark:text-purple-400" />
         <span>{str.slice(1, -1)}</span>
       </Badge>
     );
@@ -76,7 +78,7 @@ export function CellRenderer({ value }: CellRendererProps) {
   if ((str.startsWith('{') && str.endsWith('}')) || (str.startsWith('[') && str.endsWith(']'))) {
     return (
       <div className="flex items-center gap-1.5 max-w-xs group">
-        <span className="font-mono text-[11px] text-amber-300 truncate bg-amber-500/10 px-1 rounded border border-amber-500/20">
+        <span className="font-mono text-[11px] text-amber-700 dark:text-amber-300 truncate bg-amber-500/10 px-1 rounded border border-amber-500/20">
           {str.length > 300 ? str.slice(0, 300) + '...' : str}
         </span>
         <button
@@ -85,7 +87,7 @@ export function CellRenderer({ value }: CellRendererProps) {
           className="opacity-0 group-hover:opacity-100 p-0.5 text-muted-foreground hover:text-foreground"
           title="Copy JSON"
         >
-          {copied ? <Check className="size-3 text-emerald-400" /> : <Copy className="size-3" />}
+          {copied ? <Check className="size-3 text-emerald-600 dark:text-emerald-400" /> : <Copy className="size-3" />}
         </button>
       </div>
     );

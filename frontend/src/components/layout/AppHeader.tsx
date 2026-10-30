@@ -21,6 +21,7 @@ import { ConnectionManagerModal } from '@/features/connections/components/Connec
 import { UpdateBadge } from '@/features/updater/UpdateBadge';
 import { UpdateProgressModal } from '@/features/updater/UpdateProgressModal';
 import { UserProfileModal } from '@/features/profile/components/UserProfileModal';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import logoIcon from '@/assets/images/vetrolog-icon.png';
 
 interface AppHeaderProps {
@@ -224,6 +225,11 @@ export function AppHeader({
           >
             <Trash2 className="size-3.5" />
           </Button>
+
+          <div className="h-4 w-px bg-border/60 mx-0.5" />
+
+          {/* Theme Mode Toggle */}
+          <ThemeToggle />
 
           <Button
             variant="ghost"

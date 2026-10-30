@@ -40,7 +40,7 @@ export function AutocompletePopup({
   return (
     <div
       style={{ top: `${position.top}px`, left: `${position.left}px` }}
-      className="absolute z-50 min-w-[360px] max-w-[560px] w-auto max-h-72 overflow-y-auto rounded-lg border border-border/80 bg-card/95 backdrop-blur-md shadow-2xl shadow-black/50 text-xs font-mono p-1 select-none animate-in fade-in duration-100"
+      className="absolute z-50 min-w-[360px] max-w-[560px] w-auto max-h-72 overflow-y-auto rounded-lg border border-border/80 bg-card/95 backdrop-blur-md shadow-2xl shadow-black/10 dark:shadow-black/50 text-xs font-mono p-1 select-none animate-in fade-in duration-100"
     >
       <div ref={listRef} className="space-y-0.5">
         {items.map((item, idx) => {

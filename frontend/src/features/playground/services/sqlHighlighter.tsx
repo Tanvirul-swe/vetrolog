@@ -137,7 +137,7 @@ export function highlightSql(
     // 1. Comments
     if (token.startsWith('--') || token.startsWith('/*')) {
       return (
-        <span key={index} className="text-zinc-500 italic">
+        <span key={index} className="text-zinc-500 dark:text-zinc-400 italic">
           {token}
         </span>
       );
@@ -146,7 +146,7 @@ export function highlightSql(
     // 2. Single-quoted strings
     if (token.startsWith("'")) {
       return (
-        <span key={index} className="text-emerald-400">
+        <span key={index} className="text-emerald-600 dark:text-emerald-400">
           {token}
         </span>
       );
@@ -158,20 +158,20 @@ export function highlightSql(
       const innerLower = inner.toLowerCase();
       if (tableNames.has(innerLower)) {
         return (
-          <span key={index} className="text-teal-300 font-semibold">
+          <span key={index} className="text-teal-700 dark:text-teal-300 font-semibold">
             {token}
           </span>
         );
       }
       if (columnNames.has(innerLower)) {
         return (
-          <span key={index} className="text-indigo-300 font-medium">
+          <span key={index} className="text-indigo-600 dark:text-indigo-300 font-medium">
             {token}
           </span>
         );
       }
       return (
-        <span key={index} className="text-emerald-300">
+        <span key={index} className="text-emerald-600 dark:text-emerald-300">
           {token}
         </span>
       );
@@ -180,7 +180,7 @@ export function highlightSql(
     // 4. Numbers
     if (/^\d+(?:\.\d+)?$/.test(token)) {
       return (
-        <span key={index} className="text-amber-400 font-mono">
+        <span key={index} className="text-amber-600 dark:text-amber-400 font-mono">
           {token}
         </span>
       );
@@ -193,7 +193,7 @@ export function highlightSql(
 
       if (DDL_KEYWORDS.has(upper)) {
         return (
-          <span key={index} className="text-violet-400 font-bold">
+          <span key={index} className="text-violet-600 dark:text-violet-400 font-bold">
             {token}
           </span>
         );
@@ -201,7 +201,7 @@ export function highlightSql(
 
       if (SQL_KEYWORDS.has(upper)) {
         return (
-          <span key={index} className="text-sky-400 font-semibold">
+          <span key={index} className="text-sky-600 dark:text-sky-400 font-semibold">
             {token}
           </span>
         );
@@ -209,7 +209,7 @@ export function highlightSql(
 
       if (SQL_FUNCTIONS.has(upper)) {
         return (
-          <span key={index} className="text-amber-300 font-medium">
+          <span key={index} className="text-amber-600 dark:text-amber-300 font-medium">
             {token}
           </span>
         );
@@ -217,7 +217,7 @@ export function highlightSql(
 
       if (tableNames.has(lower)) {
         return (
-          <span key={index} className="text-teal-300 font-semibold">
+          <span key={index} className="text-teal-700 dark:text-teal-300 font-semibold">
             {token}
           </span>
         );
@@ -225,7 +225,7 @@ export function highlightSql(
 
       if (columnNames.has(lower)) {
         return (
-          <span key={index} className="text-indigo-300 font-medium">
+          <span key={index} className="text-indigo-600 dark:text-indigo-300 font-medium">
             {token}
           </span>
         );
@@ -241,7 +241,7 @@ export function highlightSql(
     // 6. Operators and Punctuation
     if (/^[=<>!+\-*/%,;().]+$/.test(token)) {
       return (
-        <span key={index} className="text-slate-400">
+        <span key={index} className="text-slate-500 dark:text-slate-400">
           {token}
         </span>
       );

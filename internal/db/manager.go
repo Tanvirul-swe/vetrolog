@@ -43,10 +43,15 @@ func NewConnectionManager() (*ConnectionManager, error) {
 		return nil, err
 	}
 
+	return NewConnectionManagerWithStore(store), nil
+}
+
+// NewConnectionManagerWithStore initializes a ConnectionManager with a custom Store
+func NewConnectionManagerWithStore(store *Store) *ConnectionManager {
 	return &ConnectionManager{
 		store:    store,
 		sessions: make(map[string]*ActiveSession),
-	}, nil
+	}
 }
 
 // Store returns the backing encrypted store

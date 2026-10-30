@@ -23,7 +23,15 @@ type Config struct {
 
 var (
 	configMu sync.RWMutex
+	customConfigFile string
 )
+
+// SetCustomConfigFileForTest overrides config file location for isolated unit testing
+func SetCustomConfigFileForTest(path string) {
+	configMu.Lock()
+	defer configMu.Unlock()
+	customConfigFile = path
+}
 
 // GenerateUUIDv4 creates an anonymous cryptographically secure random UUID
 func GenerateUUIDv4() string {
@@ -54,6 +62,9 @@ func getTelemetryConfigDir() string {
 }
 
 func getTelemetryConfigFile() string {
+	if customConfigFile != "" {
+		return customConfigFile
+	}
 	return filepath.Join(getTelemetryConfigDir(), "telemetry.json")
 }
 

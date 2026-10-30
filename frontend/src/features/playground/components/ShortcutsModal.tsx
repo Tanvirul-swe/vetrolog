@@ -158,7 +158,7 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               {categories.map((category) => (
                 <div key={category} className="space-y-1.5 flex flex-col">
-                  <h4 className="text-[11px] font-semibold text-sky-400 uppercase tracking-wider font-sans">
+                  <h4 className="text-[11px] font-semibold text-sky-600 dark:text-sky-400 uppercase tracking-wider font-sans">
                     {category}
                   </h4>
                   <div className="rounded-lg border border-border/60 bg-muted/20 divide-y divide-border/40 overflow-hidden flex-1">

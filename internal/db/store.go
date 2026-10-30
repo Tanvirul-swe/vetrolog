@@ -25,6 +25,23 @@ type Store struct {
 	key      []byte
 }
 
+// NewStoreWithPath initializes connection store at a specified file path
+func NewStoreWithPath(filePath string) (*Store, error) {
+	dir := filepath.Dir(filePath)
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return nil, err
+	}
+
+	h := sha256.New()
+	h.Write([]byte(filePath + "-vetrolog-secrets-salt-v1"))
+	key := h.Sum(nil)
+
+	return &Store{
+		filePath: filePath,
+		key:      key,
+	}, nil
+}
+
 // NewStore initializes connection store at ~/.vetrolog/connections.json
 func NewStore() (*Store, error) {
 	home, err := os.UserHomeDir()
@@ -32,20 +49,7 @@ func NewStore() (*Store, error) {
 		return nil, err
 	}
 
-	dir := filepath.Join(home, ".vetrolog")
-	if err := os.MkdirAll(dir, 0700); err != nil {
-		return nil, err
-	}
-
-	// Deterministic local machine key based on user and home path
-	h := sha256.New()
-	h.Write([]byte(home + "-vetrolog-secrets-salt-v1"))
-	key := h.Sum(nil)
-
-	return &Store{
-		filePath: filepath.Join(dir, "connections.json"),
-		key:      key,
-	}, nil
+	return NewStoreWithPath(filepath.Join(home, ".vetrolog", "connections.json"))
 }
 
 // ListSummaries returns sanitized profiles for UI presentation

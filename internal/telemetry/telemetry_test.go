@@ -1,6 +1,7 @@
 package telemetry
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -60,6 +61,10 @@ func TestBuildEvents(t *testing.T) {
 }
 
 func TestServiceOptOut(t *testing.T) {
+	tmpFile := filepath.Join(t.TempDir(), "telemetry.json")
+	SetCustomConfigFileForTest(tmpFile)
+	defer SetCustomConfigFileForTest("")
+
 	svc := NewService("desktop")
 	defer svc.Close()
 

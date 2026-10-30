@@ -43,8 +43,6 @@ export function DiagramToolbar({
   const toggleTypes = useDiagramStore((s) => s.toggleColumnTypes);
   const animateFlow = useDiagramStore((s) => s.animateRelationFlow);
   const toggleFlow = useDiagramStore((s) => s.toggleRelationFlow);
-  const nodes = useDiagramStore((s) => s.nodes);
-  const edges = useDiagramStore((s) => s.edges);
   const isLoading = useDiagramStore((s) => s.isLoading);
 
   const [isExportOpen, setIsExportOpen] = useState(false);
@@ -62,20 +60,11 @@ export function DiagramToolbar({
     return () => window.removeEventListener('mousedown', handleClick);
   }, [isExportOpen]);
 
-  // Compute search matches
-  const matchCount = searchQuery.trim()
-    ? nodes.filter(
-        (n) =>
-          n.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          n.columns.some((c) => c.name.toLowerCase().includes(searchQuery.toLowerCase()))
-      ).length
-    : nodes.length;
-
   return (
     <div className="h-11 border-b border-border/80 bg-card/75 backdrop-blur-md px-3 flex items-center justify-between select-none shrink-0 z-30 text-xs">
-      {/* Left: Search & Table Count Pill */}
+      {/* Left: Search */}
       <div className="flex items-center gap-2">
-        <div className="relative w-44 sm:w-56">
+        <div className="relative w-48 sm:w-60">
           <Search className="size-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
           <input
             type="text"
@@ -93,14 +82,6 @@ export function DiagramToolbar({
               <X className="size-3" />
             </button>
           )}
-        </div>
-
-        <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/50 border border-border/60 text-[11px] text-muted-foreground font-sans">
-          <span className="font-semibold text-foreground">{matchCount}</span>
-          <span>{matchCount === 1 ? 'table' : 'tables'}</span>
-          <span className="text-muted-foreground/40">•</span>
-          <span className="font-semibold text-foreground">{edges.length}</span>
-          <span>{edges.length === 1 ? 'relation' : 'relations'}</span>
         </div>
       </div>
 

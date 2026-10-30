@@ -156,7 +156,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Download all build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: release-assets
           merge-multiple: true
@@ -179,7 +179,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Download macOS build artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: VetroLog-macOS-Universal
           path: macos-artifact

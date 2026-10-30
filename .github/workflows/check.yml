@@ -49,6 +49,9 @@ jobs:
           go-version-file: 'go.mod'
           cache: true
 
+      - name: Ensure Frontend Dist Exists for Go Embed
+        run: mkdir -p frontend/dist && touch frontend/dist/index.html
+
       - name: Run Go Vet
         run: go vet ./...
 

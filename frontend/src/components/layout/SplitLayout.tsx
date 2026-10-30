@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { PanelLeftOpen } from 'lucide-react';
 import { AppHeader } from './AppHeader';
 import { AppSidebar } from './AppSidebar';
 import { AppStatusBar } from './AppStatusBar';
@@ -9,6 +10,7 @@ import { DatabaseDiagramView } from '@/features/diagram/DatabaseDiagramView';
 import { PendingChangesBar } from '@/features/datagrid/components/PendingChangesBar';
 import { usePlaygroundStore } from '@/stores/usePlaygroundStore';
 import { useConnectionManagerStore } from '@/stores/useConnectionManagerStore';
+import { useSettingsStore } from '@/stores/useSettingsStore';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 
 interface SplitLayoutProps {
@@ -32,6 +34,9 @@ export function SplitLayout({
   const activeRemoteView = useConnectionManagerStore((s) => s.activeRemoteView);
   const selectLocalFileDialog = useConnectionManagerStore((s) => s.selectLocalFileDialog);
 
+  const isSidebarOpen = useSettingsStore((s) => s.isSidebarOpen);
+  const toggleSidebar = useSettingsStore((s) => s.toggleSidebar);
+
   useKeyboardShortcuts(onRefresh);
 
   return (
@@ -44,13 +49,33 @@ export function SplitLayout({
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left Database Sidebar */}
-        <AppSidebar
-          onRefresh={onRefresh}
-          onOpenConnectionManager={() => setIsConnectionManagerOpen(true)}
-          onOpenLocalFileDialog={() => selectLocalFileDialog()}
-        />
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* Left Database Sidebar with smooth width transition */}
+        <div
+          className={`shrink-0 h-full overflow-hidden transition-all duration-200 ease-in-out border-r border-border/80 ${
+            isSidebarOpen ? 'w-64 opacity-100' : 'w-0 opacity-0 border-r-0 pointer-events-none'
+          }`}
+        >
+          <div className="w-64 h-full">
+            <AppSidebar
+              onRefresh={onRefresh}
+              onOpenConnectionManager={() => setIsConnectionManagerOpen(true)}
+              onOpenLocalFileDialog={() => selectLocalFileDialog()}
+            />
+          </div>
+        </div>
+
+        {/* Floating Expand Sidebar Button when collapsed */}
+        {!isSidebarOpen && (
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            title="Expand Sidebar (⌘B)"
+            className="absolute top-2.5 left-2.5 z-20 size-7 rounded-md bg-card/90 backdrop-blur-md border border-border/80 shadow-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-all cursor-pointer"
+          >
+            <PanelLeftOpen className="size-3.5 text-primary" />
+          </button>
+        )}
 
         {/* Center Canvas */}
         <div className="flex-1 flex flex-col overflow-hidden">

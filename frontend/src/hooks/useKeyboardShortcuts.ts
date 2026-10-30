@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useSettingsStore } from '@/stores/useSettingsStore';
 
 export function useKeyboardShortcuts(onRefresh?: () => void) {
   useEffect(() => {
@@ -8,6 +9,11 @@ export function useKeyboardShortcuts(onRefresh?: () => void) {
       if (isCmdOrCtrl && e.key.toLowerCase() === 'r') {
         e.preventDefault();
         onRefresh?.();
+      }
+
+      if (isCmdOrCtrl && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        useSettingsStore.getState().toggleSidebar();
       }
     };
 

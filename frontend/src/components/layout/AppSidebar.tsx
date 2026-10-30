@@ -1,4 +1,4 @@
-import { FolderTree, Database, Loader2, Globe } from 'lucide-react';
+import { FolderTree, Database, Loader2, Globe, PanelLeftClose } from 'lucide-react';
 import { DatabaseTree } from '@/features/databases/components/DatabaseTree';
 import { RemoteDatabaseTree } from '@/features/databases/components/RemoteDatabaseTree';
 import { useDatabaseStore } from '@/stores/useDatabaseStore';
@@ -6,6 +6,7 @@ import { usePlaygroundStore } from '@/stores/usePlaygroundStore';
 import { useAdbStore } from '@/stores/useAdbStore';
 import { useConnectionManagerStore } from '@/stores/useConnectionManagerStore';
 import { useDiagramStore } from '@/features/diagram/stores/useDiagramStore';
+import { useSettingsStore } from '@/stores/useSettingsStore';
 
 interface AppSidebarProps {
   onRefresh?: () => void;
@@ -32,6 +33,7 @@ export function AppSidebar({
   const isLoadingApps = useAdbStore((s) => s.isLoadingApps);
   const isLoadingDatabases = useAdbStore((s) => s.isLoadingDatabases);
   const isBusy = isInitialLoading || isLoadingDevices || isLoadingApps || isLoadingDatabases;
+  const toggleSidebar = useSettingsStore((s) => s.toggleSidebar);
 
   const handleSelectTable = (tableName: string) => {
     selectTable(tableName);
@@ -43,7 +45,7 @@ export function AppSidebar({
   };
 
   return (
-    <aside className="w-64 border-r border-border/80 bg-sidebar/50 flex flex-col shrink-0 select-none overflow-hidden h-full">
+    <aside className="w-full bg-sidebar/50 flex flex-col shrink-0 select-none overflow-hidden h-full">
       {/* Sidebar Section Title */}
       <div className="h-10 border-b border-border/60 px-3 flex items-center justify-between text-xs font-semibold text-muted-foreground bg-card/20 shrink-0">
         <div className="flex items-center gap-2">
@@ -57,22 +59,33 @@ export function AppSidebar({
           </span>
         </div>
 
-        {workspaceMode === 'mobile' ? (
-          isBusy && databases.length === 0 ? (
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary flex items-center gap-1 border border-primary/20">
-              <Loader2 className="size-2.5 animate-spin" />
-              <span>scanning</span>
-            </span>
+        <div className="flex items-center gap-1.5">
+          {workspaceMode === 'mobile' ? (
+            isBusy && databases.length === 0 ? (
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary flex items-center gap-1 border border-primary/20">
+                <Loader2 className="size-2.5 animate-spin" />
+                <span>scanning</span>
+              </span>
+            ) : (
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted/80 text-muted-foreground">
+                {databases.length} {databases.length === 1 ? 'store' : 'stores'}
+              </span>
+            )
           ) : (
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted/80 text-muted-foreground">
-              {databases.length} {databases.length === 1 ? 'store' : 'stores'}
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              Remote
             </span>
-          )
-        ) : (
-          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-            Remote
-          </span>
-        )}
+          )}
+
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            title="Collapse Sidebar (⌘B)"
+            className="size-6 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+          >
+            <PanelLeftClose className="size-3.5" />
+          </button>
+        </div>
       </div>
 
       {/* Main tree content depending on workspace mode */}

@@ -72,99 +72,102 @@ export function DiagramToolbar({
     : nodes.length;
 
   return (
-    <div className="h-11 border-b border-border/80 bg-card/75 backdrop-blur-md px-3 flex items-center justify-between select-none shrink-0 z-30 font-mono text-xs">
-      {/* Left: Search & Filter */}
-      <div className="flex items-center gap-2.5">
-        <div className="relative w-56 sm:w-64">
+    <div className="h-11 border-b border-border/80 bg-card/75 backdrop-blur-md px-3 flex items-center justify-between select-none shrink-0 z-30 text-xs">
+      {/* Left: Search & Table Count Pill */}
+      <div className="flex items-center gap-2">
+        <div className="relative w-44 sm:w-56">
           <Search className="size-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Filter tables or columns..."
+            placeholder="Filter tables & columns..."
             className="w-full h-7 pl-8 pr-7 text-xs rounded-lg bg-background border border-border/70 text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-primary focus:ring-1 focus:ring-primary/40 font-mono"
           />
           {searchQuery && (
             <button
               type="button"
               onClick={() => setSearchQuery('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5 cursor-pointer"
             >
               <X className="size-3" />
             </button>
           )}
         </div>
 
-        <div className="hidden md:flex items-center gap-1.5 text-[11px] text-muted-foreground font-sans">
+        <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/50 border border-border/60 text-[11px] text-muted-foreground font-sans">
           <span className="font-semibold text-foreground">{matchCount}</span>
-          <span>of</span>
-          <span>{nodes.length} tables</span>
+          <span>{matchCount === 1 ? 'table' : 'tables'}</span>
           <span className="text-muted-foreground/40">•</span>
           <span className="font-semibold text-foreground">{edges.length}</span>
-          <span>relations</span>
+          <span>{edges.length === 1 ? 'relation' : 'relations'}</span>
         </div>
       </div>
 
-      {/* Center: Layout & Display Options */}
-      <div className="flex items-center gap-1">
+      {/* Center: Layout & Display Options (Unified Segmented Groups) */}
+      <div className="flex items-center gap-2">
+        {/* Auto Arrange Layout Action */}
         <Button
           variant="outline"
           size="sm"
           onClick={autoArrange}
           title="Auto-arrange tables into clean hierarchical layers"
-          className="h-7 text-xs gap-1.5 border-border/70 hover:bg-muted font-sans"
+          className="h-7 text-xs gap-1.5 border-border/80 hover:bg-muted font-sans rounded-lg"
         >
           <LayoutGrid className="size-3 text-sky-400" />
           <span className="hidden sm:inline">Auto Arrange</span>
         </Button>
 
-        <button
-          type="button"
-          onClick={toggleInferred}
-          className={`h-7 px-2.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer border ${
-            showInferred
-              ? 'bg-primary/10 border-primary/30 text-primary'
-              : 'bg-muted/40 border-border/60 text-muted-foreground hover:text-foreground'
-          }`}
-          title="Toggle inferred relations detected by naming convention (e.g. user_id)"
-        >
-          <Link className="size-3" />
-          <span className="hidden sm:inline">Inferred FKs</span>
-        </button>
+        {/* View Options Segmented Pill */}
+        <div className="flex items-center rounded-lg border border-border/70 bg-muted/40 p-0.5 gap-0.5 shadow-2xs">
+          <button
+            type="button"
+            onClick={toggleInferred}
+            className={`h-6 px-2.5 rounded-md text-[11px] font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
+              showInferred
+                ? 'bg-background text-foreground font-semibold shadow-2xs border border-border/80'
+                : 'text-muted-foreground hover:text-foreground hover:bg-background/40'
+            }`}
+            title="Toggle inferred relations detected by naming convention (e.g. user_id)"
+          >
+            <Link className={`size-3 ${showInferred ? 'text-primary' : 'text-muted-foreground'}`} />
+            <span className="hidden md:inline">Inferred FKs</span>
+          </button>
 
-        <button
-          type="button"
-          onClick={toggleTypes}
-          className={`h-7 px-2.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer border ${
-            showTypes
-              ? 'bg-primary/10 border-primary/30 text-primary'
-              : 'bg-muted/40 border-border/60 text-muted-foreground hover:text-foreground'
-          }`}
-          title="Toggle data types display on column rows"
-        >
-          <FileCode className="size-3" />
-          <span className="hidden sm:inline">Types</span>
-        </button>
+          <button
+            type="button"
+            onClick={toggleTypes}
+            className={`h-6 px-2.5 rounded-md text-[11px] font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
+              showTypes
+                ? 'bg-background text-foreground font-semibold shadow-2xs border border-border/80'
+                : 'text-muted-foreground hover:text-foreground hover:bg-background/40'
+            }`}
+            title="Toggle data types display on column rows"
+          >
+            <FileCode className={`size-3 ${showTypes ? 'text-primary' : 'text-muted-foreground'}`} />
+            <span className="hidden md:inline">Types</span>
+          </button>
 
-        <button
-          type="button"
-          onClick={toggleFlow}
-          className={`h-7 px-2.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer border ${
-            animateFlow
-              ? 'bg-primary/10 border-primary/30 text-primary'
-              : 'bg-muted/40 border-border/60 text-muted-foreground hover:text-foreground'
-          }`}
-          title="Toggle animated data flow along relationship curves"
-        >
-          <Activity className={`size-3 ${animateFlow ? 'text-primary animate-pulse' : 'text-muted-foreground'}`} />
-          <span className="hidden sm:inline">Flow Animation</span>
-        </button>
+          <button
+            type="button"
+            onClick={toggleFlow}
+            className={`h-6 px-2.5 rounded-md text-[11px] font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
+              animateFlow
+                ? 'bg-background text-foreground font-semibold shadow-2xs border border-border/80'
+                : 'text-muted-foreground hover:text-foreground hover:bg-background/40'
+            }`}
+            title="Toggle animated data flow along relationship curves"
+          >
+            <Activity className={`size-3 ${animateFlow ? 'text-emerald-500 animate-pulse' : 'text-muted-foreground'}`} />
+            <span className="hidden md:inline">Flow Anim</span>
+          </button>
+        </div>
       </div>
 
       {/* Right: Zoom & Export Controls */}
-      <div className="flex items-center gap-1">
-        {/* Zoom controls */}
-        <div className="flex items-center rounded-lg border border-border/70 bg-muted/30 p-0.5">
+      <div className="flex items-center gap-1.5">
+        {/* Zoom Navigation Cluster */}
+        <div className="flex items-center rounded-lg border border-border/70 bg-muted/40 p-0.5 gap-0.5 shadow-2xs">
           <Button
             variant="ghost"
             size="icon-sm"
@@ -205,18 +208,16 @@ export function DiagramToolbar({
           </Button>
         </div>
 
-        <div className="h-4 w-px bg-border/60 mx-1" />
-
         {/* Refresh Schema */}
         <Button
-          variant="ghost"
+          variant="outline"
           size="icon-sm"
           onClick={onRefresh}
           disabled={isLoading}
           title="Reload schema from database (⌘R)"
-          className="size-7 text-muted-foreground hover:text-foreground"
+          className="size-7 text-muted-foreground hover:text-foreground border-border/80 rounded-lg"
         >
-          <RefreshCw className={`size-3.5 ${isLoading ? 'animate-spin text-primary' : ''}`} />
+          <RefreshCw className={`size-3 ${isLoading ? 'animate-spin text-primary' : ''}`} />
         </Button>
 
         {/* Export Dropdown */}

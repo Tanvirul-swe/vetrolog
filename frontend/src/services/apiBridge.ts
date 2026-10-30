@@ -349,7 +349,7 @@ export const apiBridge = {
       if (!res.ok) return null;
       const data = await res.json();
       return {
-        currentVersion: 'v1.4.0',
+        currentVersion: 'v1.5.0',
         latestVersion: data.tag_name,
         releaseName: data.name,
         releaseNotes: data.body,
@@ -358,7 +358,7 @@ export const apiBridge = {
         assetName: data.assets?.[0]?.name || '',
         assetSize: data.assets?.[0]?.size || 0,
         publishedAt: data.published_at,
-        hasUpdate: Boolean(data.tag_name && data.tag_name !== 'v1.4.0'),
+        hasUpdate: Boolean(data.tag_name && data.tag_name !== 'v1.5.0'),
       };
     } catch {
       return null;

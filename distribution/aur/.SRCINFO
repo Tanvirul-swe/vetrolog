@@ -1,6 +1,6 @@
 pkgbase = vetrolog-bin
 	pkgdesc = High-performance desktop SQLite database inspector for mobile developers (Flutter, Android, React Native)
-	pkgver = 1.4.0
+	pkgver = 1.5.0
 	pkgrel = 1
 	url = https://vetro.hifzio.com
 	arch = x86_64
@@ -10,7 +10,7 @@ pkgbase = vetrolog-bin
 	optdepends = android-tools: For ADB device connectivity
 	provides = vetrolog
 	conflicts = vetrolog
-	source_x86_64 = https://github.com/Tanvirul-swe/vetrolog/releases/download/v1.4.0/VetroLog-Linux-x64.tar.gz
+	source_x86_64 = https://github.com/Tanvirul-swe/vetrolog/releases/download/v1.5.0/VetroLog-Linux-x64.tar.gz
 	source_x86_64 = vetrolog.desktop::https://raw.githubusercontent.com/Tanvirul-swe/vetrolog/main/distribution/desktop/vetrolog.desktop
 	source_x86_64 = vetrolog.png::https://raw.githubusercontent.com/Tanvirul-swe/vetrolog/main/build/appicon.png
 	sha256sums_x86_64 = 1bd97d4008c55d6b40404b28d1e228b10183c760d66360737489c5fec4a53253

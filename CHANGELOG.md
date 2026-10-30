@@ -5,6 +5,55 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [v1.5.0] - 2026-10-30
+
+### 🚀 Overview
+**VetroLog v1.5.0** introduces the **Interactive Real-Time Database Schema Visualizer (ER Diagram)** inspired by dbdiagram.io, **Animated Relationship Data Flow** with directional traveling arrows and particles, smart **Inferred Foreign Key detection**, a full **2026 Light & Dark Theme** system with zero-flicker boot, a **Collapsible Left Sidebar (⌘B)** for 100% full-width canvas workspace, streamlined UI toolbars, and formal **Open-Source Governance & CI Quality Gates**.
+
+---
+
+### 🌟 New Features & Highlights
+
+#### 1. Interactive Real-Time ER Diagram (`/features/diagram`)
+* **Auto-Generated Visual Maps**: Automatically maps database tables, columns, data types, primary keys, and foreign keys into draggable interactive cards upon connecting to an Android debug app or remote database.
+* **Interactive Infinite Canvas**: Fluid panning, focal-point mouse wheel zooming, fit-to-screen (`⛶`), and an interactive mini-map navigation camera.
+* **Hierarchical Layered Auto-Layout**: Sugiyama-style layered DAG layout algorithm (`layoutEngine.ts`) calculating optimal tier positioning without table overlap.
+* **Live Schema Sync**: Automatically updates visual diagrams upon emulator/device migrations or remote catalog changes.
+* **Multi-Format Export**:
+  - **dbdiagram.io (DBML)**: Direct importable syntax with table definitions and `Ref:` declarations.
+  - **Mermaid ER Diagram**: Markdown-ready `erDiagram` syntax for documentation and GitHub previews.
+  - **SQL DDL**: Standard `CREATE TABLE` and `ALTER TABLE ... ADD CONSTRAINT` statements.
+  - **Scalable Vector Graphics (SVG)**: Clean standalone vector graphics snapshot.
+
+#### 2. Animated Relationship Data Flow
+* **Directional Traveling Arrow Chevrons**: GPU-accelerated SVG chevrons (`<animateMotion rotate="auto">`) dynamically glide along the exact curvature from child Foreign Keys into parent Primary Keys.
+* **Flowing Pulse Particles**: Moving particles follow the connector path visualizing active reference/data flow between associated tables.
+* **Target Anchor Ping**: Emits an `animate-ping` highlight on referenced primary keys when hovered or selected.
+* **Toolbar Control**: Dedicated `Flow Anim` toggle button to enable/disable animations at will.
+
+#### 3. Smart Inferred Foreign Keys & Robust Schema Parsing
+* **Safe FK Extraction**: Resolved `undefined is not an object (evaluating 'fk.toTable.toLowerCase')` by providing safe fallbacks for both Go backend (`refTable`/`column`/`refColumn`) and frontend schema representations.
+* **Expanded Heuristics**: Added plural-to-singular transformations (e.g., `categories` → `category_id`), camelCase conventions (`userId`, `orderId`), and UUID patterns (`user_uuid`).
+* **Visual Distinction**: Solid Bézier lines for formal foreign keys; dashed Bézier lines for inferred relations.
+
+#### 4. UI Streamlining & Collapsible Left Sidebar
+* **Collapsible Sidebar (⌘B / Ctrl+B)**: Left database sidebar collapses smoothly (`w-64` to `w-0`) to give 100% canvas width to the ER Diagram, DataGrid, and SQL Studio. Remembers preference in `localStorage`.
+* **Streamlined Top Bar**: Replaced bulky controls with compact segmented controls for source modes (`[ Mobile | Remote ]`) and workspace views (`[ Inspector | ER Diagram | SQL Studio ]`). Unified utility cluster for refresh, logs, theme, and user preferences.
+* **Clean ER Diagram Toolbar**: Logical functional zones for search, Auto Arrange, segmented layer toggles (`Inferred FKs`, `Types`, `Flow Anim`), and zoom controls. Removed distracting counter badges.
+
+#### 5. Modern Dark & Light Theme System
+* Complete high-contrast Light Theme alongside Deep Obsidian Navy Dark Theme.
+* Inline zero-flicker boot script, OS `prefers-color-scheme` listener, and persistent theme storage.
+
+#### 6. Open-Source Governance & Automated CI
+* Added `SECURITY.md` for responsible disclosure via GitHub Private Vulnerability Reporting.
+* Added `CODE_OF_CONDUCT.md` (Contributor Covenant v2.1).
+* Added `.github/pull_request_template.md` and `.github/CODEOWNERS`.
+* Added interactive GitHub Issue Forms for bug reports and feature requests.
+* Upgraded `.github/workflows/check.yml` to run automated frontend lint/build and backend Go race tests (`go test -race`, `go vet`).
+
+---
+
 ## [v1.4.0] - 2026-10-29
 
 ### 🚀 Overview

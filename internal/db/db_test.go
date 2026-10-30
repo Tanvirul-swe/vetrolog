@@ -233,6 +233,27 @@ func TestLocalSQLiteEngineOperations(t *testing.T) {
 		t.Fatalf("Expected database to be untouched (alice_updated), but got %v", verifyRes.Rows[0]["username"])
 	}
 
+	// 6. Test GetTableSchema with Foreign Keys
+	_, _ = active.Engine.ExecuteQuery(ctx, `
+		CREATE TABLE orders (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id INTEGER NOT NULL,
+			amount REAL NOT NULL,
+			FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+		);
+	`, 1)
+
+	ordersSchema, err := active.Engine.GetTableSchema(ctx, "", "", "orders")
+	if err != nil {
+		t.Fatalf("GetTableSchema failed: %v", err)
+	}
+	if len(ordersSchema.ForeignKeys) == 0 {
+		t.Fatalf("Expected at least 1 foreign key on 'orders', got 0")
+	}
+	if ordersSchema.ForeignKeys[0].RefTable != "users" || ordersSchema.ForeignKeys[0].Column != "user_id" {
+		t.Fatalf("Unexpected foreign key: %+v", ordersSchema.ForeignKeys[0])
+	}
+
 	// Close session
 	if err := mgr.CloseConnection(session.SessionID); err != nil {
 		t.Fatalf("CloseConnection failed: %v", err)

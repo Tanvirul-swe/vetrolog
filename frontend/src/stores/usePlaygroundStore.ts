@@ -13,7 +13,7 @@ import { useConnectionManagerStore } from './useConnectionManagerStore';
 import { telemetry } from '@/features/telemetry/telemetryService';
 
 export type PlaygroundTab = 'results' | 'plan' | 'profiler' | 'advisor' | 'history';
-export type WorkspaceView = 'grid' | 'playground';
+export type WorkspaceView = 'grid' | 'playground' | 'diagram';
 
 export interface HistoryItem {
   id: string;

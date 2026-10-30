@@ -181,3 +181,21 @@
 .dark .tab-strip-scroll::-webkit-scrollbar-thumb:hover {
   background: oklch(0.55 0.12 245 / 0.9);
 }
+
+/* ER Diagram Relationship Data Flow Animations */
+@keyframes relationFlowDash {
+  from {
+    stroke-dashoffset: 24;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-relation-flow {
+  animation: relationFlowDash 1.4s linear infinite;
+}
+
+.animate-relation-flow-fast {
+  animation: relationFlowDash 0.7s linear infinite;
+}

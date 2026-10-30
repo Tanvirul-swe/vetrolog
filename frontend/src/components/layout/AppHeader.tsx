@@ -10,11 +10,14 @@ import {
   FolderOpen,
   Power,
   Globe,
+  Network,
+  PanelLeft,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useDatabaseStore } from '@/stores/useDatabaseStore';
 import { usePlaygroundStore } from '@/stores/usePlaygroundStore';
 import { useConnectionManagerStore } from '@/stores/useConnectionManagerStore';
+import { useSettingsStore } from '@/stores/useSettingsStore';
 import { QRPairingModal } from '@/features/connection/components/QRPairingModal';
 import { AdbDeviceSelector } from '@/features/adb/components/AdbDeviceSelector';
 import { ConnectionManagerModal } from '@/features/connections/components/ConnectionManagerModal';
@@ -56,6 +59,9 @@ export function AppHeader({
   const disconnect = useConnectionManagerStore((s) => s.disconnect);
   const selectLocalFileDialog = useConnectionManagerStore((s) => s.selectLocalFileDialog);
 
+  const isSidebarOpen = useSettingsStore((s) => s.isSidebarOpen);
+  const toggleSidebar = useSettingsStore((s) => s.toggleSidebar);
+
   const handleModeSwitch = async (mode: 'mobile' | 'remote') => {
     setWorkspaceMode(mode);
     if (mode === 'remote' && !activeSession) {
@@ -69,94 +75,111 @@ export function AppHeader({
 
   return (
     <>
-      <header className="wails-drag h-13 border-b border-border/80 bg-card/60 backdrop-blur-md px-3 flex items-center justify-between select-none shrink-0 z-30">
-        {/* Left Section: Brand & Traffic Lights Offset & Source Mode Toggle */}
-        <div className={`flex items-center gap-3 ${isMac ? 'pl-[76px]' : 'pl-1'}`}>
-          <div className="size-8 rounded-lg overflow-hidden border border-primary/40 shadow-xs shadow-primary/30 bg-background/80 flex items-center justify-center shrink-0 p-0.5">
-            <img src={logoIcon} alt="VetroLog" className="size-full object-cover rounded-md" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-sm tracking-tight text-foreground">VetroLog</span>
+      <header className="wails-drag h-12 border-b border-border/80 bg-card/75 backdrop-blur-md px-3 flex items-center justify-between select-none shrink-0 z-30">
+        {/* Left Section: Traffic Lights Offset & Sidebar Toggle & Brand & Source Mode Toggle */}
+        <div className={`flex items-center gap-2.5 ${isMac ? 'pl-[76px]' : 'pl-1'}`}>
+          {/* Sidebar Toggle Button */}
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            title={isSidebarOpen ? 'Collapse sidebar (⌘B)' : 'Expand sidebar (⌘B)'}
+            className={`wails-no-drag size-7 rounded-md flex items-center justify-center transition-all cursor-pointer ${
+              isSidebarOpen
+                ? 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
+                : 'text-primary bg-primary/10 border border-primary/30 shadow-2xs'
+            }`}
+          >
+            <PanelLeft className="size-4" />
+          </button>
+
+          {/* Logo & Brand */}
+          <div className="flex items-center gap-2 mr-1">
+            <div className="size-7 rounded-lg overflow-hidden border border-border/80 shadow-2xs bg-background/80 flex items-center justify-center shrink-0 p-0.5">
+              <img src={logoIcon} alt="VetroLog" className="size-full object-cover rounded-md" />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="font-semibold text-xs tracking-tight text-foreground">VetroLog</span>
               <UpdateBadge />
             </div>
-            <p className="text-[11px] text-muted-foreground leading-none">Database & Storage Studio</p>
           </div>
 
-          {/* Source Mode Switcher: Mobile ADB vs Remote / Local DB */}
-          <div className="wails-no-drag ml-2 flex items-center rounded-lg border border-border/80 bg-muted/60 p-1 shadow-inner gap-1">
+          {/* Source Mode Switcher: Mobile vs Remote (Sleek Compact Segmented Pill) */}
+          <div className="wails-no-drag flex items-center rounded-lg border border-border/70 bg-muted/40 p-0.5 gap-0.5">
             <button
               type="button"
               onClick={() => handleModeSwitch('mobile')}
-              className={`h-7 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer select-none active:scale-[0.98] ${
+              className={`h-6 px-2.5 rounded-md text-[11px] font-medium flex items-center gap-1.5 transition-all cursor-pointer select-none ${
                 workspaceMode === 'mobile'
-                  ? 'bg-background text-foreground font-semibold shadow-xs border border-border/80 ring-1 ring-black/5 dark:ring-white/5'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-background/60 hover:shadow-2xs border border-transparent hover:border-border/50'
+                  ? 'bg-background text-foreground font-semibold shadow-2xs border border-border/80'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
-              title="Switch source to Mobile ADB (Android SQLite & SharedPreferences)"
+              title="Switch to Mobile ADB (Android SQLite, Hive, SharedPreferences)"
             >
-              <Smartphone className={`size-3.5 ${workspaceMode === 'mobile' ? 'text-sky-400' : 'text-muted-foreground'}`} />
-              <span>Mobile ADB</span>
-              {workspaceMode === 'mobile' && (
-                <span className="size-1.5 rounded-full bg-sky-400 shadow-xs shadow-sky-400/50" />
-              )}
+              <Smartphone className={`size-3 ${workspaceMode === 'mobile' ? 'text-sky-400' : 'text-muted-foreground'}`} />
+              <span>Mobile</span>
             </button>
             <button
               type="button"
               onClick={() => handleModeSwitch('remote')}
-              className={`h-7 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer select-none active:scale-[0.98] ${
+              className={`h-6 px-2.5 rounded-md text-[11px] font-medium flex items-center gap-1.5 transition-all cursor-pointer select-none ${
                 workspaceMode === 'remote'
-                  ? 'bg-background text-foreground font-semibold shadow-xs border border-border/80 ring-1 ring-black/5 dark:ring-white/5'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-background/60 hover:shadow-2xs border border-transparent hover:border-border/50'
+                  ? 'bg-background text-foreground font-semibold shadow-2xs border border-border/80'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
-              title="Switch source to Remote Databases (PostgreSQL, MySQL, MariaDB, Redis, Local SQLite files)"
+              title="Switch to Remote / Local DB (PostgreSQL, MySQL, MSSQL, Redis, SQLite file)"
             >
-              <Globe className={`size-3.5 ${workspaceMode === 'remote' ? 'text-emerald-400' : 'text-muted-foreground'}`} />
-              <span>Remote / Files</span>
-              {workspaceMode === 'remote' && (
-                <span className="size-1.5 rounded-full bg-emerald-400 shadow-xs shadow-emerald-400/50" />
-              )}
+              <Globe className={`size-3 ${workspaceMode === 'remote' ? 'text-emerald-400' : 'text-muted-foreground'}`} />
+              <span>Remote</span>
             </button>
           </div>
         </div>
 
-        {/* Center Workspace Switcher (Inspector vs SQL Playground) */}
+        {/* Center Workspace Switcher (Inspector, ER Diagram, SQL Studio) */}
         <div className="wails-no-drag flex items-center justify-center">
-          <div className="flex items-center rounded-lg border border-border/80 bg-muted/60 p-1 shadow-inner gap-1">
+          <div className="flex items-center rounded-lg border border-border/70 bg-muted/40 p-0.5 gap-0.5 shadow-2xs">
             <button
               type="button"
               onClick={() => setActiveWorkspaceView('grid')}
-              className={`h-7 px-3.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer select-none active:scale-[0.98] ${
+              className={`h-6.5 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer select-none ${
                 activeWorkspaceView === 'grid'
-                  ? 'bg-background text-foreground font-semibold shadow-xs border border-border/80 ring-1 ring-black/5 dark:ring-white/5'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-background/60 hover:shadow-2xs border border-transparent hover:border-border/50'
+                  ? 'bg-background text-foreground font-semibold shadow-2xs border border-border/80'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-background/40'
               }`}
               title="Inspector: Browse table data, schema structure, and row inspector"
             >
               <Table className={`size-3.5 ${activeWorkspaceView === 'grid' ? 'text-sky-400' : 'text-muted-foreground'}`} />
               <span>Inspector</span>
-              {activeWorkspaceView === 'grid' && (
-                <span className="size-1.5 rounded-full bg-sky-400 shadow-xs shadow-sky-400/50" />
-              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveWorkspaceView('diagram')}
+              className={`h-6.5 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer select-none ${
+                activeWorkspaceView === 'diagram'
+                  ? 'bg-background text-foreground font-semibold shadow-2xs border border-border/80'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-background/40'
+              }`}
+              title="ER Diagram: Interactive schema visualizer, relationships, and foreign keys"
+            >
+              <Network className={`size-3.5 ${activeWorkspaceView === 'diagram' ? 'text-purple-400' : 'text-muted-foreground'}`} />
+              <span>ER Diagram</span>
             </button>
             <button
               type="button"
               onClick={() => setActiveWorkspaceView('playground')}
-              className={`h-7 px-3.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer select-none active:scale-[0.98] ${
+              className={`h-6.5 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer select-none ${
                 activeWorkspaceView === 'playground'
-                  ? 'bg-background text-foreground font-semibold shadow-xs border border-border/80 ring-1 ring-black/5 dark:ring-white/5'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-background/60 hover:shadow-2xs border border-transparent hover:border-border/50'
+                  ? 'bg-background text-foreground font-semibold shadow-2xs border border-border/80'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-background/40'
               }`}
-              title="SQL Playground: Multi-tab SQL query editor, autocomplete, and dry run"
+              title="SQL Studio: Multi-tab SQL query editor, autocomplete, and dry run"
             >
               <Terminal className={`size-3.5 ${activeWorkspaceView === 'playground' ? 'text-primary' : 'text-muted-foreground'}`} />
-              <span>SQL Playground</span>
-              <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse ml-0.5 shadow-xs shadow-emerald-400/50" />
+              <span>SQL Studio</span>
             </button>
           </div>
         </div>
 
-        {/* Right Section: Connection Status & Quick Action Controls */}
+        {/* Right Section: Connection Status & Grouped Action Utilities */}
         <div className="wails-no-drag flex items-center gap-2">
           {workspaceMode === 'mobile' ? (
             <AdbDeviceSelector />
@@ -164,14 +187,14 @@ export function AppHeader({
             /* Remote Controls */
             <div className="flex items-center gap-1.5">
               {activeSession ? (
-                <div className="flex items-center gap-2 px-2.5 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs">
-                  <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <Server className="size-3.5" />
-                  <span className="font-medium max-w-[120px] truncate">{activeSession.config.name}</span>
+                <div className="flex items-center gap-1.5 h-7 px-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs">
+                  <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <Server className="size-3" />
+                  <span className="font-medium max-w-[110px] truncate">{activeSession.config.name}</span>
                   <button
                     type="button"
                     onClick={disconnect}
-                    className="p-0.5 hover:text-rose-400 rounded transition-colors"
+                    className="p-0.5 hover:text-rose-400 rounded transition-colors ml-0.5"
                     title="Disconnect session"
                   >
                     <Power className="size-3" />
@@ -182,9 +205,9 @@ export function AppHeader({
                   variant="outline"
                   size="sm"
                   onClick={() => setIsConnectionManagerOpen(true)}
-                  className="h-8 text-xs gap-1.5 border-primary/40 hover:bg-primary/10 text-primary font-medium"
+                  className="h-7 text-xs gap-1.5 border-primary/40 hover:bg-primary/10 text-primary font-medium"
                 >
-                  <Server className="size-3.5" />
+                  <Server className="size-3" />
                   <span>Connect DB</span>
                 </Button>
               )}
@@ -193,53 +216,51 @@ export function AppHeader({
                 variant="outline"
                 size="sm"
                 onClick={() => selectLocalFileDialog()}
-                className="h-8 text-xs gap-1.5 border-border/70 hover:bg-muted"
+                className="h-7 text-xs gap-1.5 border-border/70 hover:bg-muted text-muted-foreground hover:text-foreground"
                 title="Open local SQLite file from disk"
               >
-                <FolderOpen className="size-3.5 text-amber-400" />
-                <span>Open .db</span>
+                <FolderOpen className="size-3 text-amber-500" />
+                <span className="hidden sm:inline">Open .db</span>
               </Button>
             </div>
           )}
 
-          <div className="h-4 w-px bg-border/60 mx-1" />
+          {/* Clean Grouped Action Utilities */}
+          <div className="flex items-center rounded-lg border border-border/70 bg-muted/30 p-0.5 gap-0.5">
+            {onRefresh && (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={onRefresh}
+                title="Refresh table data (⌘R)"
+                className="size-6 text-muted-foreground hover:text-foreground hover:bg-background/80"
+              >
+                <RefreshCw className="size-3" />
+              </Button>
+            )}
 
-          {onRefresh && (
             <Button
               variant="ghost"
               size="icon-sm"
-              onClick={onRefresh}
-              title="Refresh table data (⌘R)"
-              className="text-muted-foreground hover:text-foreground size-8"
+              onClick={clearLogs}
+              title="Clear mutation & query logs"
+              className="size-6 text-muted-foreground hover:text-foreground hover:bg-background/80"
             >
-              <RefreshCw className="size-3.5" />
+              <Trash2 className="size-3" />
             </Button>
-          )}
 
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={clearLogs}
-            title="Clear mutation & query logs"
-            className="text-muted-foreground hover:text-foreground size-8"
-          >
-            <Trash2 className="size-3.5" />
-          </Button>
+            <ThemeToggle />
 
-          <div className="h-4 w-px bg-border/60 mx-0.5" />
-
-          {/* Theme Mode Toggle */}
-          <ThemeToggle />
-
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => setIsProfileOpen(true)}
-            title="User Profile & Preferences"
-            className="text-muted-foreground hover:text-foreground size-8 rounded-full border border-border/70 hover:border-primary/50 hover:bg-primary/10 transition-colors ml-0.5"
-          >
-            <User className="size-4 text-primary" />
-          </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => setIsProfileOpen(true)}
+              title="User Profile & Preferences"
+              className="size-6 text-muted-foreground hover:text-foreground hover:bg-background/80"
+            >
+              <User className="size-3.5 text-primary" />
+            </Button>
+          </div>
         </div>
       </header>
 

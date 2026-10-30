@@ -73,6 +73,8 @@ export function RemoteExecuteQuery(arg1:string,arg2:string,arg3:number):Promise<
 
 export function RemoteExplainQuery(arg1:string,arg2:string):Promise<types.QueryPlanResult>;
 
+export function RemoteGetDatabaseSchemaExtended(arg1:string,arg2:string,arg3:string):Promise<Array<types.ExtendedTableSchema>>;
+
 export function RemoteGetTableData(arg1:string,arg2:string,arg3:string,arg4:number,arg5:number,arg6:string,arg7:string,arg8:string):Promise<types.TableDataResult>;
 
 export function RemoteGetTableSchema(arg1:string,arg2:string,arg3:string,arg4:string):Promise<types.ExtendedTableSchema>;

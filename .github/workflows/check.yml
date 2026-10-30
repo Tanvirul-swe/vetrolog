@@ -1,25 +1,56 @@
-name: Check frontend
+name: CI Quality Checks
 
 on:
   push:
+    branches: [ main, db-draw ]
   pull_request:
+    branches: [ main ]
 
 permissions:
   contents: read
 
 jobs:
   frontend:
+    name: Frontend Lint & Build
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 22
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run build
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Lint Frontend
+        run: npm run lint
+
+      - name: Build Frontend
+        run: npm run build
+
+  backend:
+    name: Backend Go Tests & Vet
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+
+      - name: Run Go Vet
+        run: go vet ./...
+
+      - name: Run Go Unit Tests with Race Detector
+        run: go test -v -race -count=1 ./...

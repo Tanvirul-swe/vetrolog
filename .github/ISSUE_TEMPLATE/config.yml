@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 🔒 Security Vulnerability
+    url: https://github.com/Tanvirul-swe/vetrolog/security/advisories/new
+    about: Please report security vulnerabilities privately rather than filing a public issue.
+  - name: 💬 Discussions & Q&A
+    url: https://github.com/Tanvirul-swe/vetrolog/discussions
+    about: Ask questions, share workflows, and discuss features with the community.

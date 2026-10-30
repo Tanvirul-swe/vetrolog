@@ -1,0 +1,25 @@
+# GitHub CODEOWNERS
+# These owners will be automatically requested for review when a PR touches matching paths.
+# More info: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owner for everything in the repository
+*                      @Tanvirul-swe
+
+# Core Go Backend & Database Engines
+/internal/             @Tanvirul-swe
+/main.go               @Tanvirul-swe
+/go.mod                @Tanvirul-swe
+/go.sum                @Tanvirul-swe
+
+# Frontend Application & State Management
+/frontend/src/         @Tanvirul-swe
+/frontend/package.json @Tanvirul-swe
+
+# Documentation & Specifications
+/docs-site/            @Tanvirul-swe
+/CHANGELOG.md          @Tanvirul-swe
+/CONTRIBUTING.md       @Tanvirul-swe
+/SECURITY.md           @Tanvirul-swe
+
+# CI/CD & GitHub Automation Workflows
+/.github/              @Tanvirul-swe

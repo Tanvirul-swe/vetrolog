@@ -40,3 +40,4 @@ To help us triage and resolve the issue quickly, please provide:
 - **Fix & Advisory**: We will work on a patch in a private repository/fork and coordinate a release date with you before publishing a security advisory and CVE if applicable.
 
 > **Please DO NOT file public GitHub issues for security vulnerabilities.** Public issues can expose users to risk before a patch is ready.
+

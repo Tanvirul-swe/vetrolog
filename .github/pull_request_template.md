@@ -28,3 +28,4 @@
 - [ ] I have tested these changes on both Light and Dark themes.
 - [ ] I have updated the documentation / CHANGELOG if applicable.
 - [ ] All new and existing tests passed.
+

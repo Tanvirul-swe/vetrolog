@@ -23,17 +23,17 @@ hero:
 
 import { Card, CardGrid, LinkButton, Badge, Tabs, TabItem } from '@astrojs/starlight/components';
 
-## 📥 Download VetroLog for Your Platform
+## Download VetroLog for Your Platform
 
 Choose the pre-compiled installer for your operating system. Free, open-source, and updated with every release.
 
 <Tabs>
   <TabItem label="macOS" icon="apple">
     <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; margin: 1.25rem 0 1rem 0;">
-      <LinkButton href="https://github.com/Tanvirul-swe/releases/latest/download/VetroLog-macOS-Universal.dmg" variant="primary" icon="download">
+      <LinkButton href="https://github.com/Tanvirul-swe/vetrolog/releases/latest/download/VetroLog-macOS-Universal.dmg" variant="primary" icon="download">
         Download DMG Installer (.dmg)
       </LinkButton>
-      <LinkButton href="https://github.com/Tanvirul-swe/releases/latest/download/VetroLog-macOS-Universal.zip" variant="secondary" icon="document">
+      <LinkButton href="https://github.com/Tanvirul-swe/vetrolog/releases/latest/download/VetroLog-macOS-Universal.zip" variant="secondary" icon="document">
         Download .zip Archive
       </LinkButton>
     </div>
@@ -51,11 +51,11 @@ Choose the pre-compiled installer for your operating system. Free, open-source, 
 
   <TabItem label="Windows" icon="windows">
     <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; margin: 1.25rem 0 1rem 0;">
-      <LinkButton href="https://github.com/Tanvirul-swe/releases/latest/download/VetroLog-amd64-installer.exe" variant="primary" icon="download">
-        Download Windows Setup (.exe)
-      </LinkButton>
-      <LinkButton href="https://github.com/Tanvirul-swe/releases/latest/download/VetroLog-Windows-x64-Portable.zip" variant="secondary" icon="document">
+      <LinkButton href="https://github.com/Tanvirul-swe/vetrolog/releases/latest/download/VetroLog-Windows-x64-Portable.zip" variant="primary" icon="download">
         Download Portable (.zip)
+      </LinkButton>
+      <LinkButton href="https://github.com/Tanvirul-swe/vetrolog/releases/latest" variant="secondary" icon="external">
+        All Releases & Assets
       </LinkButton>
     </div>
 
@@ -64,15 +64,17 @@ Choose the pre-compiled installer for your operating system. Free, open-source, 
       <Badge text="x86_64" variant="note" />
     </div>
 
-    Includes automated NSIS setup wizard with desktop shortcuts, Start Menu integration, and clean uninstaller support.
+    Zero-install portable package. Extract and run `vetrolog.exe` directly. Also installable via **`winget install Hifzio.VetroLog`** and **Scoop**.
+
+    👉 *See the **[Windows Installation Guide](/getting-started/installation/#-windows)** for package managers & setup details.*
   </TabItem>
 
   <TabItem label="Linux" icon="linux">
     <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; margin: 1.25rem 0 1rem 0;">
-      <LinkButton href="https://github.com/Tanvirul-swe/releases/latest/download/VetroLog-Linux-amd64.deb" variant="primary" icon="download">
+      <LinkButton href="https://github.com/Tanvirul-swe/vetrolog/releases/latest/download/VetroLog-Linux-amd64.deb" variant="primary" icon="download">
         Download Debian / Ubuntu (.deb)
       </LinkButton>
-      <LinkButton href="https://github.com/Tanvirul-swe/releases/latest/download/VetroLog-Linux-x64.tar.gz" variant="secondary" icon="document">
+      <LinkButton href="https://github.com/Tanvirul-swe/vetrolog/releases/latest/download/VetroLog-Linux-x64.tar.gz" variant="secondary" icon="document">
         Download Tarball (.tar.gz)
       </LinkButton>
     </div>
@@ -83,7 +85,9 @@ Choose the pre-compiled installer for your operating system. Free, open-source, 
       <Badge text="amd64" variant="default" />
     </div>
 
-    GTK3 + WebKit2GTK desktop build. Install with `sudo dpkg -i VetroLog-Linux-amd64.deb` or extract the standalone tarball.
+    GTK3 + WebKit2GTK desktop build. Install with `sudo dpkg -i VetroLog-Linux-amd64.deb` or extract the standalone tarball. Also available via Snap and AUR.
+
+    👉 *See the **[Linux Installation Guide](/getting-started/installation/#-linux)** for Snap (`snap install vetrolog`) and AUR (`yay -S vetrolog-bin`).*
   </TabItem>
 </Tabs>
 

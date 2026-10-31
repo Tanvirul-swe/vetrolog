@@ -103,4 +103,4 @@ Google deprecated older 1.5 model aliases on `v1beta`.
 ## Next Steps
 
 * Still have questions? Browse the **[FAQ](/faq/)**.
-* Need to report a bug? Open an issue on **[GitHub](https://github.com/Tanvirul-swe/issues)**.
+* Need to report a bug? Open an issue on **[GitHub](https://github.com/Tanvirul-swe/vetrolog/issues)**.

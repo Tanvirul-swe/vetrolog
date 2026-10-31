@@ -90,6 +90,7 @@ jobs:
       - name: Build Windows Executable & NSIS Installer
         if: runner.os == 'Windows'
         run: |
+          choco install nsis -y
           wails build -platform ${{ matrix.platform.wails_platform }} -clean -nsis
           cd build/bin
           Compress-Archive -Path vetrolog.exe -DestinationPath VetroLog-Windows-x64-Portable.zip

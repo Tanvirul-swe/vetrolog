@@ -61,5 +61,5 @@ VetroLog is engineered for speed:
 ## Have More Questions?
 
 Join our community and contribute:
-* **[GitHub Discussions](https://github.com/Tanvirul-swe/discussions)**
-* **[Issue Tracker](https://github.com/Tanvirul-swe/issues)**
+* **[GitHub Discussions](https://github.com/Tanvirul-swe/vetrolog/discussions)**
+* **[Issue Tracker](https://github.com/Tanvirul-swe/vetrolog/issues)**

@@ -8,7 +8,7 @@ VetroLog uses **GitHub Actions** to fully automate cross-platform compilation, p
 
 ## 🏗️ Release Pipeline Architecture
 
-Whenever a semantic version tag (e.g. `v1.2.0`) is pushed to GitHub, [`.github/workflows/release.yml`](https://github.com/Tanvirul-swe/blob/main/.github/workflows/release.yml) executes a 3-way parallel build matrix:
+Whenever a semantic version tag (e.g. `v1.2.0`) is pushed to GitHub, [`.github/workflows/release.yml`](https://github.com/Tanvirul-swe/vetrolog/blob/main/.github/workflows/release.yml) executes a 3-way parallel build matrix:
 
 ```mermaid
 graph TD
@@ -56,7 +56,7 @@ VetroLog includes a lightweight client-side update checker (`useUpdateChecker.ts
 
 1. On launch, the frontend queries:
    ```http
-   GET https://api.github.com/repos/Tanvirul-swe/releases/latest
+   GET https://api.github.com/repos/Tanvirul-swe/vetrolog/releases/latest
    ```
 2. Compares the latest published `tag_name` (e.g. `v1.2.0`) against the app's internal `CURRENT_VERSION`.
 3. If an update is detected, the top header badge pulses with an amber indicator:

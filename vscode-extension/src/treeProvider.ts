@@ -207,3 +207,4 @@ export class ServerStatusProvider implements vscode.TreeDataProvider<ServerStatu
     return items;
   }
 }
+

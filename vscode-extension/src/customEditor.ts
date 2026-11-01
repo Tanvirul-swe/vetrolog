@@ -146,3 +146,4 @@ export class VetroLogCustomEditorProvider implements vscode.CustomReadonlyEditor
 </html>`;
   }
 }
+

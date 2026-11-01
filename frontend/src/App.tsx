@@ -7,6 +7,8 @@ import { useDatabaseStore } from './stores/useDatabaseStore';
 import { useAdbStore } from './stores/useAdbStore';
 import { useConnectionManagerStore } from './stores/useConnectionManagerStore';
 import { useStagedChangesStore } from './stores/useStagedChangesStore';
+import { usePlaygroundStore } from './stores/usePlaygroundStore';
+import { useThemeStore } from './stores/useThemeStore';
 import * as AppBindings from '../wailsjs/go/app/App';
 
 export function App() {
@@ -42,6 +44,65 @@ export function App() {
       // Running in browser preview
     }
   }, [setConnectionState]);
+
+  // 2. Listen for URL parameters and parent Webview postMessages (VS Code Extension & Embedded mode)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleMessage = (event: MessageEvent) => {
+      const data = event.data;
+      if (!data) return;
+
+      if (data.type === 'themeChange' && (data.theme === 'light' || data.theme === 'dark')) {
+        useThemeStore.getState().setTheme(data.theme);
+      }
+      if (data.type === 'openFile' && typeof data.filePath === 'string') {
+        useConnectionManagerStore.getState().openLocalFile(data.filePath);
+      }
+      if (data.type === 'navigate' || data.action) {
+        const action = data.action || data.path;
+        if (action === 'erDiagram' || action === 'diagram' || action === '/diagram') {
+          usePlaygroundStore.getState().setActiveWorkspaceView('diagram');
+        } else if (action === 'newQuery' || action === 'playground' || action === '/playground') {
+          usePlaygroundStore.getState().setActiveWorkspaceView('playground');
+        } else if (action === 'data' || action === 'grid' || action === '/grid') {
+          usePlaygroundStore.getState().setActiveWorkspaceView('grid');
+        } else if (action === 'adb' || action === '/adb' || action === 'mobile') {
+          useConnectionManagerStore.getState().setWorkspaceMode('mobile');
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+
+    // Initial check from URL parameters
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const filePath = params.get('file') || params.get('filePath');
+      const action = params.get('action') || params.get('view');
+      const mode = params.get('mode');
+
+      if (filePath) {
+        useConnectionManagerStore.getState().openLocalFile(filePath);
+      }
+      if (mode === 'remote') {
+        useConnectionManagerStore.getState().setWorkspaceMode('remote');
+      } else if (mode === 'mobile' || mode === 'adb') {
+        useConnectionManagerStore.getState().setWorkspaceMode('mobile');
+      }
+      if (action === 'erDiagram' || action === 'diagram') {
+        usePlaygroundStore.getState().setActiveWorkspaceView('diagram');
+      } else if (action === 'newQuery' || action === 'playground') {
+        usePlaygroundStore.getState().setActiveWorkspaceView('playground');
+      }
+    } catch {
+      // Safe fallback
+    }
+
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
+  }, []);
 
 
   // 3. Wails IPC Event Listeners

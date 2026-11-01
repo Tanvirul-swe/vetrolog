@@ -57,3 +57,30 @@ jobs:
 
       - name: Run Go Unit Tests with Race Detector
         run: go test -v -race -count=1 ./...
+
+  vscode-extension:
+    name: VS Code Extension Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: vscode-extension
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Extension Dependencies
+        run: npm install
+
+      - name: Typecheck Extension
+        run: npx tsc --noEmit
+
+      - name: Build Extension Bundle
+        run: npm run build
+
+      - name: Validate Extension Package
+        run: npx @vscode/vsce package --no-dependencies

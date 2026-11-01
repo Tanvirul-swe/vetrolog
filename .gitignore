@@ -12,6 +12,9 @@ node_modules/
 frontend/node_modules/
 frontend/dist/
 frontend/package.json.md5
+vscode-extension/node_modules/
+vscode-extension/out/
+*.vsix
 
 # OS generated files
 .DS_Store

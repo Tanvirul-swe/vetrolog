@@ -33,7 +33,9 @@ export const getApiBaseUrl = (): string => {
     if (p) return `http://localhost:${p}`;
     const api = params.get('apiUrl');
     if (api) return api.replace(/\/$/, '');
-  } catch {}
+  } catch {
+    // Fallback if window.location is inaccessible
+  }
   return '';
 };
 

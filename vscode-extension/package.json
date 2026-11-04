@@ -3,7 +3,7 @@
   "displayName": "VetroLog: Mobile & Remote Database Studio",
   "description": "High-performance Database Inspector for Mobile (Flutter, React Native, Android) & Remote (PostgreSQL, MySQL, SQLite, MSSQL, Redis) with real-time WAL sync and interactive ER diagrams.",
   "version": "1.5.0",
-  "publisher": "tanvirul-swe",
+  "publisher": "vetrolog",
   "license": "MIT",
   "icon": "resources/icon.png",
   "homepage": "https://vetro.hifzio.com",

@@ -1,6 +1,6 @@
 # VetroLog: Mobile & Remote Database Studio for VS Code
 
-[![Visual Studio Marketplace](https://img.shields.io/visual-studio-marketplace/v/tanvirul-swe.vetrolog?label=Marketplace&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=tanvirul-swe.vetrolog)
+[![Visual Studio Marketplace](https://img.shields.io/visual-studio-marketplace/v/vetrolog.vetrolog?label=Marketplace&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=vetrolog.vetrolog)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Release](https://img.shields.io/github/v/release/Tanvirul-swe/vetrolog?label=Engine%20Version)](https://github.com/Tanvirul-swe/vetrolog/releases)
 
@@ -46,7 +46,7 @@ Inspect mobile SQLite databases (Flutter, React Native, Android) over ADB in rea
 ## 🚀 Getting Started
 
 ### 1. Install Extension
-Install **VetroLog** from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=tanvirul-swe.vetrolog) or via the Extensions view (`Ctrl+Shift+X` / `Cmd+Shift+X`).
+Install **VetroLog** from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=vetrolog.vetrolog) or via the Extensions view (`Ctrl+Shift+X` / `Cmd+Shift+X`).
 
 ### 2. Launching Database Studio
 - Click the **VetroLog** icon in the Activity Bar.

@@ -1,0 +1,109 @@
+---
+title: "Visual Studio Code Extension"
+description: "Inspect mobile SQLite databases over ADB, remote database engines, and workspace SQLite files directly inside VS Code."
+---
+
+import { LinkButton, Badge, Steps, Card, CardGrid } from '@astrojs/starlight/components';
+
+The **VetroLog VS Code Extension** brings high-performance database inspection, real-time live synchronization, and interactive schema modeling directly into Visual Studio Code.
+
+<div style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; margin: 1.5rem 0;">
+  <LinkButton href="https://marketplace.visualstudio.com/items?itemName=vetrolog.vetrolog" variant="primary" icon="external">
+    View on VS Code Marketplace
+  </LinkButton>
+  <LinkButton href="vscode:extension/vetrolog.vetrolog" variant="secondary" icon="puzzle">
+    Open Directly in VS Code
+  </LinkButton>
+</div>
+
+<div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem;">
+  <Badge text="Official Extension" variant="tip" />
+  <Badge text="Zero SDK Required" variant="note" />
+  <Badge text="macOS · Windows · Linux" variant="default" />
+</div>
+
+---
+
+## ⚡ Key Features
+
+<CardGrid stagger>
+  <Card title="Workspace SQLite Inspector" icon="document">
+    Directly double-click `*.db`, `*.sqlite`, `*.sqlite3`, `*.db3`, or `*.wal` files in your VS Code Explorer for instant high-speed data grid browsing.
+  </Card>
+  <Card title="Mobile SQLite over ADB" icon="laptop">
+    Live inspection of Flutter (`sqflite`, `drift`), React Native, and native Android Room databases with real-time WAL change detection.
+  </Card>
+  <Card title="Remote Database Suite" icon="setting">
+    Connect to **PostgreSQL**, **MySQL**, **MariaDB**, **MSSQL**, and **Redis** with SSL encryption, saved connection profiles, and latency checks.
+  </Card>
+  <Card title="Interactive ER Diagrams" icon="star">
+    Auto-generated visual entity-relationship diagrams with directional relation flow and multi-format exports (**DBML**, **Mermaid ER**, **SQL DDL**, and **SVG**).
+  </Card>
+  <Card title="Intelligent SQL Playground" icon="pencil">
+    Multi-tab query console with syntax highlighting, autocomplete, timing metrics, and non-destructive transaction simulation.
+  </Card>
+  <Card title="Automatic Theme Sync" icon="sun">
+    Seamlessly adapts to your active VS Code color theme in real time (Modern Light & Dark themes with zero-flicker boot).
+  </Card>
+</CardGrid>
+
+---
+
+## 📥 Installation
+
+### 1-Click Install inside VS Code
+
+<Steps>
+1. Open the Extensions sidebar (`Ctrl+Shift+X` on Windows/Linux or `Cmd+Shift+X` on macOS).
+2. Type **`VetroLog`** in the search bar.
+3. Click **Install** on the official extension by **`vetrolog`**.
+</Steps>
+
+### Command Line Install
+
+```bash
+code --install-extension vetrolog.vetrolog
+```
+
+---
+
+## 🚀 How to Use
+
+### 1. Launching Database Studio
+- Click the **VetroLog** icon in the Activity Bar (left sidebar).
+- Use the **Quick Actions** tree view to open the full studio, scan ADB devices, or generate ER diagrams.
+- Press `Ctrl+Shift+P` (or `Cmd+Shift+P`) and choose **`VetroLog: Open Database Studio`**.
+- Click the **`$(database) VetroLog`** status bar button in the bottom right corner.
+
+### 2. Inspecting Workspace SQLite Files
+Double-click any `.db`, `.sqlite`, or `.sqlite3` file directly in the VS Code file tree. VetroLog opens as a native custom editor with full data grid pagination, sorting, and cell filtering.
+
+### 3. Inspecting Live Mobile Apps over ADB
+1. Plug in your Android device or start an emulator with **USB Debugging** enabled.
+2. Run your app in debug mode (`flutter run` or Android Studio).
+3. From the VetroLog Activity Bar or command palette, run **`VetroLog: Scan ADB Devices & Mobile Apps`**.
+4. Select your app package to inspect tables and live WAL mutations with zero mobile code modification!
+
+---
+
+## ⚙️ Configuration Settings
+
+You can customize the extension via **VS Code Settings** (`Ctrl+,` or `Cmd+,` → search for `vetrolog`):
+
+| Setting | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `vetrolog.serverPort` | `number` | `8787` | Port used by the local background database daemon. |
+| `vetrolog.autoStartServer` | `boolean` | `true` | Automatically spawn the local daemon when VS Code starts. |
+| `vetrolog.customBinaryPath` | `string` | `""` | Optional path to custom `vetrolog` CLI binary. Auto-detected by default. |
+| `vetrolog.themeSync` | `boolean` | `true` | Synchronize webview appearance with active VS Code theme. |
+
+---
+
+## 🛠️ CLI Daemon Lifecycle
+
+The extension manages the VetroLog background daemon automatically. If you have the standalone VetroLog desktop app or CLI installed, the extension auto-discovers it across your system PATH, Homebrew, Snap, or workspace builds.
+
+You can also start, stop, or restart the daemon anytime:
+- **Restart Local Daemon**: `VetroLog: Restart Local Daemon`
+- **Stop Local Daemon**: `VetroLog: Stop Local Daemon`
+- **Output Channel**: Check the `VetroLog Daemon` tab in the Output panel (`Ctrl+Shift+U` / `Cmd+Shift+U`) for logs and connection status.

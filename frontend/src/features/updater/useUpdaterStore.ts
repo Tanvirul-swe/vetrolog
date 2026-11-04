@@ -41,7 +41,7 @@ interface UpdaterStoreState {
   initEventListeners: () => () => void;
 }
 
-export const CURRENT_APP_VERSION = 'v1.5.0';
+export const CURRENT_APP_VERSION = 'v1.5.1';
 
 export const useUpdaterStore = create<UpdaterStoreState>((set, get) => ({
   status: 'idle',
@@ -151,9 +151,9 @@ export const useUpdaterStore = create<UpdaterStoreState>((set, get) => ({
   simulateUpdateFlow: () => {
     const mockInfo: UpdateInfoBridge = {
       currentVersion: CURRENT_APP_VERSION,
-      latestVersion: 'v1.5.0',
-      releaseName: 'v1.5.0 — Interactive ER Diagram, Animated Data Flow & Modern Theme',
-      releaseNotes: '### What is New in v1.5.0:\n• Interactive Real-Time ER Diagram: Auto-generated visual maps, pan/zoom, auto-layout & mini-map\n• Animated Relationship Data Flow: Directional traveling chevrons and flowing pulses\n• Multi-Format Schema Export: dbdiagram.io (DBML), Mermaid ER, SQL DDL, and SVG\n• Modern Light & Dark Theme: 2026 high-contrast light theme with zero-flicker boot\n• Collapsible Left Sidebar (⌘B) & Streamlined Header UI Controls',
+      latestVersion: 'v1.5.1',
+      releaseName: 'v1.5.1 — Multi-Platform Desktop & VS Code Extension Studio',
+      releaseNotes: '### What is New in v1.5.1:\n• Official VS Code Extension: Inspect mobile apps over ADB and local/remote databases inside VS Code\n• Full Remote Database Studio: PostgreSQL, MySQL, MariaDB, SQLite, MSSQL, Redis REST daemon\n• Interactive Real-Time ER Diagram: Auto-generated visual maps, pan/zoom & multi-format exports\n• Modern Light & Dark Theme: High-contrast theme system with zero-flicker boot',
       releaseUrl: 'https://github.com/Tanvirul-swe/vetrolog/releases',
       assetUrl: 'https://github.com/Tanvirul-swe/vetrolog/releases/download/v1.2.0/VetroLog-macOS-Universal.zip',
       assetName: 'VetroLog-macOS-Universal.zip',

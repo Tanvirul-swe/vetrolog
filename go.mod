@@ -10,7 +10,7 @@ require (
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/microsoft/go-mssqldb v1.11.2
 	github.com/redis/go-redis/v9 v9.23.0
-	github.com/wailsapp/wails/v2 v2.16.0
+	github.com/wailsapp/wails/v2 v2.17.0
 	golang.org/x/crypto v0.55.0
 	modernc.org/sqlite v1.36.0
 )

@@ -350,20 +350,27 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
 
         // 2. Try single batch fetch from Go backend
         try {
+          let fullSchemas: any[] | null = null;
           if (
             typeof window !== 'undefined' &&
             // @ts-expect-error window.go may be undefined
             window?.go?.app?.App?.RemoteGetDatabaseSchemaExtended
           ) {
-            const fullSchemas = await AppBindings.RemoteGetDatabaseSchemaExtended(
+            fullSchemas = await AppBindings.RemoteGetDatabaseSchemaExtended(
               session.sessionId,
               selectedDb,
               selectedSchema
             );
-            if (fullSchemas && fullSchemas.length > 0) {
-              get().syncSchema(selectedDb || 'remote', fullSchemas as any);
-              return;
-            }
+          } else {
+            fullSchemas = await apiBridge.remote.getDatabaseSchemaExtended(
+              session.sessionId,
+              selectedDb,
+              selectedSchema
+            );
+          }
+          if (fullSchemas && fullSchemas.length > 0) {
+            get().syncSchema(selectedDb || 'remote', fullSchemas as any);
+            return;
           }
         } catch {
           // Fallback to table-by-table fetching below

@@ -1,0 +1,215 @@
+{
+  "name": "vetrolog",
+  "displayName": "VetroLog: Mobile & Remote Database Studio",
+  "description": "High-performance Database Inspector for Mobile (Flutter, React Native, Android) & Remote (PostgreSQL, MySQL, SQLite, MSSQL, Redis) with real-time WAL sync and interactive ER diagrams.",
+  "version": "1.5.0",
+  "publisher": "vetrolog",
+  "license": "MIT",
+  "icon": "resources/icon.png",
+  "homepage": "https://vetro.hifzio.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Tanvirul-swe/vetrolog.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Tanvirul-swe/vetrolog/issues"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Data Science",
+    "Visualization",
+    "Other"
+  ],
+  "keywords": [
+    "database",
+    "sqlite",
+    "adb",
+    "flutter",
+    "react-native",
+    "android",
+    "postgresql",
+    "mysql",
+    "er-diagram",
+    "sql"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "vetrolog.open",
+        "title": "Open Database Studio",
+        "category": "VetroLog",
+        "icon": "$(database)"
+      },
+      {
+        "command": "vetrolog.openFile",
+        "title": "Open SQLite Database File",
+        "category": "VetroLog",
+        "icon": "$(file-submodule)"
+      },
+      {
+        "command": "vetrolog.connectADB",
+        "title": "Scan ADB Devices & Mobile Apps",
+        "category": "VetroLog",
+        "icon": "$(device-mobile)"
+      },
+      {
+        "command": "vetrolog.openERDiagram",
+        "title": "View Interactive ER Diagram",
+        "category": "VetroLog",
+        "icon": "$(type-hierarchy)"
+      },
+      {
+        "command": "vetrolog.newQuery",
+        "title": "New SQL Studio Query",
+        "category": "VetroLog",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "vetrolog.startServer",
+        "title": "Start Local Daemon",
+        "category": "VetroLog"
+      },
+      {
+        "command": "vetrolog.stopServer",
+        "title": "Stop Local Daemon",
+        "category": "VetroLog"
+      },
+      {
+        "command": "vetrolog.restartServer",
+        "title": "Restart Local Daemon",
+        "category": "VetroLog",
+        "icon": "$(refresh)"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "vetrolog-container",
+          "title": "VetroLog Studio",
+          "icon": "resources/icon.png"
+        }
+      ]
+    },
+    "views": {
+      "vetrolog-container": [
+        {
+          "id": "vetrolog.quickActions",
+          "name": "Quick Actions",
+          "type": "tree"
+        },
+        {
+          "id": "vetrolog.serverStatus",
+          "name": "Daemon Status",
+          "type": "tree"
+        }
+      ]
+    },
+    "customEditors": [
+      {
+        "viewType": "vetrolog.dbEditor",
+        "displayName": "VetroLog SQLite Inspector",
+        "selector": [
+          {
+            "filenamePattern": "*.{db,sqlite,sqlite3,db3,wal}"
+          }
+        ],
+        "priority": "option"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "vetrolog.open"
+        },
+        {
+          "command": "vetrolog.openFile"
+        },
+        {
+          "command": "vetrolog.connectADB"
+        },
+        {
+          "command": "vetrolog.openERDiagram"
+        },
+        {
+          "command": "vetrolog.newQuery"
+        },
+        {
+          "command": "vetrolog.startServer"
+        },
+        {
+          "command": "vetrolog.stopServer"
+        },
+        {
+          "command": "vetrolog.restartServer"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "vetrolog.open",
+          "when": "view == vetrolog.quickActions",
+          "group": "navigation"
+        },
+        {
+          "command": "vetrolog.restartServer",
+          "when": "view == vetrolog.serverStatus",
+          "group": "navigation"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "vetrolog.openFile",
+          "when": "resourceExtname =~ /\\.(db|sqlite|sqlite3|db3|wal)$/",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "VetroLog",
+      "properties": {
+        "vetrolog.serverPort": {
+          "type": "number",
+          "default": 8787,
+          "description": "Port on which the local VetroLog background daemon listens."
+        },
+        "vetrolog.autoStartServer": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically spawn the local VetroLog daemon when VS Code starts."
+        },
+        "vetrolog.customBinaryPath": {
+          "type": "string",
+          "default": "",
+          "description": "Optional custom path to the 'vetrolog' CLI binary. If blank, auto-detected from PATH or bundled distribution."
+        },
+        "vetrolog.themeSync": {
+          "type": "boolean",
+          "default": true,
+          "description": "Synchronize the VetroLog webview theme with the active VS Code theme."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "node esbuild.js --production",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "build": "node esbuild.js",
+    "package": "vsce package",
+    "publish:marketplace": "vsce publish",
+    "publish:openvsx": "ovsx publish"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.2.1",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.3.3"
+  }
+}

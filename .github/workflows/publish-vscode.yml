@@ -1,0 +1,89 @@
+name: Publish VS Code Extension
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      publish_marketplace:
+        description: 'Publish to VS Code Marketplace'
+        required: true
+        type: boolean
+        default: true
+      publish_openvsx:
+        description: 'Publish to Open VSX Registry'
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  package-and-publish:
+    name: Package & Publish Extension
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: vscode-extension/package.json
+
+      - name: Install Extension Dependencies
+        working-directory: vscode-extension
+        run: npm install
+
+      - name: Build Extension Bundle
+        working-directory: vscode-extension
+        run: npm run build
+
+      - name: Package VSIX
+        working-directory: vscode-extension
+        run: npx @vscode/vsce package --no-dependencies
+
+      - name: Upload VSIX Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vetrolog-vscode-extension
+          path: vscode-extension/*.vsix
+
+      - name: Publish to VS Code Marketplace
+        if: ${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'workflow_dispatch' && inputs.publish_marketplace) }}
+        working-directory: vscode-extension
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          if [ -n "$VSCE_PAT" ]; then
+            echo "Publishing to VS Code Marketplace..."
+            npx @vscode/vsce publish -p "$VSCE_PAT" --no-dependencies
+          else
+            echo "VSCE_PAT secret is not configured. Skipping VS Code Marketplace publish."
+          fi
+
+      - name: Publish to Open VSX Registry
+        if: ${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'workflow_dispatch' && inputs.publish_openvsx) }}
+        working-directory: vscode-extension
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        run: |
+          if [ -n "$OVSX_PAT" ]; then
+            echo "Publishing to Open VSX Registry..."
+            npx ovsx publish $(ls *.vsix | head -n 1) -p "$OVSX_PAT"
+          else
+            echo "OVSX_PAT secret is not configured. Skipping Open VSX publish."
+          fi
+
+      - name: Attach VSIX to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: vscode-extension/*.vsix
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

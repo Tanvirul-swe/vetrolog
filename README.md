@@ -4,8 +4,9 @@
   <p><strong>High-Performance Desktop Database Inspector for Mobile Apps (Flutter, Android, iOS, React Native)</strong></p>
   
   <p>
+    <a href="https://marketplace.visualstudio.com/items?itemName=vetrolog.vetrolog"><img src="https://img.shields.io/visual-studio-marketplace/v/vetrolog.vetrolog?label=VS%20Code%20Marketplace&logo=visual-studio-code" alt="VS Code Marketplace" /></a>
     <a href="https://github.com/Tanvirul-swe/vetrolog/releases"><img src="https://img.shields.io/github/v/release/Tanvirul-swe/vetrolog?include_prereleases&color=emerald&label=Release" alt="Release" /></a>
-    <img src="https://img.shields.io/badge/Platform-macOS%20%7C%20Windows%20%7C%20Linux-blue" alt="Platform" />
+    <img src="https://img.shields.io/badge/Platform-macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20VS%20Code-blue" alt="Platform" />
     <img src="https://img.shields.io/badge/Go-1.26-00ADD8?logo=go" alt="Go" />
     <img src="https://img.shields.io/badge/Wails-v2-DF1A29?logo=wails" alt="Wails" />
     <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react" alt="React" />
@@ -17,8 +18,10 @@
 
 ## 🌟 Highlights & Features
 
+- **🧩 Official VS Code Extension**: Inspect local workspace SQLite databases, live mobile ADB apps, and remote databases (PostgreSQL, MySQL, MariaDB, SQLite, MSSQL, Redis) directly inside Visual Studio Code.
 - **⚡ Zero-Config ADB Mobile Inspector**: Plug in your Android device via USB and inspect SQLite databases (`.db`) without modifying a single line of code in your Flutter or Android project!
 - **🧠 Intelligent SQL Playground**: Live visual query plan analyzer (`EXPLAIN QUERY PLAN`), schema-aware autocomplete & FK join predictor, safe transaction dry-run simulation, natural language to SQL engine (Offline + BYOK Gemini/OpenAI/Ollama), bidirectional inline cell editing, mobile UI thread FPS profiler, 1-click index advisor, and multi-platform code generator (Flutter, Android Room, iOS GRDB, Go).
+- **🗺️ Interactive ER Diagram Visualizer**: Auto-generated visual entity-relationship diagrams for any connected database with live directional traveling relationship flow and multi-format exports (DBML, Mermaid, SQL DDL, SVG).
 - **🔄 Real-Time Live Sync & WAL Support**: Automatically detects insertions, updates, and deletions on the fly with SQLite Write-Ahead Logging (`-wal`) and Shared Memory (`-shm`) sync.
 - **📊 Real-Time Table Badges**: Dynamic record counts updated automatically in the sidebar database tree.
 - **✏️ Bidirectional Record Editing**: Double-click cells to update values with automatic write-back sync to the phone sandbox.
@@ -34,6 +37,7 @@ Visit our complete documentation site: **[https://vetro.hifzio.com/](https://vet
 | Document | Description |
 | :--- | :--- |
 | **[📖 Official Documentation](https://vetro.hifzio.com/)** | Full documentation site with live search, guides, and tutorials. |
+| **[🧩 VS Code Extension](https://vetro.hifzio.com/deployment-and-modes/vscode-extension/)** | Install and use the official VetroLog extension from the Visual Studio Marketplace. |
 | **[⚡ 3-Minute Quick Start](https://vetro.hifzio.com/getting-started/quickstart/)** | Step-by-step tutorial on connecting USB debugging and inspecting tables. |
 | **[🧠 Intelligent SQL Playground](https://vetro.hifzio.com/sql-playground/overview/)** | Multi-tab console, visual explain plans, Gemini 2.5 AI, and 1-click index advisor. |
 | **[💻 Multi-Platform Installation](https://vetro.hifzio.com/getting-started/installation/)** | Direct download & setup guides for macOS (Universal DMG), Windows, and Linux. |
@@ -46,6 +50,15 @@ Visit our complete documentation site: **[https://vetro.hifzio.com/](https://vet
 ## 📥 Download & Package Managers
 
 Install VetroLog using your favorite package manager or download direct pre-compiled release binaries from **[GitHub Releases](https://github.com/Tanvirul-swe/vetrolog/releases/latest)**:
+
+### 🧩 Visual Studio Code Extension (All Platforms)
+Install directly from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=vetrolog.vetrolog):
+
+* **Inside VS Code**: Open the Extensions view (`Ctrl+Shift+X` / `Cmd+Shift+X`) and search for **`VetroLog`**.
+* **Quick CLI Install**:
+  ```bash
+  code --install-extension vetrolog.vetrolog
+  ```
 
 ### 🍎 macOS (Apple Silicon M1/M2/M3/M4 & Intel)
 * **Homebrew Cask (Recommended)**:

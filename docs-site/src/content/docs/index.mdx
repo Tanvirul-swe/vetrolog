@@ -28,6 +28,28 @@ import { Card, CardGrid, LinkButton, Badge, Tabs, TabItem } from '@astrojs/starl
 Choose the pre-compiled installer for your operating system. Free, open-source, and updated with every release.
 
 <Tabs>
+  <TabItem label="VS Code Extension" icon="puzzle">
+    <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; margin: 1.25rem 0 1rem 0;">
+      <LinkButton href="https://marketplace.visualstudio.com/items?itemName=vetrolog.vetrolog" variant="primary" icon="external">
+        Install from VS Code Marketplace
+      </LinkButton>
+      <LinkButton href="vscode:extension/vetrolog.vetrolog" variant="secondary" icon="puzzle">
+        Open Directly in VS Code
+      </LinkButton>
+      <LinkButton href="/deployment-and-modes/vscode-extension/" variant="minimal" icon="right-arrow">
+        Extension Guide & Docs
+      </LinkButton>
+    </div>
+    
+    <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
+      <Badge text="Official Marketplace" variant="tip" />
+      <Badge text="Zero External Config" variant="note" />
+      <Badge text="macOS · Windows · Linux" variant="default" />
+    </div>
+
+    Inspect mobile SQLite over ADB, remote databases (PostgreSQL, MySQL, SQLite, MSSQL, Redis), and double-click workspace `.db` files directly inside Visual Studio Code.
+  </TabItem>
+
   <TabItem label="macOS" icon="apple">
     <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; margin: 1.25rem 0 1rem 0;">
       <LinkButton href="https://github.com/Tanvirul-swe/vetrolog/releases/latest/download/VetroLog-macOS-Universal.dmg" variant="primary" icon="download">
@@ -96,6 +118,9 @@ Choose the pre-compiled installer for your operating system. Free, open-source, 
 ## ⚡ Why Mobile Developers Choose VetroLog
 
 <CardGrid stagger>
+  <Card title="Official VS Code Extension" icon="puzzle">
+    Inspect mobile SQLite databases, remote database engines (Postgres, MySQL, MariaDB, MSSQL, Redis), and double-click workspace `.db` files directly inside your editor.
+  </Card>
   <Card title="Zero SDK Boilerplate" icon="rocket">
     No SDK installation or network listeners required. VetroLog securely accesses app databases directly via Android Debug Bridge (`run-as`).
   </Card>

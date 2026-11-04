@@ -5,6 +5,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [v1.5.1] - 2026-11-04
+
+### 🚀 Overview
+**VetroLog v1.5.1** delivers the **Official Visual Studio Code Extension**, bringing mobile ADB SQLite inspection, remote database connections (PostgreSQL, MySQL, MariaDB, SQLite, MSSQL, Redis), and workspace SQLite database editing directly into VS Code, alongside unified multi-platform release distribution.
+
+---
+
+### 🌟 New Features & Highlights
+
+#### 1. Official Visual Studio Code Extension (`vscode-extension/`)
+* **Workspace SQLite Inspector**: Double-click any `*.db`, `*.sqlite`, `*.sqlite3`, `*.db3`, or `*.wal` file in the VS Code Explorer for instant high-speed data grid browsing.
+* **Direct Mobile ADB Inspection**: Scan and inspect running Flutter, Android Room, and React Native databases live from within VS Code with zero mobile app code modification.
+* **Remote Database Suite**: Connect to PostgreSQL, MySQL, MariaDB, MSSQL, and Redis with SSL encryption, saved connection profiles, and latency checks.
+* **Interactive ER Diagram Visualizer**: Auto-generated schema maps with directional traveling relation flow and multi-format exports (DBML, Mermaid, SQL DDL, SVG).
+* **Automatic Theme Synchronization**: Seamlessly adapts to your active VS Code color theme in real time (Modern Light & Dark themes with zero-flicker boot).
+* **Automated Daemon Lifecycle**: Auto-detects local `vetrolog` CLI binary, manages background daemon spawning on port 8787, and provides live health monitoring.
+
+#### 2. Headless Web REST Daemon Engine (`internal/web`)
+* Exposed full REST API endpoints for remote databases, SQLite file inspection, and mobile ADB bridging.
+* Unified frontend API bridge to route requests dynamically between Wails desktop IPC and HTTP REST daemon.
+
+---
+
 ## [v1.5.0] - 2026-10-30
 
 ### 🚀 Overview

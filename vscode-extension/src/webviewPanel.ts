@@ -103,9 +103,40 @@ export class VetroLogWebviewPanel {
   }
 
   public navigate(subPath: string) {
+    let action = subPath;
+    if (subPath.includes('mode=adb')) {
+      action = 'adb';
+    } else if (subPath.includes('view=diagram')) {
+      action = 'diagram';
+    } else if (subPath.includes('view=playground')) {
+      action = 'playground';
+    } else if (subPath.includes('view=grid')) {
+      action = 'grid';
+    }
+
     this.panel.webview.postMessage({
       type: 'navigate',
+      action,
       path: subPath,
+    });
+
+    if (subPath.includes('file=')) {
+      try {
+        const urlParams = new URLSearchParams(subPath.replace(/^\/?\?/, ''));
+        const file = urlParams.get('file');
+        if (file) {
+          this.openFile(file);
+        }
+      } catch {
+        // Fallback
+      }
+    }
+  }
+
+  public openFile(filePath: string) {
+    this.panel.webview.postMessage({
+      type: 'openFile',
+      filePath,
     });
   }
 
@@ -140,6 +171,7 @@ export class VetroLogWebviewPanel {
 <html lang="en" class="${theme}">
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; frame-src http://localhost:* http://127.0.0.1:*; img-src vscode-resource: https: http: data:; style-src 'unsafe-inline' vscode-resource:; script-src 'unsafe-inline' vscode-resource:;">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>VetroLog Studio</title>
   <style>
@@ -185,6 +217,7 @@ export class VetroLogWebviewPanel {
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; frame-src http://localhost:* http://127.0.0.1:*; img-src vscode-resource: https: http: data:; style-src 'unsafe-inline' vscode-resource:; script-src 'unsafe-inline' vscode-resource:;">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>VetroLog Offline</title>
   <style>

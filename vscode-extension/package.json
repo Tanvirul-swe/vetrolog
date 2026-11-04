@@ -20,6 +20,7 @@
   "categories": [
     "Programming Languages",
     "Data Science",
+    "Visualization",
     "Other"
   ],
   "keywords": [
@@ -128,6 +129,9 @@
           "command": "vetrolog.open"
         },
         {
+          "command": "vetrolog.openFile"
+        },
+        {
           "command": "vetrolog.connectADB"
         },
         {
@@ -161,7 +165,7 @@
       "explorer/context": [
         {
           "command": "vetrolog.openFile",
-          "when": "resourceExtname =~ /\\.(db|sqlite|sqlite3|db3)$/",
+          "when": "resourceExtname =~ /\\.(db|sqlite|sqlite3|db3|wal)$/",
           "group": "navigation"
         }
       ]
@@ -193,7 +197,7 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run build",
+    "vscode:prepublish": "node esbuild.js --production",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "build": "node esbuild.js",

@@ -94,6 +94,8 @@ export class ServerManager {
           '/usr/local/bin/vetrolog',
           '/opt/homebrew/bin/vetrolog',
           '/usr/bin/vetrolog',
+          '/snap/bin/vetrolog',
+          path.join(homeDir, '.local', 'bin', 'vetrolog'),
           path.join(homeDir, 'go', 'bin', 'vetrolog'),
           '/Applications/VetroLog.app/Contents/MacOS/vetrolog',
           path.join(homeDir, 'Applications/VetroLog.app/Contents/MacOS/vetrolog'),

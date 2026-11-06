@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
+  <!-- VetroLog Activity Bar Icon: Layered Database Cylinder with Stylized Inspection Chevron -->
+  <ellipse cx="12" cy="5.5" rx="7.5" ry="2.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M4.5 5.5v5.5c0 1.38 3.36 2.5 7.5 2.5s7.5-1.12 7.5-2.5V5.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M4.5 11v6c0 1.38 3.36 2.5 7.5 2.5s7.5-1.12 7.5-2.5v-6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M9 10.5l3 3.5 3-3.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

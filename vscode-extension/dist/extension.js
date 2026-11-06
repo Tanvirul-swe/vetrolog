@@ -1,5 +1,364 @@
-"use strict";var U=Object.create;var P=Object.defineProperty;var $=Object.getOwnPropertyDescriptor;var H=Object.getOwnPropertyNames;var q=Object.getPrototypeOf,W=Object.prototype.hasOwnProperty;var Q=(o,e)=>{for(var t in e)P(o,t,{get:e[t],enumerable:!0})},V=(o,e,t,n)=>{if(e&&typeof e=="object"||typeof e=="function")for(let r of H(e))!W.call(o,r)&&r!==t&&P(o,r,{get:()=>e[r],enumerable:!(n=$(e,r))||n.enumerable});return o};var m=(o,e,t)=>(t=o!=null?U(q(o)):{},V(e||!o||!o.__esModule?P(t,"default",{value:o,enumerable:!0}):t,o)),j=o=>V(P({},"__esModule",{value:!0}),o);var K={};Q(K,{activate:()=>N,deactivate:()=>z});module.exports=j(K);var s=m(require("vscode"));var f=m(require("vscode")),E=require("child_process"),I=m(require("http")),h=m(require("path")),k=m(require("fs")),B=m(require("os")),D=class{process=null;outputChannel;currentPort=8787;isStarting=!1;onStatusChangeEmitter=new f.EventEmitter;onStatusChange=this.onStatusChangeEmitter.event;constructor(){this.outputChannel=f.window.createOutputChannel("VetroLog Daemon");let e=f.workspace.getConfiguration("vetrolog");this.currentPort=e.get("serverPort",8787)}getPort(){return this.currentPort}getBaseUrl(){return`http://localhost:${this.currentPort}`}async checkHealth(e=this.currentPort){return new Promise(t=>{let n=I.get(`http://localhost:${e}/api/status`,{timeout:1500},r=>{r.statusCode===200?t(!0):t(!1)});n.on("error",()=>t(!1)),n.on("timeout",()=>{n.destroy(),t(!1)})})}findBinary(){let t=f.workspace.getConfiguration("vetrolog").get("customBinaryPath","").trim();if(t&&k.existsSync(t))return t;let n=process.platform==="win32",r=n?"vetrolog.exe":"vetrolog",i=f.workspace.workspaceFolders||[];for(let c of i){let y=[h.join(c.uri.fsPath,"build","bin",r),h.join(c.uri.fsPath,"build","bin","vetrolog.app","Contents","MacOS","vetrolog"),h.join(c.uri.fsPath,r)];for(let S of y)if(k.existsSync(S))return S}let d=B.homedir(),v=n?[h.join(d,"go","bin",r),`C:\\Program Files\\VetroLog\\${r}`,`C:\\Program Files (x86)\\VetroLog\\${r}`,h.join(process.env.LOCALAPPDATA||"","Programs","VetroLog",r)]:["/usr/local/bin/vetrolog","/opt/homebrew/bin/vetrolog","/usr/bin/vetrolog","/snap/bin/vetrolog",h.join(d,".local","bin","vetrolog"),h.join(d,"go","bin","vetrolog"),"/Applications/VetroLog.app/Contents/MacOS/vetrolog",h.join(d,"Applications/VetroLog.app/Contents/MacOS/vetrolog")];for(let c of v)if(k.existsSync(c))return c;let a=(process.env.PATH||"").split(h.delimiter);for(let c of a){let y=h.join(c,r);if(k.existsSync(y))return y}return null}async startServer(){if(this.isStarting)return!1;if(this.isStarting=!0,await this.checkHealth(this.currentPort))return this.outputChannel.appendLine(`[Daemon] Existing VetroLog instance detected on port ${this.currentPort}`),this.isStarting=!1,this.notifyStatus(!0),!0;let t=this.findBinary();if(!t)return this.outputChannel.appendLine("[Daemon Error] Could not find vetrolog executable binary."),this.outputChannel.appendLine('Please install VetroLog or specify "vetrolog.customBinaryPath" in settings.'),this.isStarting=!1,this.notifyStatus(!1,"Binary not found. Please install VetroLog."),!1;this.outputChannel.appendLine(`[Daemon] Launching ${t} on port ${this.currentPort}...`);try{this.process=(0,E.spawn)(t,["--web",`--port=${this.currentPort}`,"--no-browser"],{detached:!1,env:{...process.env}}),this.process.stdout?.on("data",r=>{this.outputChannel.append(`[VetroLog] ${r.toString()}`)}),this.process.stderr?.on("data",r=>{this.outputChannel.append(`[VetroLog Error] ${r.toString()}`)}),this.process.on("close",r=>{this.outputChannel.appendLine(`[Daemon] Process exited with code ${r}`),this.process=null,this.notifyStatus(!1)});let n=Date.now();for(;Date.now()-n<1e4;)if(await new Promise(i=>setTimeout(i,400)),await this.checkHealth(this.currentPort))return this.outputChannel.appendLine(`[Daemon] Verified running at ${this.getBaseUrl()}`),this.isStarting=!1,this.notifyStatus(!0),!0;return this.outputChannel.appendLine("[Daemon Warning] Server health check timed out."),this.isStarting=!1,!1}catch(n){return this.outputChannel.appendLine(`[Daemon Error] Failed to spawn process: ${n.message}`),this.isStarting=!1,this.notifyStatus(!1,n.message),!1}}stopServer(){this.process&&(this.outputChannel.appendLine("[Daemon] Terminating process..."),this.process.kill("SIGTERM"),this.process=null,this.notifyStatus(!1))}async restartServer(){return this.stopServer(),await new Promise(e=>setTimeout(e,600)),this.startServer()}notifyStatus(e,t){this.onStatusChangeEmitter.fire({isRunning:e,port:this.currentPort,url:this.getBaseUrl(),error:t})}dispose(){this.stopServer(),this.outputChannel.dispose(),this.onStatusChangeEmitter.dispose()}};var p=m(require("vscode")),w=class o{static currentPanel;panel;extensionUri;serverManager;disposables=[];static async createOrShow(e,t,n=p.ViewColumn.One,r="/"){if(o.currentPanel)return o.currentPanel.panel.reveal(n),r!=="/"&&o.currentPanel.navigate(r),o.currentPanel;let i=p.window.createWebviewPanel("vetrologStudio","VetroLog Database Studio",n,{enableScripts:!0,retainContextWhenHidden:!0,localResourceRoots:[e]});return o.currentPanel=new o(i,e,t,r),o.currentPanel}constructor(e,t,n,r="/"){this.panel=e,this.extensionUri=t,this.serverManager=n,this.updateContent(r),this.panel.onDidDispose(()=>this.dispose(),null,this.disposables),p.window.onDidChangeActiveColorTheme(()=>{this.updateTheme()},null,this.disposables),this.serverManager.onStatusChange(()=>{this.updateContent(r)},null,this.disposables),this.panel.webview.onDidReceiveMessage(async i=>{switch(i.command){case"startServer":await this.serverManager.startServer(),this.updateContent();break;case"openSettings":p.commands.executeCommand("workbench.action.openSettings","vetrolog");break;case"showInfo":p.window.showInformationMessage(i.text);break;case"showError":p.window.showErrorMessage(i.text);break}},null,this.disposables)}navigate(e){let t=e;if(e.includes("mode=adb")?t="adb":e.includes("view=diagram")?t="diagram":e.includes("view=playground")?t="playground":e.includes("view=grid")&&(t="grid"),this.panel.webview.postMessage({type:"navigate",action:t,path:e}),e.includes("file="))try{let r=new URLSearchParams(e.replace(/^\/?\?/,"")).get("file");r&&this.openFile(r)}catch{}}openFile(e){this.panel.webview.postMessage({type:"openFile",filePath:e})}getActiveTheme(){let e=p.window.activeColorTheme.kind;return e===p.ColorThemeKind.Light||e===p.ColorThemeKind.HighContrastLight?"light":"dark"}updateTheme(){this.panel.webview.postMessage({type:"themeChange",theme:this.getActiveTheme()})}async updateContent(e="/"){let t=await this.serverManager.checkHealth(),n=this.getActiveTheme(),r=`${this.serverManager.getBaseUrl()}${e}`;t?this.panel.webview.html=this.getIframeHtml(r,n):this.panel.webview.html=this.getOfflineHtml()}getIframeHtml(e,t){return`<!DOCTYPE html>
-<html lang="en" class="${t}">
+"use strict";
+var __create = Object.create;
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+
+// src/extension.ts
+var extension_exports = {};
+__export(extension_exports, {
+  activate: () => activate,
+  deactivate: () => deactivate
+});
+module.exports = __toCommonJS(extension_exports);
+var vscode5 = __toESM(require("vscode"));
+
+// src/serverManager.ts
+var vscode = __toESM(require("vscode"));
+var import_child_process = require("child_process");
+var http = __toESM(require("http"));
+var path = __toESM(require("path"));
+var fs = __toESM(require("fs"));
+var os = __toESM(require("os"));
+var ServerManager = class {
+  process = null;
+  outputChannel;
+  currentPort = 8787;
+  isStarting = false;
+  onStatusChangeEmitter = new vscode.EventEmitter();
+  onStatusChange = this.onStatusChangeEmitter.event;
+  constructor() {
+    this.outputChannel = vscode.window.createOutputChannel("VetroLog Daemon");
+    const config = vscode.workspace.getConfiguration("vetrolog");
+    this.currentPort = config.get("serverPort", 8787);
+  }
+  getPort() {
+    return this.currentPort;
+  }
+  getBaseUrl() {
+    return `http://localhost:${this.currentPort}`;
+  }
+  /**
+   * Pings the server status endpoint to see if it's already running.
+   */
+  async checkHealth(port = this.currentPort) {
+    return new Promise((resolve) => {
+      const req = http.get(`http://localhost:${port}/api/status`, { timeout: 1500 }, (res) => {
+        if (res.statusCode === 200) {
+          resolve(true);
+        } else {
+          resolve(false);
+        }
+      });
+      req.on("error", () => resolve(false));
+      req.on("timeout", () => {
+        req.destroy();
+        resolve(false);
+      });
+    });
+  }
+  /**
+   * Locates the VetroLog executable on the system.
+   */
+  findBinary() {
+    const config = vscode.workspace.getConfiguration("vetrolog");
+    const customPath = config.get("customBinaryPath", "").trim();
+    if (customPath && fs.existsSync(customPath)) {
+      return customPath;
+    }
+    const isWindows = process.platform === "win32";
+    const binaryName = isWindows ? "vetrolog.exe" : "vetrolog";
+    const workspaceFolders = vscode.workspace.workspaceFolders || [];
+    for (const folder of workspaceFolders) {
+      const candidates = [
+        path.join(folder.uri.fsPath, "build", "bin", binaryName),
+        path.join(folder.uri.fsPath, "build", "bin", "vetrolog.app", "Contents", "MacOS", "vetrolog"),
+        path.join(folder.uri.fsPath, binaryName)
+      ];
+      for (const c of candidates) {
+        if (fs.existsSync(c)) return c;
+      }
+    }
+    const homeDir = os.homedir();
+    const standardLocations = isWindows ? [
+      path.join(homeDir, "go", "bin", binaryName),
+      `C:\\Program Files\\VetroLog\\${binaryName}`,
+      `C:\\Program Files (x86)\\VetroLog\\${binaryName}`,
+      path.join(process.env.LOCALAPPDATA || "", "Programs", "VetroLog", binaryName)
+    ] : [
+      "/usr/local/bin/vetrolog",
+      "/opt/homebrew/bin/vetrolog",
+      "/usr/bin/vetrolog",
+      "/snap/bin/vetrolog",
+      path.join(homeDir, ".local", "bin", "vetrolog"),
+      path.join(homeDir, "go", "bin", "vetrolog"),
+      "/Applications/VetroLog.app/Contents/MacOS/vetrolog",
+      path.join(homeDir, "Applications/VetroLog.app/Contents/MacOS/vetrolog")
+    ];
+    for (const loc of standardLocations) {
+      if (fs.existsSync(loc)) {
+        return loc;
+      }
+    }
+    const pathDirs = (process.env.PATH || "").split(path.delimiter);
+    for (const p of pathDirs) {
+      const fullPath = path.join(p, binaryName);
+      if (fs.existsSync(fullPath)) {
+        return fullPath;
+      }
+    }
+    return null;
+  }
+  /**
+   * Starts the VetroLog daemon in headless web server mode.
+   */
+  async startServer() {
+    if (this.isStarting) return false;
+    this.isStarting = true;
+    const alreadyRunning = await this.checkHealth(this.currentPort);
+    if (alreadyRunning) {
+      this.outputChannel.appendLine(`[Daemon] Existing VetroLog instance detected on port ${this.currentPort}`);
+      this.isStarting = false;
+      this.notifyStatus(true);
+      return true;
+    }
+    const binary = this.findBinary();
+    if (!binary) {
+      this.outputChannel.appendLine("[Daemon Error] Could not find vetrolog executable binary.");
+      this.outputChannel.appendLine('Please install VetroLog or specify "vetrolog.customBinaryPath" in settings.');
+      this.isStarting = false;
+      this.notifyStatus(false, "Binary not found. Please install VetroLog.");
+      return false;
+    }
+    this.outputChannel.appendLine(`[Daemon] Launching ${binary} on port ${this.currentPort}...`);
+    try {
+      this.process = (0, import_child_process.spawn)(binary, ["--web", `--port=${this.currentPort}`, "--no-browser"], {
+        detached: false,
+        env: {
+          ...process.env
+        }
+      });
+      this.process.stdout?.on("data", (data) => {
+        this.outputChannel.append(`[VetroLog] ${data.toString()}`);
+      });
+      this.process.stderr?.on("data", (data) => {
+        this.outputChannel.append(`[VetroLog Error] ${data.toString()}`);
+      });
+      this.process.on("close", (code) => {
+        this.outputChannel.appendLine(`[Daemon] Process exited with code ${code}`);
+        this.process = null;
+        this.notifyStatus(false);
+      });
+      const startTime = Date.now();
+      while (Date.now() - startTime < 1e4) {
+        await new Promise((r) => setTimeout(r, 400));
+        const ok = await this.checkHealth(this.currentPort);
+        if (ok) {
+          this.outputChannel.appendLine(`[Daemon] Verified running at ${this.getBaseUrl()}`);
+          this.isStarting = false;
+          this.notifyStatus(true);
+          return true;
+        }
+      }
+      this.outputChannel.appendLine("[Daemon Warning] Server health check timed out.");
+      this.isStarting = false;
+      return false;
+    } catch (err) {
+      this.outputChannel.appendLine(`[Daemon Error] Failed to spawn process: ${err.message}`);
+      this.isStarting = false;
+      this.notifyStatus(false, err.message);
+      return false;
+    }
+  }
+  /**
+   * Stops the running server daemon.
+   */
+  stopServer() {
+    if (this.process) {
+      this.outputChannel.appendLine("[Daemon] Terminating process...");
+      this.process.kill("SIGTERM");
+      this.process = null;
+      this.notifyStatus(false);
+    }
+  }
+  /**
+   * Restarts the server daemon.
+   */
+  async restartServer() {
+    this.stopServer();
+    await new Promise((r) => setTimeout(r, 600));
+    return this.startServer();
+  }
+  notifyStatus(isRunning, error) {
+    this.onStatusChangeEmitter.fire({
+      isRunning,
+      port: this.currentPort,
+      url: this.getBaseUrl(),
+      error
+    });
+  }
+  dispose() {
+    this.stopServer();
+    this.outputChannel.dispose();
+    this.onStatusChangeEmitter.dispose();
+  }
+};
+
+// src/webviewPanel.ts
+var vscode2 = __toESM(require("vscode"));
+var VetroLogWebviewPanel = class _VetroLogWebviewPanel {
+  static currentPanel;
+  panel;
+  extensionUri;
+  serverManager;
+  disposables = [];
+  static async createOrShow(extensionUri, serverManager, viewColumn = vscode2.ViewColumn.One, initialPath = "/") {
+    if (_VetroLogWebviewPanel.currentPanel) {
+      _VetroLogWebviewPanel.currentPanel.panel.reveal(viewColumn);
+      if (initialPath !== "/") {
+        _VetroLogWebviewPanel.currentPanel.navigate(initialPath);
+      }
+      return _VetroLogWebviewPanel.currentPanel;
+    }
+    const panel = vscode2.window.createWebviewPanel(
+      "vetrologStudio",
+      "VetroLog Database Studio",
+      viewColumn,
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+        localResourceRoots: [extensionUri]
+      }
+    );
+    _VetroLogWebviewPanel.currentPanel = new _VetroLogWebviewPanel(
+      panel,
+      extensionUri,
+      serverManager,
+      initialPath
+    );
+    return _VetroLogWebviewPanel.currentPanel;
+  }
+  constructor(panel, extensionUri, serverManager, initialPath = "/") {
+    this.panel = panel;
+    this.extensionUri = extensionUri;
+    this.serverManager = serverManager;
+    this.updateContent(initialPath);
+    this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
+    vscode2.window.onDidChangeActiveColorTheme(
+      () => {
+        this.updateTheme();
+      },
+      null,
+      this.disposables
+    );
+    this.serverManager.onStatusChange(
+      () => {
+        this.updateContent(initialPath);
+      },
+      null,
+      this.disposables
+    );
+    this.panel.webview.onDidReceiveMessage(
+      async (message) => {
+        switch (message.command) {
+          case "startServer":
+            await this.serverManager.startServer();
+            this.updateContent();
+            break;
+          case "openSettings":
+            vscode2.commands.executeCommand("workbench.action.openSettings", "vetrolog");
+            break;
+          case "showInfo":
+            vscode2.window.showInformationMessage(message.text);
+            break;
+          case "showError":
+            vscode2.window.showErrorMessage(message.text);
+            break;
+        }
+      },
+      null,
+      this.disposables
+    );
+  }
+  navigate(subPath) {
+    let action = subPath;
+    if (subPath.includes("mode=adb")) {
+      action = "adb";
+    } else if (subPath.includes("view=diagram")) {
+      action = "diagram";
+    } else if (subPath.includes("view=playground")) {
+      action = "playground";
+    } else if (subPath.includes("view=grid")) {
+      action = "grid";
+    }
+    this.panel.webview.postMessage({
+      type: "navigate",
+      action,
+      path: subPath
+    });
+    if (subPath.includes("file=")) {
+      try {
+        const urlParams = new URLSearchParams(subPath.replace(/^\/?\?/, ""));
+        const file = urlParams.get("file");
+        if (file) {
+          this.openFile(file);
+        }
+      } catch {
+      }
+    }
+  }
+  openFile(filePath) {
+    this.panel.webview.postMessage({
+      type: "openFile",
+      filePath
+    });
+  }
+  getActiveTheme() {
+    const kind = vscode2.window.activeColorTheme.kind;
+    return kind === vscode2.ColorThemeKind.Light || kind === vscode2.ColorThemeKind.HighContrastLight ? "light" : "dark";
+  }
+  updateTheme() {
+    this.panel.webview.postMessage({
+      type: "themeChange",
+      theme: this.getActiveTheme()
+    });
+  }
+  async updateContent(subPath = "/") {
+    const isRunning = await this.serverManager.checkHealth();
+    const theme = this.getActiveTheme();
+    const serverUrl = `${this.serverManager.getBaseUrl()}${subPath}`;
+    if (!isRunning) {
+      this.panel.webview.html = this.getOfflineHtml();
+    } else {
+      this.panel.webview.html = this.getIframeHtml(serverUrl, theme);
+    }
+  }
+  getIframeHtml(url, theme) {
+    return `<!DOCTYPE html>
+<html lang="en" class="${theme}">
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; frame-src http://localhost:* http://127.0.0.1:*; img-src vscode-resource: https: http: data:; style-src 'unsafe-inline' vscode-resource:; script-src 'unsafe-inline' vscode-resource:;">
@@ -24,7 +383,7 @@
 </head>
 <body>
   <iframe 
-    src="${e}" 
+    src="${url}" 
     allow="clipboard-read; clipboard-write;"
     sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads">
   </iframe>
@@ -39,7 +398,11 @@
     });
   </script>
 </body>
-</html>`}getOfflineHtml(){return`<!DOCTYPE html>
+</html>`;
+  }
+  getOfflineHtml() {
+    const port = this.serverManager.getPort();
+    return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -104,7 +467,7 @@
   <div class="icon">\u{1F50C}</div>
   <h2>VetroLog Daemon Offline</h2>
   <p>
-    The background database engine is not running on port <strong>${this.serverManager.getPort()}</strong>. 
+    The background database engine is not running on port <strong>${port}</strong>. 
     Click below to launch the local daemon or configure your custom binary path.
   </p>
   <div class="actions">
@@ -125,13 +488,121 @@
     }
   </script>
 </body>
-</html>`}dispose(){for(o.currentPanel=void 0,this.panel.dispose();this.disposables.length;){let e=this.disposables.pop();e&&e.dispose()}}};var u=m(require("vscode")),L=m(require("path")),T=class o{constructor(e,t){this.context=e;this.serverManager=t}static viewType="vetrolog.dbEditor";static register(e,t){let n=new o(e,t);return u.window.registerCustomEditorProvider(o.viewType,n,{webviewOptions:{retainContextWhenHidden:!0,enableFindWidget:!0},supportsMultipleEditorsPerDocument:!1})}async openCustomDocument(e,t,n){return{uri:e,dispose:()=>{}}}async resolveCustomEditor(e,t,n){t.webview.options={enableScripts:!0,enableForms:!0,localResourceRoots:[this.context.extensionUri]};let r=e.uri.fsPath,i=async()=>{let g=await this.serverManager.checkHealth(),R=this.getActiveTheme();if(!g)t.webview.html=this.getOfflineHtml();else{let A=encodeURIComponent(r),O=`${this.serverManager.getBaseUrl()}/?file=${A}`;t.webview.html=this.getHtmlForWebview(O,R,r)}};await this.serverManager.checkHealth()||await this.serverManager.startServer(),await i();let v=u.window.onDidChangeActiveColorTheme(()=>{t.webview.postMessage({type:"themeChange",theme:this.getActiveTheme()})}),a=this.serverManager.onStatusChange(g=>{g.isRunning&&i()}),c=t.webview.onDidReceiveMessage(async g=>{g.command==="startServer"?(await this.serverManager.startServer(),await i()):g.command==="openSettings"&&u.commands.executeCommand("workbench.action.openSettings","vetrolog")}),y=L.dirname(r),S=L.basename(r),F=u.workspace.createFileSystemWatcher(new u.RelativePattern(y,S));F.onDidChange(()=>{t.webview.postMessage({type:"fileChanged",filePath:r})}),t.onDidDispose(()=>{v.dispose(),a.dispose(),c.dispose(),F.dispose()})}getActiveTheme(){let e=u.window.activeColorTheme.kind;return e===u.ColorThemeKind.Light||e===u.ColorThemeKind.HighContrastLight?"light":"dark"}getHtmlForWebview(e,t,n){let r=L.basename(n)||"database";return`<!DOCTYPE html>
-<html lang="en" class="${t}">
+</html>`;
+  }
+  dispose() {
+    _VetroLogWebviewPanel.currentPanel = void 0;
+    this.panel.dispose();
+    while (this.disposables.length) {
+      const x = this.disposables.pop();
+      if (x) x.dispose();
+    }
+  }
+};
+
+// src/customEditor.ts
+var vscode3 = __toESM(require("vscode"));
+var path2 = __toESM(require("path"));
+var VetroLogCustomEditorProvider = class _VetroLogCustomEditorProvider {
+  constructor(context, serverManager) {
+    this.context = context;
+    this.serverManager = serverManager;
+  }
+  static viewType = "vetrolog.dbEditor";
+  static register(context, serverManager) {
+    const provider = new _VetroLogCustomEditorProvider(context, serverManager);
+    return vscode3.window.registerCustomEditorProvider(
+      _VetroLogCustomEditorProvider.viewType,
+      provider,
+      {
+        webviewOptions: {
+          retainContextWhenHidden: true,
+          enableFindWidget: true
+        },
+        supportsMultipleEditorsPerDocument: false
+      }
+    );
+  }
+  async openCustomDocument(uri, _openContext, _token) {
+    return {
+      uri,
+      dispose: () => {
+      }
+    };
+  }
+  async resolveCustomEditor(document, webviewPanel, _token) {
+    webviewPanel.webview.options = {
+      enableScripts: true,
+      enableForms: true,
+      localResourceRoots: [this.context.extensionUri]
+    };
+    const filePath = document.uri.fsPath;
+    const render = async () => {
+      const isHealthy = await this.serverManager.checkHealth();
+      const theme = this.getActiveTheme();
+      if (!isHealthy) {
+        webviewPanel.webview.html = this.getOfflineHtml();
+      } else {
+        const encodedPath = encodeURIComponent(filePath);
+        const url = `${this.serverManager.getBaseUrl()}/?file=${encodedPath}`;
+        webviewPanel.webview.html = this.getHtmlForWebview(url, theme, filePath);
+      }
+    };
+    const initialHealth = await this.serverManager.checkHealth();
+    if (!initialHealth) {
+      await this.serverManager.startServer();
+    }
+    await render();
+    const themeListener = vscode3.window.onDidChangeActiveColorTheme(() => {
+      webviewPanel.webview.postMessage({
+        type: "themeChange",
+        theme: this.getActiveTheme()
+      });
+    });
+    const statusListener = this.serverManager.onStatusChange((status) => {
+      if (status.isRunning) {
+        render();
+      }
+    });
+    const messageListener = webviewPanel.webview.onDidReceiveMessage(async (msg) => {
+      if (msg.command === "startServer") {
+        await this.serverManager.startServer();
+        await render();
+      } else if (msg.command === "openSettings") {
+        vscode3.commands.executeCommand("workbench.action.openSettings", "vetrolog");
+      }
+    });
+    const dir = path2.dirname(filePath);
+    const base = path2.basename(filePath);
+    const fileWatcher = vscode3.workspace.createFileSystemWatcher(
+      new vscode3.RelativePattern(dir, base)
+    );
+    fileWatcher.onDidChange(() => {
+      webviewPanel.webview.postMessage({
+        type: "fileChanged",
+        filePath
+      });
+    });
+    webviewPanel.onDidDispose(() => {
+      themeListener.dispose();
+      statusListener.dispose();
+      messageListener.dispose();
+      fileWatcher.dispose();
+    });
+  }
+  getActiveTheme() {
+    const kind = vscode3.window.activeColorTheme.kind;
+    return kind === vscode3.ColorThemeKind.Light || kind === vscode3.ColorThemeKind.HighContrastLight ? "light" : "dark";
+  }
+  getHtmlForWebview(url, theme, filePath) {
+    const fileName = path2.basename(filePath) || "database";
+    return `<!DOCTYPE html>
+<html lang="en" class="${theme}">
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; frame-src http://localhost:* http://127.0.0.1:*; img-src vscode-resource: https: http: data:; style-src 'unsafe-inline' vscode-resource:; script-src 'unsafe-inline' vscode-resource:;">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${r} \u2014 VetroLog</title>
+  <title>${fileName} \u2014 VetroLog</title>
   <style>
     html, body {
       margin: 0;
@@ -151,7 +622,7 @@
 </head>
 <body>
   <iframe 
-    src="${e}" 
+    src="${url}" 
     allow="clipboard-read; clipboard-write;"
     sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads">
   </iframe>
@@ -166,7 +637,11 @@
     });
   </script>
 </body>
-</html>`}getOfflineHtml(){return`<!DOCTYPE html>
+</html>`;
+  }
+  getOfflineHtml() {
+    const port = this.serverManager.getPort();
+    return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -231,7 +706,7 @@
   <div class="icon">\u{1F50C}</div>
   <h2>VetroLog Daemon Offline</h2>
   <p>
-    The background database engine is not running on port <strong>${this.serverManager.getPort()}</strong>. 
+    The background database engine is not running on port <strong>${port}</strong>. 
     Click below to launch the local daemon to inspect this SQLite file.
   </p>
   <div class="actions">
@@ -252,4 +727,357 @@
     }
   </script>
 </body>
-</html>`}};var l=m(require("vscode")),C=class extends l.TreeItem{constructor(t,n,r,i,d){super(t,l.TreeItemCollapsibleState.None);this.label=t;this.commandId=n;this.iconName=r;this.description=i;this.tooltip=d;this.iconPath=new l.ThemeIcon(r),this.tooltip=d||t,this.description=i,this.command={command:n,title:t}}},M=class{_onDidChangeTreeData=new l.EventEmitter;onDidChangeTreeData=this._onDidChangeTreeData.event;refresh(){this._onDidChangeTreeData.fire()}getTreeItem(e){return e}getChildren(){return Promise.resolve([new C("Open Database Studio","vetrolog.open","database","Full Studio","Launch VetroLog Database Studio webview"),new C("Scan ADB Devices & Apps","vetrolog.connectADB","device-mobile","Mobile Inspector","Inspect live SQLite databases on Android / Flutter / React Native"),new C("Interactive ER Diagram","vetrolog.openERDiagram","type-hierarchy","Visual Schema","Open visual schema map with interactive foreign key flows"),new C("New SQL Query","vetrolog.newQuery","terminal","SQL Playground","Execute ad-hoc queries with auto-complete and safety simulation"),new C("Open SQLite File...","vetrolog.openFile","file-submodule","Local File","Select a SQLite file (.db, .sqlite, .db3) from your filesystem")])}},b=class extends l.TreeItem{constructor(t,n,r,i,d){super(t,l.TreeItemCollapsibleState.None);this.label=t;this.iconName=n;this.description=r;this.tooltip=i;this.command=d;this.iconPath=new l.ThemeIcon(n),this.description=r,this.tooltip=i||t}},x=class{constructor(e){this.serverManager=e;this.currentPort=e.getPort(),e.onStatusChange(t=>{this.isRunning=t.isRunning,this.currentPort=t.port,this.refresh()}),this.serverManager.checkHealth().then(t=>{this.isRunning=t,this.refresh()})}_onDidChangeTreeData=new l.EventEmitter;onDidChangeTreeData=this._onDidChangeTreeData.event;isRunning=!1;currentPort=8787;refresh(){this._onDidChangeTreeData.fire()}getTreeItem(e){return e}async getChildren(){let e=await this.serverManager.checkHealth();this.isRunning=e;let t=this.serverManager.findBinary(),n=[];if(this.isRunning?(n.push(new b("Status: Active","check",`Port ${this.currentPort}`,`VetroLog daemon is running at ${this.serverManager.getBaseUrl()}`)),n.push(new b("URL","globe",this.serverManager.getBaseUrl(),"Click to open in browser",{command:"vscode.open",title:"Open in Browser",arguments:[l.Uri.parse(this.serverManager.getBaseUrl())]}))):n.push(new b("Status: Stopped","circle-slash","Offline","VetroLog daemon is not currently running")),t){let r=t.length>35?"..."+t.slice(-32):t;n.push(new b("CLI Binary","file-binary",r,`Binary: ${t}`))}else n.push(new b("CLI Binary: Not Found","warning","Install VetroLog","VetroLog binary was not detected on system PATH. Click to open settings.",{command:"workbench.action.openSettings",title:"Open Settings",arguments:["vetrolog.customBinaryPath"]}));return n.push(new b(this.isRunning?"Restart Local Daemon":"Start Local Daemon","refresh","","Start or restart background database daemon",{command:this.isRunning?"vetrolog.restartServer":"vetrolog.startServer",title:"Restart Daemon"})),n}};async function N(o){let e=new D;o.subscriptions.push(e);let t=s.window.createStatusBarItem(s.StatusBarAlignment.Right,100);t.command="vetrolog.open",t.text="$(database) VetroLog",t.tooltip="Click to open VetroLog Database Studio",t.show(),o.subscriptions.push(t),e.onStatusChange(a=>{a.isRunning?(t.text="$(database) VetroLog: Active",t.tooltip=`VetroLog Studio connected on port ${a.port}`):(t.text="$(database) VetroLog: Offline",t.tooltip="VetroLog daemon is stopped. Click to launch.")}),s.workspace.getConfiguration("vetrolog").get("autoStartServer",!0)&&e.startServer().catch(a=>{console.warn("[VetroLog] Auto-start daemon encountered an issue:",a)}),o.subscriptions.push(T.register(o,e));let i=new M,d=new x(e);o.subscriptions.push(s.window.registerTreeDataProvider("vetrolog.quickActions",i)),o.subscriptions.push(s.window.registerTreeDataProvider("vetrolog.serverStatus",d));let v=async()=>await e.checkHealth()?!0:await e.startServer();o.subscriptions.push(s.commands.registerCommand("vetrolog.open",async()=>{await v(),await w.createOrShow(o.extensionUri,e)})),o.subscriptions.push(s.commands.registerCommand("vetrolog.connectADB",async()=>{await v(),(await w.createOrShow(o.extensionUri,e,s.ViewColumn.One,"/?mode=adb")).navigate("/?mode=adb")})),o.subscriptions.push(s.commands.registerCommand("vetrolog.openERDiagram",async()=>{await v(),(await w.createOrShow(o.extensionUri,e,s.ViewColumn.One,"/?view=diagram")).navigate("/?view=diagram")})),o.subscriptions.push(s.commands.registerCommand("vetrolog.newQuery",async()=>{await v(),(await w.createOrShow(o.extensionUri,e,s.ViewColumn.One,"/?view=playground")).navigate("/?view=playground")})),o.subscriptions.push(s.commands.registerCommand("vetrolog.openFile",async a=>{let c;if(a&&a.fsPath)c=a.fsPath;else{let g=await s.window.showOpenDialog({canSelectFiles:!0,canSelectFolders:!1,canSelectMany:!1,openLabel:"Inspect Database",filters:{"SQLite Databases":["db","sqlite","sqlite3","db3","wal"],"All Files":["*"]}});g&&g.length>0&&(c=g[0].fsPath)}if(!c)return;await v();let S=`/?file=${encodeURIComponent(c)}`;(await w.createOrShow(o.extensionUri,e,s.ViewColumn.One,S)).navigate(S)})),o.subscriptions.push(s.commands.registerCommand("vetrolog.startServer",async()=>{await e.startServer()?s.window.showInformationMessage(`VetroLog daemon active at ${e.getBaseUrl()}`):s.window.showErrorMessage("Failed to start VetroLog daemon. Check VetroLog Daemon output channel."),d.refresh()})),o.subscriptions.push(s.commands.registerCommand("vetrolog.stopServer",()=>{e.stopServer(),s.window.showInformationMessage("VetroLog daemon stopped."),d.refresh()})),o.subscriptions.push(s.commands.registerCommand("vetrolog.restartServer",async()=>{s.window.showInformationMessage("Restarting VetroLog daemon..."),await e.restartServer()?s.window.showInformationMessage(`VetroLog daemon restarted at ${e.getBaseUrl()}`):s.window.showErrorMessage("Failed to restart VetroLog daemon."),d.refresh()}))}function z(){}0&&(module.exports={activate,deactivate});
+</html>`;
+  }
+};
+
+// src/treeProvider.ts
+var vscode4 = __toESM(require("vscode"));
+var QuickActionItem = class extends vscode4.TreeItem {
+  constructor(label, commandId, iconName, description, tooltip) {
+    super(label, vscode4.TreeItemCollapsibleState.None);
+    this.label = label;
+    this.commandId = commandId;
+    this.iconName = iconName;
+    this.description = description;
+    this.tooltip = tooltip;
+    this.iconPath = new vscode4.ThemeIcon(iconName);
+    this.tooltip = tooltip || label;
+    this.description = description;
+    this.command = {
+      command: commandId,
+      title: label
+    };
+  }
+};
+var QuickActionsProvider = class {
+  _onDidChangeTreeData = new vscode4.EventEmitter();
+  onDidChangeTreeData = this._onDidChangeTreeData.event;
+  refresh() {
+    this._onDidChangeTreeData.fire();
+  }
+  getTreeItem(element) {
+    return element;
+  }
+  getChildren() {
+    return Promise.resolve([
+      new QuickActionItem(
+        "Open Database Studio",
+        "vetrolog.open",
+        "database",
+        "Full Studio",
+        "Launch VetroLog Database Studio webview"
+      ),
+      new QuickActionItem(
+        "Scan ADB Devices & Apps",
+        "vetrolog.connectADB",
+        "device-mobile",
+        "Mobile Inspector",
+        "Inspect live SQLite databases on Android / Flutter / React Native"
+      ),
+      new QuickActionItem(
+        "Interactive ER Diagram",
+        "vetrolog.openERDiagram",
+        "type-hierarchy",
+        "Visual Schema",
+        "Open visual schema map with interactive foreign key flows"
+      ),
+      new QuickActionItem(
+        "New SQL Query",
+        "vetrolog.newQuery",
+        "terminal",
+        "SQL Playground",
+        "Execute ad-hoc queries with auto-complete and safety simulation"
+      ),
+      new QuickActionItem(
+        "Open SQLite File...",
+        "vetrolog.openFile",
+        "file-submodule",
+        "Local File",
+        "Select a SQLite file (.db, .sqlite, .db3) from your filesystem"
+      )
+    ]);
+  }
+};
+var ServerStatusItem = class extends vscode4.TreeItem {
+  constructor(label, iconName, description, tooltip, command) {
+    super(label, vscode4.TreeItemCollapsibleState.None);
+    this.label = label;
+    this.iconName = iconName;
+    this.description = description;
+    this.tooltip = tooltip;
+    this.command = command;
+    this.iconPath = new vscode4.ThemeIcon(iconName);
+    this.description = description;
+    this.tooltip = tooltip || label;
+  }
+};
+var ServerStatusProvider = class {
+  constructor(serverManager) {
+    this.serverManager = serverManager;
+    this.currentPort = serverManager.getPort();
+    serverManager.onStatusChange((status) => {
+      this.isRunning = status.isRunning;
+      this.currentPort = status.port;
+      this.refresh();
+    });
+    this.serverManager.checkHealth().then((running) => {
+      this.isRunning = running;
+      this.refresh();
+    });
+  }
+  _onDidChangeTreeData = new vscode4.EventEmitter();
+  onDidChangeTreeData = this._onDidChangeTreeData.event;
+  isRunning = false;
+  currentPort = 8787;
+  refresh() {
+    this._onDidChangeTreeData.fire();
+  }
+  getTreeItem(element) {
+    return element;
+  }
+  async getChildren() {
+    const running = await this.serverManager.checkHealth();
+    this.isRunning = running;
+    const binary = this.serverManager.findBinary();
+    const items = [];
+    if (this.isRunning) {
+      items.push(
+        new ServerStatusItem(
+          "Status: Active",
+          "check",
+          `Port ${this.currentPort}`,
+          `VetroLog daemon is running at ${this.serverManager.getBaseUrl()}`
+        )
+      );
+      items.push(
+        new ServerStatusItem(
+          "URL",
+          "globe",
+          this.serverManager.getBaseUrl(),
+          "Click to open in browser",
+          {
+            command: "vscode.open",
+            title: "Open in Browser",
+            arguments: [vscode4.Uri.parse(this.serverManager.getBaseUrl())]
+          }
+        )
+      );
+    } else {
+      items.push(
+        new ServerStatusItem(
+          "Status: Stopped",
+          "circle-slash",
+          "Offline",
+          "VetroLog daemon is not currently running"
+        )
+      );
+    }
+    if (binary) {
+      const displayBinary = binary.length > 35 ? "..." + binary.slice(-32) : binary;
+      items.push(
+        new ServerStatusItem(
+          "CLI Binary",
+          "file-binary",
+          displayBinary,
+          `Binary: ${binary}`
+        )
+      );
+    } else {
+      items.push(
+        new ServerStatusItem(
+          "CLI Binary: Not Found",
+          "warning",
+          "Install VetroLog",
+          "VetroLog binary was not detected on system PATH. Click to open settings.",
+          {
+            command: "workbench.action.openSettings",
+            title: "Open Settings",
+            arguments: ["vetrolog.customBinaryPath"]
+          }
+        )
+      );
+    }
+    items.push(
+      new ServerStatusItem(
+        this.isRunning ? "Restart Local Daemon" : "Start Local Daemon",
+        "refresh",
+        "",
+        "Start or restart background database daemon",
+        {
+          command: this.isRunning ? "vetrolog.restartServer" : "vetrolog.startServer",
+          title: "Restart Daemon"
+        }
+      )
+    );
+    return items;
+  }
+};
+
+// src/extension.ts
+async function activate(context) {
+  const serverManager = new ServerManager();
+  context.subscriptions.push(serverManager);
+  const statusBarItem = vscode5.window.createStatusBarItem(
+    vscode5.StatusBarAlignment.Right,
+    100
+  );
+  statusBarItem.command = "vetrolog.open";
+  statusBarItem.text = "$(database) VetroLog";
+  statusBarItem.tooltip = "Click to open VetroLog Database Studio";
+  statusBarItem.show();
+  context.subscriptions.push(statusBarItem);
+  serverManager.onStatusChange((status) => {
+    if (status.isRunning) {
+      statusBarItem.text = "$(database) VetroLog: Active";
+      statusBarItem.tooltip = `VetroLog Studio connected on port ${status.port}`;
+    } else {
+      statusBarItem.text = "$(database) VetroLog: Offline";
+      statusBarItem.tooltip = "VetroLog daemon is stopped. Click to launch.";
+    }
+  });
+  const config = vscode5.workspace.getConfiguration("vetrolog");
+  const autoStart = config.get("autoStartServer", true);
+  if (autoStart) {
+    serverManager.startServer().catch((err) => {
+      console.warn("[VetroLog] Auto-start daemon encountered an issue:", err);
+    });
+  }
+  context.subscriptions.push(
+    VetroLogCustomEditorProvider.register(context, serverManager)
+  );
+  const quickActionsProvider = new QuickActionsProvider();
+  const serverStatusProvider = new ServerStatusProvider(serverManager);
+  context.subscriptions.push(
+    vscode5.window.registerTreeDataProvider("vetrolog.quickActions", quickActionsProvider)
+  );
+  context.subscriptions.push(
+    vscode5.window.registerTreeDataProvider("vetrolog.serverStatus", serverStatusProvider)
+  );
+  const ensureServerRunning = async () => {
+    const isRunning = await serverManager.checkHealth();
+    if (!isRunning) {
+      return await serverManager.startServer();
+    }
+    return true;
+  };
+  context.subscriptions.push(
+    vscode5.commands.registerCommand("vetrolog.open", async () => {
+      await ensureServerRunning();
+      await VetroLogWebviewPanel.createOrShow(context.extensionUri, serverManager);
+    })
+  );
+  context.subscriptions.push(
+    vscode5.commands.registerCommand("vetrolog.connectADB", async () => {
+      await ensureServerRunning();
+      const panel = await VetroLogWebviewPanel.createOrShow(
+        context.extensionUri,
+        serverManager,
+        vscode5.ViewColumn.One,
+        "/?mode=adb"
+      );
+      panel.navigate("/?mode=adb");
+    })
+  );
+  context.subscriptions.push(
+    vscode5.commands.registerCommand("vetrolog.openERDiagram", async () => {
+      await ensureServerRunning();
+      const panel = await VetroLogWebviewPanel.createOrShow(
+        context.extensionUri,
+        serverManager,
+        vscode5.ViewColumn.One,
+        "/?view=diagram"
+      );
+      panel.navigate("/?view=diagram");
+    })
+  );
+  context.subscriptions.push(
+    vscode5.commands.registerCommand("vetrolog.newQuery", async () => {
+      await ensureServerRunning();
+      const panel = await VetroLogWebviewPanel.createOrShow(
+        context.extensionUri,
+        serverManager,
+        vscode5.ViewColumn.One,
+        "/?view=playground"
+      );
+      panel.navigate("/?view=playground");
+    })
+  );
+  context.subscriptions.push(
+    vscode5.commands.registerCommand("vetrolog.openFile", async (uri) => {
+      let targetPath;
+      if (uri && uri.fsPath) {
+        targetPath = uri.fsPath;
+      } else {
+        const files = await vscode5.window.showOpenDialog({
+          canSelectFiles: true,
+          canSelectFolders: false,
+          canSelectMany: false,
+          openLabel: "Inspect Database",
+          filters: {
+            "SQLite Databases": ["db", "sqlite", "sqlite3", "db3", "wal"],
+            "All Files": ["*"]
+          }
+        });
+        if (files && files.length > 0) {
+          targetPath = files[0].fsPath;
+        }
+      }
+      if (!targetPath) return;
+      await ensureServerRunning();
+      const encoded = encodeURIComponent(targetPath);
+      const initialPath = `/?file=${encoded}`;
+      const panel = await VetroLogWebviewPanel.createOrShow(
+        context.extensionUri,
+        serverManager,
+        vscode5.ViewColumn.One,
+        initialPath
+      );
+      panel.navigate(initialPath);
+    })
+  );
+  context.subscriptions.push(
+    vscode5.commands.registerCommand("vetrolog.startServer", async () => {
+      const ok = await serverManager.startServer();
+      if (ok) {
+        vscode5.window.showInformationMessage(
+          `VetroLog daemon active at ${serverManager.getBaseUrl()}`
+        );
+      } else {
+        vscode5.window.showErrorMessage(
+          "Failed to start VetroLog daemon. Check VetroLog Daemon output channel."
+        );
+      }
+      serverStatusProvider.refresh();
+    })
+  );
+  context.subscriptions.push(
+    vscode5.commands.registerCommand("vetrolog.stopServer", () => {
+      serverManager.stopServer();
+      vscode5.window.showInformationMessage("VetroLog daemon stopped.");
+      serverStatusProvider.refresh();
+    })
+  );
+  context.subscriptions.push(
+    vscode5.commands.registerCommand("vetrolog.restartServer", async () => {
+      vscode5.window.showInformationMessage("Restarting VetroLog daemon...");
+      const ok = await serverManager.restartServer();
+      if (ok) {
+        vscode5.window.showInformationMessage(
+          `VetroLog daemon restarted at ${serverManager.getBaseUrl()}`
+        );
+      } else {
+        vscode5.window.showErrorMessage("Failed to restart VetroLog daemon.");
+      }
+      serverStatusProvider.refresh();
+    })
+  );
+}
+function deactivate() {
+}
+// Annotate the CommonJS export names for ESM import in node:
+0 && (module.exports = {
+  activate,
+  deactivate
+});
+//# sourceMappingURL=extension.js.map

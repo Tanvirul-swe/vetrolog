@@ -93,7 +93,7 @@
         {
           "id": "vetrolog-container",
           "title": "VetroLog Studio",
-          "icon": "resources/icon.png"
+          "icon": "resources/activitybar.svg"
         }
       ]
     },

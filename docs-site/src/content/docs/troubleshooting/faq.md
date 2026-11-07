@@ -63,3 +63,4 @@ VetroLog is engineered for speed:
 Join our community and contribute:
 * **[GitHub Discussions](https://github.com/Tanvirul-swe/vetrolog/discussions)**
 * **[Issue Tracker](https://github.com/Tanvirul-swe/vetrolog/issues)**
+* **[Sponsor & Support](https://buymeacoffee.com/tanvir_swe)**: Support ongoing open-source development via Buy Me a Coffee.

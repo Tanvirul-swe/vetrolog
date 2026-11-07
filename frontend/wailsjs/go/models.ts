@@ -1014,6 +1014,7 @@ export namespace updater {
 	    assetUrl: string;
 	    assetName: string;
 	    assetSize: number;
+	    checksumUrl?: string;
 	    publishedAt: string;
 	    hasUpdate: boolean;
 	
@@ -1031,6 +1032,7 @@ export namespace updater {
 	        this.assetUrl = source["assetUrl"];
 	        this.assetName = source["assetName"];
 	        this.assetSize = source["assetSize"];
+	        this.checksumUrl = source["checksumUrl"];
 	        this.publishedAt = source["publishedAt"];
 	        this.hasUpdate = source["hasUpdate"];
 	    }

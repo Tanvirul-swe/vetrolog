@@ -107,3 +107,4 @@ func TestCORSOriginValidation(t *testing.T) {
 		t.Fatalf("Expected reflected vscode-webview origin, got: %s", wVSCode.Header().Get("Access-Control-Allow-Origin"))
 	}
 }
+

@@ -64,3 +64,15 @@ func TestFormatBytes(t *testing.T) {
 		t.Errorf("FormatBytes(12MB) = %s, expected 12.0 MB", s)
 	}
 }
+
+func TestFindChecksumAsset(t *testing.T) {
+	assets := []GitHubAsset{
+		{Name: "VetroLog-macOS-Universal.zip", BrowserDownloadURL: "https://example.com/zip"},
+		{Name: "checksums.txt", BrowserDownloadURL: "https://example.com/checksums.txt"},
+	}
+
+	cs := FindChecksumAsset(assets)
+	if cs == nil || cs.Name != "checksums.txt" {
+		t.Fatalf("Expected checksums.txt, got %+v", cs)
+	}
+}

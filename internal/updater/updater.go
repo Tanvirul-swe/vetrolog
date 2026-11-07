@@ -3,6 +3,8 @@ package updater
 import (
 	"archive/zip"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -32,6 +34,7 @@ type UpdateInfo struct {
 	AssetURL       string `json:"assetUrl"`
 	AssetName      string `json:"assetName"`
 	AssetSize      int64  `json:"assetSize"`
+	ChecksumURL    string `json:"checksumUrl,omitempty"`
 	PublishedAt    string `json:"publishedAt"`
 	HasUpdate      bool   `json:"hasUpdate"`
 }
@@ -199,6 +202,17 @@ func FormatBytes(b int64) string {
 	return fmt.Sprintf("%.1f %cB", float64(b)/float64(div), "KMGTPE"[exp])
 }
 
+// FindChecksumAsset searches release assets for a sha256 checksum manifest
+func FindChecksumAsset(assets []GitHubAsset) *GitHubAsset {
+	for _, a := range assets {
+		lower := strings.ToLower(a.Name)
+		if lower == "checksums.txt" || lower == "sha256sums" || lower == "sha256sums.txt" {
+			return &a
+		}
+	}
+	return nil
+}
+
 // FormatSpeed formats bytes/sec transfer speed
 func FormatSpeed(bytesPerSec float64) string {
 	if bytesPerSec < 1024 {
@@ -266,6 +280,11 @@ func (s *Service) CheckForUpdate() (*UpdateInfo, error) {
 		info.AssetURL = bestAsset.BrowserDownloadURL
 		info.AssetName = bestAsset.Name
 		info.AssetSize = bestAsset.Size
+	}
+
+	checksumAsset := FindChecksumAsset(release.Assets)
+	if checksumAsset != nil {
+		info.ChecksumURL = checksumAsset.BrowserDownloadURL
 	}
 
 	s.mu.Lock()
@@ -352,6 +371,9 @@ func (s *Service) StartDownloadUpdate(assetURL, targetVersion string) error {
 		}
 		defer out.Close()
 
+		hasher := sha256.New()
+		multiWriter := io.MultiWriter(out, hasher)
+
 		totalBytes := resp.ContentLength
 		totalStr := FormatBytes(totalBytes)
 		var bytesRead int64
@@ -371,7 +393,7 @@ func (s *Service) StartDownloadUpdate(assetURL, targetVersion string) error {
 
 			n, readErr := resp.Body.Read(buf)
 			if n > 0 {
-				_, writeErr := out.Write(buf[:n])
+				_, writeErr := multiWriter.Write(buf[:n])
 				if writeErr != nil {
 					s.emitError(wCtx, "Failed to write download chunk: "+writeErr.Error())
 					return
@@ -416,6 +438,28 @@ func (s *Service) StartDownloadUpdate(assetURL, targetVersion string) error {
 		}
 
 		out.Close()
+
+		computedHash := hex.EncodeToString(hasher.Sum(nil))
+
+		// Check and enforce SHA-256 integrity if release checksum manifest is available
+		s.mu.Lock()
+		checksumURL := ""
+		if s.lastUpdate != nil {
+			checksumURL = s.lastUpdate.ChecksumURL
+		}
+		s.mu.Unlock()
+
+		if checksumURL != "" {
+			expectedHash, err := s.fetchExpectedChecksum(ctx, checksumURL, filename)
+			if err == nil && expectedHash != "" {
+				if !strings.EqualFold(computedHash, expectedHash) {
+					_ = os.Remove(targetFilePath)
+					s.emitError(wCtx, fmt.Sprintf("Security Verification Failed: Computed SHA-256 (%s) does not match release checksum (%s)", computedHash, expectedHash))
+					return
+				}
+				log.Printf("[VetroLog Updater] Verified SHA-256 for %s successfully: %s", filename, computedHash)
+			}
+		}
 
 		var extractedAppPath string
 		// If on macOS and downloaded a .zip archive, extract the .app bundle
@@ -692,4 +736,45 @@ func extractZipApp(zipPath, targetDir string) (string, error) {
 	}
 
 	return appBundlePath, nil
+}
+
+func (s *Service) fetchExpectedChecksum(ctx context.Context, checksumURL, targetFilename string) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", checksumURL, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("User-Agent", "VetroLog-AutoUpdater/1.0")
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("checksum HTTP %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	lines := strings.Split(string(body), "\n")
+	for _, l := range lines {
+		l = strings.TrimSpace(l)
+		if l == "" || strings.HasPrefix(l, "#") {
+			continue
+		}
+		parts := strings.Fields(l)
+		if len(parts) >= 2 {
+			hash := parts[0]
+			file := strings.TrimPrefix(parts[1], "*")
+			if filepath.Base(file) == targetFilename {
+				return hash, nil
+			}
+		}
+	}
+	return "", nil
 }

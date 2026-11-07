@@ -21,7 +21,9 @@ var assets embed.FS
 func main() {
 	// Parse CLI flags
 	webMode := flag.Bool("web", false, "Start VetroLog in Local Web Server mode")
+	webHost := flag.String("host", "127.0.0.1", "Host address for Web Server mode (default: 127.0.0.1)")
 	webPort := flag.Int("port", 8787, "Port for Web Server mode (default: 8787)")
+	tokenFlag := flag.String("token", "", "Optional secret token for API authentication (auto-generated if omitted)")
 	noBrowser := flag.Bool("no-browser", false, "Do not auto-open the browser in Web Server mode")
 	flag.Parse()
 
@@ -29,7 +31,7 @@ func main() {
 	isServeCmd := len(os.Args) > 1 && os.Args[1] == "serve"
 
 	if *webMode || isServeCmd {
-		err := web.StartServer(assets, *webPort, !*noBrowser)
+		err := web.StartServer(assets, *webHost, *webPort, *tokenFlag, !*noBrowser)
 		if err != nil {
 			println("Web Server Error:", err.Error())
 		}

@@ -166,7 +166,7 @@ func (s *Service) ensureDatabaseSynced(deviceID, packageName, remotePath string,
 	}
 
 	// 2. Fast remote stat check (~20-30ms)
-	cmd := fmt.Sprintf("sh -c 'ls -l \"%s\"* 2>/dev/null'", remotePath)
+	cmd := fmt.Sprintf("sh -c 'ls -l %s* 2>/dev/null'", QuotePosixShell(remotePath))
 	out, err := s.client.RunAs(deviceID, packageName, cmd)
 	if err != nil && strings.TrimSpace(out) == "" {
 		// Fallback to local file if available
@@ -403,7 +403,7 @@ func (s *Service) DiscoverDatabases(deviceID, packageName string) ([]DiscoveredD
 	}
 
 	for _, d := range dirsToSearch {
-		out, err := s.client.RunAs(deviceID, packageName, fmt.Sprintf("ls -la '%s'", d.remoteDir))
+		out, err := s.client.RunAs(deviceID, packageName, fmt.Sprintf("ls -la %s", QuotePosixShell(d.remoteDir)))
 		if err != nil || strings.Contains(out, "No such file") {
 			continue
 		}
@@ -520,7 +520,7 @@ func (s *Service) GetTableData(deviceID, packageName, remotePath, tableName stri
 
 	// Get total row count for the requested table
 	var totalRows int64
-	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM \"%s\"", tableName)
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM \"%s\"", escapeSqliteIdentifier(tableName))
 	_ = db.QueryRow(countQuery).Scan(&totalRows)
 
 	// Update active table count immediately
@@ -554,7 +554,7 @@ func (s *Service) GetTableData(deviceID, packageName, remotePath, tableName stri
 
 			for _, tName := range tableNames {
 				var count int64
-				if err := bgDB.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM \"%s\"", tName)).Scan(&count); err == nil {
+				if err := bgDB.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM \"%s\"", escapeSqliteIdentifier(tName))).Scan(&count); err == nil {
 					entry.mu.Lock()
 					entry.tableCounts[tName] = count
 					entry.mu.Unlock()
@@ -577,7 +577,7 @@ func (s *Service) GetTableData(deviceID, packageName, remotePath, tableName stri
 
 	// Query paginated rows
 	offset := (page - 1) * pageSize
-	dataQuery := fmt.Sprintf("SELECT * FROM \"%s\" LIMIT %d OFFSET %d", tableName, pageSize, offset)
+	dataQuery := fmt.Sprintf("SELECT * FROM \"%s\" LIMIT %d OFFSET %d", escapeSqliteIdentifier(tableName), pageSize, offset)
 	rows, err := db.Query(dataQuery)
 	if err != nil {
 		return nil, fmt.Errorf("failed querying table data: %v", err)
@@ -778,17 +778,17 @@ func (s *Service) UpdateRow(deviceID, packageName, remotePath, tableName string,
 	var setClauses []string
 	var args []interface{}
 	for k, v := range values {
-		setClauses = append(setClauses, fmt.Sprintf("\"%s\" = ?", k))
+		setClauses = append(setClauses, fmt.Sprintf("\"%s\" = ?", escapeSqliteIdentifier(k)))
 		args = append(args, v)
 	}
 
 	var whereClauses []string
 	for k, v := range pk {
-		whereClauses = append(whereClauses, fmt.Sprintf("\"%s\" = ?", k))
+		whereClauses = append(whereClauses, fmt.Sprintf("\"%s\" = ?", escapeSqliteIdentifier(k)))
 		args = append(args, v)
 	}
 
-	query := fmt.Sprintf("UPDATE \"%s\" SET %s WHERE %s", tableName, strings.Join(setClauses, ", "), strings.Join(whereClauses, " AND "))
+	query := fmt.Sprintf("UPDATE \"%s\" SET %s WHERE %s", escapeSqliteIdentifier(tableName), strings.Join(setClauses, ", "), strings.Join(whereClauses, " AND "))
 	_, err = db.Exec(query, args...)
 	if err != nil {
 		return err
@@ -814,11 +814,11 @@ func (s *Service) DeleteRow(deviceID, packageName, remotePath, tableName string,
 	var whereClauses []string
 	var args []interface{}
 	for k, v := range pk {
-		whereClauses = append(whereClauses, fmt.Sprintf("\"%s\" = ?", k))
+		whereClauses = append(whereClauses, fmt.Sprintf("\"%s\" = ?", escapeSqliteIdentifier(k)))
 		args = append(args, v)
 	}
 
-	query := fmt.Sprintf("DELETE FROM \"%s\" WHERE %s", tableName, strings.Join(whereClauses, " AND "))
+	query := fmt.Sprintf("DELETE FROM \"%s\" WHERE %s", escapeSqliteIdentifier(tableName), strings.Join(whereClauses, " AND "))
 	_, err = db.Exec(query, args...)
 	if err != nil {
 		return err
@@ -835,8 +835,19 @@ func (s *Service) getLocalCachePath(deviceID, packageName, fileName string) stri
 }
 
 func sanitize(in string) string {
-	replacer := strings.NewReplacer(":", "_", "/", "_", "\\", "_")
-	return replacer.Replace(in)
+	cleaned := filepath.Clean(in)
+	cleaned = strings.TrimPrefix(cleaned, "/")
+	cleaned = strings.TrimPrefix(cleaned, "\\")
+	replacer := strings.NewReplacer("..", "", ":", "_", "/", "_", "\\", "_", "\x00", "")
+	res := replacer.Replace(cleaned)
+	if res == "" || res == "." {
+		return "unnamed"
+	}
+	return res
+}
+
+func escapeSqliteIdentifier(id string) string {
+	return strings.ReplaceAll(id, "\"", "\"\"")
 }
 
 func (s *Service) inspectSqliteTables(dbPath string) ([]TableMeta, error) {
@@ -856,7 +867,7 @@ func (s *Service) inspectSqliteTables(dbPath string) ([]TableMeta, error) {
 		var name, tType string
 		if err := rows.Scan(&name, &tType); err == nil {
 			var rowCount int64
-			_ = db.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM \"%s\"", name)).Scan(&rowCount)
+			_ = db.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM \"%s\"", escapeSqliteIdentifier(name))).Scan(&rowCount)
 
 			cols, _ := s.getTableColumns(db, name)
 			tables = append(tables, TableMeta{

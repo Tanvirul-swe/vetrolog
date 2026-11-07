@@ -16,7 +16,7 @@ type Config struct {
 // DefaultConfig returns safe production defaults
 func DefaultConfig() *Config {
 	return &Config{
-		WSHost:           "0.0.0.0",
+		WSHost:           "127.0.0.1",
 		WSPort:           9222,
 		BatchFlushWindow: 50 * time.Millisecond,
 		MaxBatchSize:     250,

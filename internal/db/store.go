@@ -18,11 +18,15 @@ import (
 	"vetrolog/internal/db/types"
 )
 
+// PasswordMask is the placeholder returned on API calls to protect stored passwords
+const PasswordMask = "••••••••"
+
 // Store handles encrypted persistent storage of database connection profiles
 type Store struct {
-	mu       sync.RWMutex
-	filePath string
-	key      []byte
+	mu        sync.RWMutex
+	filePath  string
+	key       []byte
+	legacyKey []byte
 }
 
 // NewStoreWithPath initializes connection store at a specified file path
@@ -32,14 +36,47 @@ func NewStoreWithPath(filePath string) (*Store, error) {
 		return nil, err
 	}
 
+	// Legacy static key for backward-compatibility with older installations
+	hLegacy := sha256.New()
+	hLegacy.Write([]byte(filePath + "-vetrolog-secrets-salt-v1"))
+	legacyKey := hLegacy.Sum(nil)
+
+	// Machine-unique key stored with 0600 permissions
+	machineKey, err := getOrCreateMachineKey(dir)
+	if err != nil {
+		return &Store{
+			filePath:  filePath,
+			key:       legacyKey,
+			legacyKey: legacyKey,
+		}, nil
+	}
+
 	h := sha256.New()
-	h.Write([]byte(filePath + "-vetrolog-secrets-salt-v1"))
+	h.Write(machineKey)
+	h.Write([]byte("::vetrolog-master-secrets::"))
+	h.Write([]byte(filePath))
 	key := h.Sum(nil)
 
 	return &Store{
-		filePath: filePath,
-		key:      key,
+		filePath:  filePath,
+		key:       key,
+		legacyKey: legacyKey,
 	}, nil
+}
+
+func getOrCreateMachineKey(dir string) ([]byte, error) {
+	keyFile := filepath.Join(dir, ".vetrolog.key")
+	if data, err := os.ReadFile(keyFile); err == nil && len(data) >= 32 {
+		return data, nil
+	}
+
+	raw := make([]byte, 32)
+	if _, err := io.ReadFull(rand.Reader, raw); err != nil {
+		return nil, err
+	}
+
+	_ = os.WriteFile(keyFile, raw, 0600)
+	return raw, nil
 }
 
 // NewStore initializes connection store at ~/.vetrolog/connections.json
@@ -154,9 +191,9 @@ func (s *Store) Save(cfg *types.ConnectionConfig) (*types.ConnectionSummary, err
 	}
 	cfg.UpdatedAt = now
 
-	// Encrypt sensitive fields for disk writing
+	// Encrypt sensitive fields for disk writing (only if new plaintext password was provided)
 	toSave := *cfg
-	if toSave.Password != "" {
+	if toSave.Password != "" && toSave.Password != PasswordMask {
 		enc, err := s.encrypt(toSave.Password)
 		if err == nil {
 			toSave.Password = enc
@@ -164,13 +201,13 @@ func (s *Store) Save(cfg *types.ConnectionConfig) (*types.ConnectionSummary, err
 	}
 	if toSave.SSH != nil {
 		sshCopy := *toSave.SSH
-		if sshCopy.Password != "" {
+		if sshCopy.Password != "" && sshCopy.Password != PasswordMask {
 			enc, err := s.encrypt(sshCopy.Password)
 			if err == nil {
 				sshCopy.Password = enc
 			}
 		}
-		if sshCopy.Passphrase != "" {
+		if sshCopy.Passphrase != "" && sshCopy.Passphrase != PasswordMask {
 			enc, err := s.encrypt(sshCopy.Passphrase)
 			if err == nil {
 				sshCopy.Passphrase = enc
@@ -182,15 +219,15 @@ func (s *Store) Save(cfg *types.ConnectionConfig) (*types.ConnectionSummary, err
 	found := false
 	for i := range all {
 		if all[i].ID == cfg.ID {
-			// If incoming password is empty, preserve already saved encrypted password
-			if toSave.Password == "" && all[i].Password != "" {
+			// If incoming password is empty or masked, preserve already saved encrypted password
+			if (toSave.Password == "" || toSave.Password == PasswordMask) && all[i].Password != "" {
 				toSave.Password = all[i].Password
 			}
 			if toSave.SSH != nil && all[i].SSH != nil {
-				if toSave.SSH.Password == "" && all[i].SSH.Password != "" {
+				if (toSave.SSH.Password == "" || toSave.SSH.Password == PasswordMask) && all[i].SSH.Password != "" {
 					toSave.SSH.Password = all[i].SSH.Password
 				}
-				if toSave.SSH.Passphrase == "" && all[i].SSH.Passphrase != "" {
+				if (toSave.SSH.Passphrase == "" || toSave.SSH.Passphrase == PasswordMask) && all[i].SSH.Passphrase != "" {
 					toSave.SSH.Passphrase = all[i].SSH.Passphrase
 				}
 			}
@@ -287,11 +324,26 @@ func (s *Store) encrypt(text string) (string, error) {
 }
 
 func (s *Store) decrypt(encoded string) (string, error) {
+	// Try decrypting with machine-unique key
+	res, err := s.decryptWithKey(encoded, s.key)
+	if err == nil {
+		return res, nil
+	}
+	// Fallback to legacy static key to ensure seamless migration of existing profiles
+	if len(s.legacyKey) > 0 {
+		if legacyRes, legacyErr := s.decryptWithKey(encoded, s.legacyKey); legacyErr == nil {
+			return legacyRes, nil
+		}
+	}
+	return "", err
+}
+
+func (s *Store) decryptWithKey(encoded string, key []byte) (string, error) {
 	data, err := hex.DecodeString(encoded)
 	if err != nil {
 		return "", err
 	}
-	block, err := aes.NewCipher(s.key)
+	block, err := aes.NewCipher(key)
 	if err != nil {
 		return "", err
 	}

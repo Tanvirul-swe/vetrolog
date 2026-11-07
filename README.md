@@ -10,6 +10,7 @@
     <img src="https://img.shields.io/badge/Go-1.26-00ADD8?logo=go" alt="Go" />
     <img src="https://img.shields.io/badge/Wails-v2-DF1A29?logo=wails" alt="Wails" />
     <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react" alt="React" />
+    <a href="https://buymeacoffee.com/tanvir_swe"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-Support-FFDD00?logo=buy-me-a-coffee&logoColor=black" alt="Buy Me A Coffee" /></a>
     <img src="https://img.shields.io/badge/License-MIT-purple" alt="License" />
   </p>
 </div>
@@ -163,6 +164,18 @@ wails build -platform windows/amd64 -nsis
 # Linux (Binary)
 wails build -platform linux/amd64
 ```
+
+---
+
+## 💖 Support the Project
+
+VetroLog is an independent, 100% free, and open-source project. If VetroLog helps your development workflow or saves you time, consider buying a coffee or sponsoring to support continuous updates, cross-platform maintenance, and upcoming features:
+
+<p align="left">
+  <a href="https://buymeacoffee.com/tanvir_swe" target="_blank" rel="noopener noreferrer">
+    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" width="210" />
+  </a>
+</p>
 
 ---
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, X, Check, Sparkles, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Settings, X, Check, Sparkles, Loader2, AlertCircle, CheckCircle2, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AIProvider } from '@/types/database';
@@ -95,6 +95,16 @@ export function AiSettingsDialog() {
 
         {/* Content */}
         <form onSubmit={handleSave} className="p-4 space-y-4">
+          {/* Privacy & Governance Notice */}
+          <div className="p-3 bg-primary/5 rounded-lg border border-primary/20 flex gap-2.5 items-start text-xs leading-relaxed text-muted-foreground">
+            <Shield className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+            <div>
+              <span className="font-semibold text-foreground">Privacy & Security Guardrail</span>:
+              {' '}VetroLog sends only table and column schema names to your selected AI provider to generate accurate SQL.{' '}
+              <span className="text-foreground font-medium">Your actual database table data is never transmitted.</span>
+            </div>
+          </div>
+
           {/* Provider Selection */}
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-foreground">Query Translation Engine</label>

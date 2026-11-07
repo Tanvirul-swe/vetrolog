@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"sync"
 	"time"
+	"strings"
 
 	"github.com/gorilla/websocket"
 	"vetrolog/internal/broadcaster"
@@ -17,9 +18,19 @@ import (
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024 * 64,
 	WriteBufferSize: 1024 * 64,
-	// Allow all origins since mobile devices connect from local LAN / USB adb reverse
+	// Validate origin to prevent Cross-Site WebSocket Hijacking (CSWSH)
 	CheckOrigin: func(r *http.Request) bool {
-		return true
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			return true // Non-browser mobile ADB client or local tool
+		}
+		lower := strings.ToLower(origin)
+		return strings.HasPrefix(lower, "http://localhost:") ||
+			lower == "http://localhost" ||
+			strings.HasPrefix(lower, "http://127.0.0.1:") ||
+			lower == "http://127.0.0.1" ||
+			strings.HasPrefix(lower, "vscode-webview://") ||
+			strings.HasPrefix(lower, "wails://")
 	},
 }
 

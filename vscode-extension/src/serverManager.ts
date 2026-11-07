@@ -4,6 +4,7 @@ import * as http from 'http';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
+import * as crypto from 'crypto';
 
 export interface ServerStatus {
   isRunning: boolean;
@@ -17,6 +18,7 @@ export class ServerManager {
   private process: ChildProcess | null = null;
   private outputChannel: vscode.OutputChannel;
   private currentPort = 8787;
+  private sessionToken = crypto.randomBytes(16).toString('hex');
   private isStarting = false;
   private onStatusChangeEmitter = new vscode.EventEmitter<ServerStatus>();
   public readonly onStatusChange = this.onStatusChangeEmitter.event;
@@ -29,6 +31,10 @@ export class ServerManager {
 
   public getPort(): number {
     return this.currentPort;
+  }
+
+  public getToken(): string {
+    return this.sessionToken;
   }
 
   public getBaseUrl(): string {
@@ -147,7 +153,7 @@ export class ServerManager {
     this.outputChannel.appendLine(`[Daemon] Launching ${binary} on port ${this.currentPort}...`);
 
     try {
-      this.process = spawn(binary, ['--web', `--port=${this.currentPort}`, '--no-browser'], {
+      this.process = spawn(binary, ['--web', `--port=${this.currentPort}`, `--token=${this.sessionToken}`, '--no-browser'], {
         detached: false,
         env: {
           ...process.env,

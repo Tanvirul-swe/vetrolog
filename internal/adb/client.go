@@ -8,10 +8,23 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
 )
+
+var validPackageNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_]+(\.[a-zA-Z0-9_]+)+$`)
+
+// IsValidPackageName verifies the package name is a valid reverse-DNS Android identifier
+func IsValidPackageName(pkg string) bool {
+	return validPackageNameRegex.MatchString(pkg)
+}
+
+// QuotePosixShell securely escapes arguments for POSIX /bin/sh commands
+func QuotePosixShell(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
+}
 
 // Client coordinates low-level ADB command execution.
 type Client struct {
@@ -129,8 +142,15 @@ func (c *Client) ExecOutCat(deviceID, packageName, remotePath, localDestPath str
 	return os.Rename(tmpPath, localDestPath)
 }
 
-// PushToSandbox writes a local file into the app sandbox.
+// PushToSandbox writes a local file into the app sandbox safely
 func (c *Client) PushToSandbox(deviceID, packageName, localSourcePath, remoteDestPath string) error {
+	if !IsValidPackageName(packageName) {
+		return fmt.Errorf("invalid package name format: %s", packageName)
+	}
+	if strings.ContainsAny(remoteDestPath, "\x00\r\n") {
+		return fmt.Errorf("invalid remote destination path: illegal characters")
+	}
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -140,8 +160,8 @@ func (c *Client) PushToSandbox(deviceID, packageName, localSourcePath, remoteDes
 	}
 	defer srcFile.Close()
 
-	// Pipe local file content into adb shell run-as <pkg> sh -c 'cat > <dest>'
-	shellCmd := fmt.Sprintf("cat > '%s'", remoteDestPath)
+	// Safe POSIX shell quotation of destination path
+	shellCmd := fmt.Sprintf("cat > %s", QuotePosixShell(remoteDestPath))
 	cmd := exec.Command(c.adbPath, "-s", deviceID, "shell", "run-as", packageName, "sh", "-c", shellCmd)
 	cmd.Stdin = srcFile
 	var stderr bytes.Buffer

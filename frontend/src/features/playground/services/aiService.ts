@@ -176,8 +176,13 @@ export function getDialectName(engine?: string): string {
  * Fetches the list of models that support generateContent for the given Gemini API key.
  */
 export async function fetchAvailableGeminiModels(apiKey: string, signal?: AbortSignal): Promise<string[]> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
-  const res = await fetch(url, { signal });
+  const url = 'https://generativelanguage.googleapis.com/v1beta/models';
+  const res = await fetch(url, {
+    signal,
+    headers: {
+      'x-goog-api-key': apiKey,
+    },
+  });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error?.message || `Failed to fetch models: HTTP ${res.status}`);
@@ -234,10 +239,13 @@ Rules:
       }
 
       const executeGemini = async (model: string) => {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${config.geminiApiKey}`;
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
         const res = await fetch(url, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': config.geminiApiKey!,
+          },
           body: JSON.stringify({
             contents: [
               {

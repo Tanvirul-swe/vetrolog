@@ -90,6 +90,55 @@ func TestStoreEncryptionAndPersistence(t *testing.T) {
 	}
 }
 
+func TestPasswordMaskPreservation(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "vetrolog-mask-test-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	store, err := NewStoreWithPath(filepath.Join(tmpDir, "connections.json"))
+	if err != nil {
+		t.Fatalf("NewStoreWithPath failed: %v", err)
+	}
+
+	cfg := &types.ConnectionConfig{
+		Name:     "Mask Test DB",
+		Engine:   types.EnginePostgres,
+		Host:     "localhost",
+		Port:     5432,
+		User:     "admin",
+		Password: "InitialSuperSecretPassword123!",
+	}
+
+	saved, err := store.Save(cfg)
+	if err != nil {
+		t.Fatalf("Initial save failed: %v", err)
+	}
+
+	// Simulate client editing connection name while sending masked password
+	updatedCfg := *cfg
+	updatedCfg.ID = saved.ID
+	updatedCfg.Name = "Updated Mask Test DB"
+	updatedCfg.Password = PasswordMask // Redacted placeholder sent back from client
+
+	if _, err := store.Save(&updatedCfg); err != nil {
+		t.Fatalf("Save with mask failed: %v", err)
+	}
+
+	// Verify the original encrypted password was preserved intact
+	retrieved, err := store.Get(saved.ID)
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	if retrieved.Password != "InitialSuperSecretPassword123!" {
+		t.Fatalf("Expected password to be preserved, got: %s", retrieved.Password)
+	}
+	if retrieved.Name != "Updated Mask Test DB" {
+		t.Fatalf("Expected name to be updated, got: %s", retrieved.Name)
+	}
+}
+
 func TestLocalSQLiteEngineOperations(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "vetrolog-sqlite-test-*")
 	if err != nil {

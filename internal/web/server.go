@@ -1,7 +1,9 @@
 package web
 
 import (
+	"crypto/rand"
 	"embed"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -22,39 +24,59 @@ import (
 
 // Server handles the HTTP REST API and serves the embedded React frontend
 type Server struct {
+	host      string
 	port      int
+	token     string
 	assets    embed.FS
 	adbServer *adb.Service
 	dbManager *db.ConnectionManager
 }
 
 // NewServer initializes a web server instance
-func NewServer(assets embed.FS, port int) *Server {
+func NewServer(assets embed.FS, host string, port int, token string) *Server {
+	if host == "" {
+		host = "127.0.0.1"
+	}
+	if token == "" {
+		token = generateSecureToken()
+	}
 	dbMgr, _ := db.NewConnectionManager()
 	return &Server{
+		host:      host,
 		port:      port,
+		token:     token,
 		assets:    assets,
 		adbServer: adb.GetService(),
 		dbManager: dbMgr,
 	}
 }
 
+func generateSecureToken() string {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return fmt.Sprintf("tok_%d", time.Now().UnixNano())
+	}
+	return hex.EncodeToString(b)
+}
+
 // NewAPIHandler creates an http.Handler with all VetroLog API routes and CORS support
 func NewAPIHandler() http.Handler {
 	dbMgr, _ := db.NewConnectionManager()
 	srv := &Server{
+		host:      "127.0.0.1",
+		token:     "", // In-process desktop mode: no token check needed for native Wails window
 		adbServer: adb.GetService(),
 		dbManager: dbMgr,
 	}
 	mux := http.NewServeMux()
 	srv.registerAPIRoutes(mux)
 	srv.registerRemoteRoutes(mux)
-	return enableCORS(mux)
+	return enableCORS(srv.authMiddleware(mux))
 }
 
 // StartServer launches the HTTP server and optionally launches the browser
-func StartServer(assets embed.FS, port int, openBrowser bool) error {
-	srv := NewServer(assets, port)
+func StartServer(assets embed.FS, host string, port int, token string, openBrowser bool) error {
+	srv := NewServer(assets, host, port, token)
 	mux := http.NewServeMux()
 
 	// Register API routes
@@ -64,13 +86,15 @@ func StartServer(assets embed.FS, port int, openBrowser bool) error {
 	// Register static asset server with SPA fallback
 	srv.registerStaticRoutes(mux)
 
-	// Wrap mux with CORS middleware
-	handler := enableCORS(mux)
+	// Wrap mux with Auth & CORS middleware
+	handler := enableCORS(srv.authMiddleware(mux))
 
-	addr := fmt.Sprintf(":%d", port)
-	url := fmt.Sprintf("http://localhost:%d", port)
+	addr := fmt.Sprintf("%s:%d", srv.host, srv.port)
+	url := fmt.Sprintf("http://localhost:%d/?token=%s", srv.port, srv.token)
 
-	fmt.Printf("\n🚀 VetroLog Web Server started at %s\n", url)
+	fmt.Printf("\n🚀 VetroLog Web Server started at http://localhost:%d\n", srv.port)
+	fmt.Printf("🔑 Security Token: %s\n", srv.token)
+	fmt.Printf("🌐 Web Studio URL: %s\n", url)
 	fmt.Printf("📱 Connecting to ADB bridge...\n")
 	fmt.Printf("Press Ctrl+C to stop the server\n\n")
 
@@ -373,7 +397,7 @@ func (s *Server) registerRemoteRoutes(mux *http.ServeMux) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	})
 
-	// Get saved connection details by ID
+	// Get saved connection details by ID (with secrets redacted for client safety)
 	mux.HandleFunc("/api/remote/connections/get", func(w http.ResponseWriter, r *http.Request) {
 		id := r.URL.Query().Get("id")
 		if id == "" {
@@ -385,7 +409,23 @@ func (s *Server) registerRemoteRoutes(mux *http.ServeMux) {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": err.Error()})
 			return
 		}
-		writeJSON(w, http.StatusOK, cfg)
+
+		safeCfg := *cfg
+		if safeCfg.Password != "" {
+			safeCfg.Password = db.PasswordMask
+		}
+		if safeCfg.SSH != nil {
+			sshCopy := *safeCfg.SSH
+			if sshCopy.Password != "" {
+				sshCopy.Password = db.PasswordMask
+			}
+			if sshCopy.Passphrase != "" {
+				sshCopy.Passphrase = db.PasswordMask
+			}
+			safeCfg.SSH = &sshCopy
+		}
+
+		writeJSON(w, http.StatusOK, safeCfg)
 	})
 
 	// Save or update connection
@@ -895,6 +935,17 @@ func (s *Server) registerStaticRoutes(mux *http.ServeMux) {
 			return
 		}
 
+		// If token parameter is passed in URL query, set strict session cookie
+		tokenParam := r.URL.Query().Get("token")
+		if tokenParam != "" && s.token != "" && tokenParam == s.token {
+			http.SetCookie(w, &http.Cookie{
+				Name:     "vetro_token",
+				Value:    s.token,
+				Path:     "/",
+				SameSite: http.SameSiteStrictMode,
+			})
+		}
+
 		// Check if requested file exists in dist
 		filePath := strings.TrimPrefix(r.URL.Path, "/")
 		if filePath == "" {
@@ -922,6 +973,55 @@ func (s *Server) registerStaticRoutes(mux *http.ServeMux) {
 	})
 }
 
+// authMiddleware validates the ephemeral security token on all sensitive /api/ routes
+func (s *Server) authMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// In native desktop Wails mode (in-process), no token check is needed
+		if s.token == "" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Public health check and static assets do not require token
+		if r.URL.Path == "/api/status" || !strings.HasPrefix(r.URL.Path, "/api/") {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// 1. Check X-Vetro-Token header
+		reqToken := r.Header.Get("X-Vetro-Token")
+
+		// 2. Check Authorization: Bearer <token>
+		if reqToken == "" {
+			authHeader := r.Header.Get("Authorization")
+			if strings.HasPrefix(authHeader, "Bearer ") {
+				reqToken = strings.TrimPrefix(authHeader, "Bearer ")
+			}
+		}
+
+		// 3. Check query parameter ?token=...
+		if reqToken == "" {
+			reqToken = r.URL.Query().Get("token")
+		}
+
+		// 4. Check session cookie
+		if reqToken == "" {
+			if cookie, err := r.Cookie("vetro_token"); err == nil {
+				reqToken = cookie.Value
+			}
+		}
+
+		if reqToken == "" || reqToken != s.token {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{
+				"error": "Unauthorized: invalid or missing security token (X-Vetro-Token)",
+			})
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
 func writeJSON(w http.ResponseWriter, statusCode int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(statusCode)
@@ -930,9 +1030,20 @@ func writeJSON(w http.ResponseWriter, statusCode int, data interface{}) {
 
 func enableCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		origin := r.Header.Get("Origin")
+		if origin != "" {
+			// Enforce origin validation to prevent Drive-by Web localhost exploitation
+			if isTrustedOrigin(origin) {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+				w.Header().Set("Access-Control-Allow-Credentials", "true")
+				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Vetro-Token")
+			}
+		} else {
+			// Non-browser local callers (e.g. curl or internal requests)
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Vetro-Token")
+		}
 
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusOK)
@@ -941,6 +1052,20 @@ func enableCORS(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+func isTrustedOrigin(origin string) bool {
+	lower := strings.ToLower(origin)
+	if strings.HasPrefix(lower, "http://localhost:") || lower == "http://localhost" {
+		return true
+	}
+	if strings.HasPrefix(lower, "http://127.0.0.1:") || lower == "http://127.0.0.1" {
+		return true
+	}
+	if strings.HasPrefix(lower, "vscode-webview://") || strings.HasPrefix(lower, "wails://") {
+		return true
+	}
+	return false
 }
 
 // OpenBrowser opens the given URL in the user's default browser

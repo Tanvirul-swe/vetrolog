@@ -306,12 +306,12 @@ func (e *Engine) GetTableData(ctx context.Context, req types.TableDataRequest) (
 	}
 
 	var query strings.Builder
-	query.WriteString(fmt.Sprintf(`SELECT * FROM "%s"`, req.Table))
+	query.WriteString(fmt.Sprintf(`SELECT * FROM "%s"`, escapeSqliteIdentifier(req.Table)))
 
 	if req.Filter != "" {
 		var filters []string
 		for _, col := range schemaInfo.Columns {
-			filters = append(filters, fmt.Sprintf(`CAST("%s" AS TEXT) LIKE '%%%s%%'`, col.Name, escapeSql(req.Filter)))
+			filters = append(filters, fmt.Sprintf(`CAST("%s" AS TEXT) LIKE '%%%s%%'`, escapeSqliteIdentifier(col.Name), escapeSql(req.Filter)))
 		}
 		if len(filters) > 0 {
 			query.WriteString(" WHERE " + strings.Join(filters, " OR "))
@@ -319,13 +319,25 @@ func (e *Engine) GetTableData(ctx context.Context, req types.TableDataRequest) (
 	}
 
 	if req.SortColumn != "" {
-		sortDir := "ASC"
-		if strings.ToUpper(req.SortDirection) == "DESC" {
-			sortDir = "DESC"
+		// Whitelist SortColumn against table columns
+		validCol := false
+		for _, c := range schemaInfo.Columns {
+			if c.Name == req.SortColumn {
+				validCol = true
+				break
+			}
 		}
-		query.WriteString(fmt.Sprintf(` ORDER BY "%s" %s`, req.SortColumn, sortDir))
+		if validCol {
+			sortDir := "ASC"
+			if strings.ToUpper(req.SortDirection) == "DESC" {
+				sortDir = "DESC"
+			}
+			query.WriteString(fmt.Sprintf(` ORDER BY "%s" %s`, escapeSqliteIdentifier(req.SortColumn), sortDir))
+		} else if len(schemaInfo.PrimaryKeys) > 0 {
+			query.WriteString(fmt.Sprintf(` ORDER BY "%s" ASC`, escapeSqliteIdentifier(schemaInfo.PrimaryKeys[0])))
+		}
 	} else if len(schemaInfo.PrimaryKeys) > 0 {
-		query.WriteString(fmt.Sprintf(` ORDER BY "%s" ASC`, schemaInfo.PrimaryKeys[0]))
+		query.WriteString(fmt.Sprintf(` ORDER BY "%s" ASC`, escapeSqliteIdentifier(schemaInfo.PrimaryKeys[0])))
 	}
 
 	query.WriteString(fmt.Sprintf(` LIMIT %d OFFSET %d;`, limit, offset))
@@ -502,17 +514,17 @@ func (e *Engine) ApplyPendingChanges(ctx context.Context, changes types.PendingC
 			var args []interface{}
 
 			for col, val := range ch.NewValues {
-				setClauses = append(setClauses, fmt.Sprintf(`"%s" = ?`, col))
+				setClauses = append(setClauses, fmt.Sprintf(`"%s" = ?`, escapeSqliteIdentifier(col)))
 				args = append(args, val)
 			}
 
 			var whereClauses []string
 			for pkCol, pkVal := range ch.PrimaryKey {
-				whereClauses = append(whereClauses, fmt.Sprintf(`"%s" = ?`, pkCol))
+				whereClauses = append(whereClauses, fmt.Sprintf(`"%s" = ?`, escapeSqliteIdentifier(pkCol)))
 				args = append(args, pkVal)
 			}
 
-			sqlStr := fmt.Sprintf(`UPDATE "%s" SET %s WHERE %s;`, ch.Table, strings.Join(setClauses, ", "), strings.Join(whereClauses, " AND "))
+			sqlStr := fmt.Sprintf(`UPDATE "%s" SET %s WHERE %s;`, escapeSqliteIdentifier(ch.Table), strings.Join(setClauses, ", "), strings.Join(whereClauses, " AND "))
 			generatedSQL.WriteString(sqlStr + "\n")
 
 			res, err := tx.ExecContext(ctx, sqlStr, args...)
@@ -533,12 +545,12 @@ func (e *Engine) ApplyPendingChanges(ctx context.Context, changes types.PendingC
 			var args []interface{}
 
 			for col, val := range ch.NewValues {
-				cols = append(cols, fmt.Sprintf(`"%s"`, col))
+				cols = append(cols, fmt.Sprintf(`"%s"`, escapeSqliteIdentifier(col)))
 				placeholders = append(placeholders, "?")
 				args = append(args, val)
 			}
 
-			sqlStr := fmt.Sprintf(`INSERT INTO "%s" (%s) VALUES (%s);`, ch.Table, strings.Join(cols, ", "), strings.Join(placeholders, ", "))
+			sqlStr := fmt.Sprintf(`INSERT INTO "%s" (%s) VALUES (%s);`, escapeSqliteIdentifier(ch.Table), strings.Join(cols, ", "), strings.Join(placeholders, ", "))
 			generatedSQL.WriteString(sqlStr + "\n")
 
 			res, err := tx.ExecContext(ctx, sqlStr, args...)
@@ -558,11 +570,11 @@ func (e *Engine) ApplyPendingChanges(ctx context.Context, changes types.PendingC
 			var args []interface{}
 
 			for pkCol, pkVal := range ch.PrimaryKey {
-				whereClauses = append(whereClauses, fmt.Sprintf(`"%s" = ?`, pkCol))
+				whereClauses = append(whereClauses, fmt.Sprintf(`"%s" = ?`, escapeSqliteIdentifier(pkCol)))
 				args = append(args, pkVal)
 			}
 
-			sqlStr := fmt.Sprintf(`DELETE FROM "%s" WHERE %s;`, ch.Table, strings.Join(whereClauses, " AND "))
+			sqlStr := fmt.Sprintf(`DELETE FROM "%s" WHERE %s;`, escapeSqliteIdentifier(ch.Table), strings.Join(whereClauses, " AND "))
 			generatedSQL.WriteString(sqlStr + "\n")
 
 			res, err := tx.ExecContext(ctx, sqlStr, args...)
@@ -759,4 +771,8 @@ func scanRows(rows *sql.Rows, colTypes []*sql.ColumnType) ([]map[string]interfac
 
 func escapeSql(s string) string {
 	return strings.ReplaceAll(s, "'", "''")
+}
+
+func escapeSqliteIdentifier(id string) string {
+	return strings.ReplaceAll(id, "\"", "\"\"")
 }

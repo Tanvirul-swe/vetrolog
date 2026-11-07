@@ -412,7 +412,7 @@ func (e *Engine) GetTableSchema(ctx context.Context, _ string, schema string, ta
 		countCtx, countCancel := context.WithTimeout(ctx, 500*time.Millisecond)
 		defer countCancel()
 
-		countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM "%s"."%s"`, schema, table)
+		countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM "%s"."%s"`, escapePostgresIdentifier(schema), escapePostgresIdentifier(table))
 		if err := e.pool.QueryRow(countCtx, countQuery).Scan(&rowCount); err != nil {
 			if estimatedCount >= 0 {
 				rowCount = estimatedCount
@@ -464,13 +464,13 @@ func (e *Engine) GetTableData(ctx context.Context, req types.TableDataRequest) (
 
 	// Build query
 	var query strings.Builder
-	query.WriteString(fmt.Sprintf(`SELECT * FROM "%s"."%s"`, schema, req.Table))
+	query.WriteString(fmt.Sprintf(`SELECT * FROM "%s"."%s"`, escapePostgresIdentifier(schema), escapePostgresIdentifier(req.Table)))
 
 	if req.Filter != "" {
 		// Generic ILIKE search across text columns
 		var filters []string
 		for _, col := range schemaInfo.Columns {
-			filters = append(filters, fmt.Sprintf(`CAST("%s" AS text) ILIKE '%%%s%%'`, col.Name, escapeSql(req.Filter)))
+			filters = append(filters, fmt.Sprintf(`CAST("%s" AS text) ILIKE '%%%s%%'`, escapePostgresIdentifier(col.Name), escapeSql(req.Filter)))
 		}
 		if len(filters) > 0 {
 			query.WriteString(" WHERE " + strings.Join(filters, " OR "))
@@ -478,13 +478,25 @@ func (e *Engine) GetTableData(ctx context.Context, req types.TableDataRequest) (
 	}
 
 	if req.SortColumn != "" {
-		sortDir := "ASC"
-		if strings.ToUpper(req.SortDirection) == "DESC" {
-			sortDir = "DESC"
+		// Whitelist SortColumn against table columns to prevent identifier injection
+		validCol := false
+		for _, c := range schemaInfo.Columns {
+			if c.Name == req.SortColumn {
+				validCol = true
+				break
+			}
 		}
-		query.WriteString(fmt.Sprintf(` ORDER BY "%s" %s`, req.SortColumn, sortDir))
+		if validCol {
+			sortDir := "ASC"
+			if strings.ToUpper(req.SortDirection) == "DESC" {
+				sortDir = "DESC"
+			}
+			query.WriteString(fmt.Sprintf(` ORDER BY "%s" %s`, escapePostgresIdentifier(req.SortColumn), sortDir))
+		} else if len(schemaInfo.PrimaryKeys) > 0 {
+			query.WriteString(fmt.Sprintf(` ORDER BY "%s" ASC`, escapePostgresIdentifier(schemaInfo.PrimaryKeys[0])))
+		}
 	} else if len(schemaInfo.PrimaryKeys) > 0 {
-		query.WriteString(fmt.Sprintf(` ORDER BY "%s" ASC`, schemaInfo.PrimaryKeys[0]))
+		query.WriteString(fmt.Sprintf(` ORDER BY "%s" ASC`, escapePostgresIdentifier(schemaInfo.PrimaryKeys[0])))
 	}
 
 	query.WriteString(fmt.Sprintf(` LIMIT %d OFFSET %d;`, limit, offset))
@@ -671,19 +683,19 @@ func (e *Engine) ApplyPendingChanges(ctx context.Context, changes types.PendingC
 			argIdx := 1
 
 			for col, val := range ch.NewValues {
-				setClauses = append(setClauses, fmt.Sprintf(`"%s" = $%d`, col, argIdx))
+				setClauses = append(setClauses, fmt.Sprintf(`"%s" = $%d`, escapePostgresIdentifier(col), argIdx))
 				args = append(args, val)
 				argIdx++
 			}
 
 			var whereClauses []string
 			for pkCol, pkVal := range ch.PrimaryKey {
-				whereClauses = append(whereClauses, fmt.Sprintf(`"%s" = $%d`, pkCol, argIdx))
+				whereClauses = append(whereClauses, fmt.Sprintf(`"%s" = $%d`, escapePostgresIdentifier(pkCol), argIdx))
 				args = append(args, pkVal)
 				argIdx++
 			}
 
-			sql := fmt.Sprintf(`UPDATE "%s"."%s" SET %s WHERE %s;`, schema, ch.Table, strings.Join(setClauses, ", "), strings.Join(whereClauses, " AND "))
+			sql := fmt.Sprintf(`UPDATE "%s"."%s" SET %s WHERE %s;`, escapePostgresIdentifier(schema), escapePostgresIdentifier(ch.Table), strings.Join(setClauses, ", "), strings.Join(whereClauses, " AND "))
 			generatedSQL.WriteString(sql + "\n")
 
 			tag, err := tx.Exec(ctx, sql, args...)
@@ -704,13 +716,13 @@ func (e *Engine) ApplyPendingChanges(ctx context.Context, changes types.PendingC
 			argIdx := 1
 
 			for col, val := range ch.NewValues {
-				cols = append(cols, fmt.Sprintf(`"%s"`, col))
+				cols = append(cols, fmt.Sprintf(`"%s"`, escapePostgresIdentifier(col)))
 				placeholders = append(placeholders, fmt.Sprintf(`$%d`, argIdx))
 				args = append(args, val)
 				argIdx++
 			}
 
-			sql := fmt.Sprintf(`INSERT INTO "%s"."%s" (%s) VALUES (%s);`, schema, ch.Table, strings.Join(cols, ", "), strings.Join(placeholders, ", "))
+			sql := fmt.Sprintf(`INSERT INTO "%s"."%s" (%s) VALUES (%s);`, escapePostgresIdentifier(schema), escapePostgresIdentifier(ch.Table), strings.Join(cols, ", "), strings.Join(placeholders, ", "))
 			generatedSQL.WriteString(sql + "\n")
 
 			tag, err := tx.Exec(ctx, sql, args...)
@@ -730,12 +742,12 @@ func (e *Engine) ApplyPendingChanges(ctx context.Context, changes types.PendingC
 			argIdx := 1
 
 			for pkCol, pkVal := range ch.PrimaryKey {
-				whereClauses = append(whereClauses, fmt.Sprintf(`"%s" = $%d`, pkCol, argIdx))
+				whereClauses = append(whereClauses, fmt.Sprintf(`"%s" = $%d`, escapePostgresIdentifier(pkCol), argIdx))
 				args = append(args, pkVal)
 				argIdx++
 			}
 
-			sql := fmt.Sprintf(`DELETE FROM "%s"."%s" WHERE %s;`, schema, ch.Table, strings.Join(whereClauses, " AND "))
+			sql := fmt.Sprintf(`DELETE FROM "%s"."%s" WHERE %s;`, escapePostgresIdentifier(schema), escapePostgresIdentifier(ch.Table), strings.Join(whereClauses, " AND "))
 			generatedSQL.WriteString(sql + "\n")
 
 			tag, err := tx.Exec(ctx, sql, args...)
@@ -907,4 +919,8 @@ func (e *Engine) SimulateQuery(ctx context.Context, query string) (*types.Simula
 
 func escapeSql(s string) string {
 	return strings.ReplaceAll(s, "'", "''")
+}
+
+func escapePostgresIdentifier(id string) string {
+	return strings.ReplaceAll(id, "\"", "\"\"")
 }

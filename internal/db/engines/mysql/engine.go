@@ -270,7 +270,7 @@ func (e *Engine) GetTableSchema(ctx context.Context, dbName string, _ string, ta
 	}
 
 	// 2. Indexes
-	idxQuery := fmt.Sprintf("SHOW INDEX FROM `%s`.`%s`;", dbName, table)
+	idxQuery := fmt.Sprintf("SHOW INDEX FROM `%s`.`%s`;", escapeMysqlIdentifier(dbName), escapeMysqlIdentifier(table))
 	idxRows, err := e.dbInstance.QueryContext(ctx, idxQuery)
 	var indexes []types.IndexInfo
 	if err == nil {
@@ -349,7 +349,7 @@ func (e *Engine) GetTableSchema(ctx context.Context, dbName string, _ string, ta
 		countCtx, countCancel := context.WithTimeout(ctx, 500*time.Millisecond)
 		defer countCancel()
 
-		countQuery := fmt.Sprintf("SELECT COUNT(*) FROM `%s`.`%s`;", dbName, table)
+		countQuery := fmt.Sprintf("SELECT COUNT(*) FROM `%s`.`%s`;", escapeMysqlIdentifier(dbName), escapeMysqlIdentifier(table))
 		if err := e.dbInstance.QueryRowContext(countCtx, countQuery).Scan(&rowCount); err != nil {
 			if estimatedCount >= 0 {
 				rowCount = estimatedCount
@@ -399,12 +399,12 @@ func (e *Engine) GetTableData(ctx context.Context, req types.TableDataRequest) (
 	}
 
 	var query strings.Builder
-	query.WriteString(fmt.Sprintf("SELECT * FROM `%s`.`%s`", dbName, req.Table))
+	query.WriteString(fmt.Sprintf("SELECT * FROM `%s`.`%s`", escapeMysqlIdentifier(dbName), escapeMysqlIdentifier(req.Table)))
 
 	if req.Filter != "" {
 		var filters []string
 		for _, col := range schemaInfo.Columns {
-			filters = append(filters, fmt.Sprintf("`%s` LIKE '%%%s%%'", col.Name, escapeMySql(req.Filter)))
+			filters = append(filters, fmt.Sprintf("`%s` LIKE '%%%s%%'", escapeMysqlIdentifier(col.Name), escapeMySql(req.Filter)))
 		}
 		if len(filters) > 0 {
 			query.WriteString(" WHERE " + strings.Join(filters, " OR "))
@@ -412,13 +412,25 @@ func (e *Engine) GetTableData(ctx context.Context, req types.TableDataRequest) (
 	}
 
 	if req.SortColumn != "" {
-		sortDir := "ASC"
-		if strings.ToUpper(req.SortDirection) == "DESC" {
-			sortDir = "DESC"
+		// Whitelist SortColumn against table columns
+		validCol := false
+		for _, c := range schemaInfo.Columns {
+			if c.Name == req.SortColumn {
+				validCol = true
+				break
+			}
 		}
-		query.WriteString(fmt.Sprintf(" ORDER BY `%s` %s", req.SortColumn, sortDir))
+		if validCol {
+			sortDir := "ASC"
+			if strings.ToUpper(req.SortDirection) == "DESC" {
+				sortDir = "DESC"
+			}
+			query.WriteString(fmt.Sprintf(" ORDER BY `%s` %s", escapeMysqlIdentifier(req.SortColumn), sortDir))
+		} else if len(schemaInfo.PrimaryKeys) > 0 {
+			query.WriteString(fmt.Sprintf(" ORDER BY `%s` ASC", escapeMysqlIdentifier(schemaInfo.PrimaryKeys[0])))
+		}
 	} else if len(schemaInfo.PrimaryKeys) > 0 {
-		query.WriteString(fmt.Sprintf(" ORDER BY `%s` ASC", schemaInfo.PrimaryKeys[0]))
+		query.WriteString(fmt.Sprintf(" ORDER BY `%s` ASC", escapeMysqlIdentifier(schemaInfo.PrimaryKeys[0])))
 	}
 
 	query.WriteString(fmt.Sprintf(" LIMIT %d OFFSET %d;", limit, offset))
@@ -602,17 +614,17 @@ func (e *Engine) ApplyPendingChanges(ctx context.Context, changes types.PendingC
 			var args []interface{}
 
 			for col, val := range ch.NewValues {
-				setClauses = append(setClauses, fmt.Sprintf("`%s` = ?", col))
+				setClauses = append(setClauses, fmt.Sprintf("`%s` = ?", escapeMysqlIdentifier(col)))
 				args = append(args, val)
 			}
 
 			var whereClauses []string
 			for pkCol, pkVal := range ch.PrimaryKey {
-				whereClauses = append(whereClauses, fmt.Sprintf("`%s` = ?", pkCol))
+				whereClauses = append(whereClauses, fmt.Sprintf("`%s` = ?", escapeMysqlIdentifier(pkCol)))
 				args = append(args, pkVal)
 			}
 
-			sqlStr := fmt.Sprintf("UPDATE `%s`.`%s` SET %s WHERE %s;", dbName, ch.Table, strings.Join(setClauses, ", "), strings.Join(whereClauses, " AND "))
+			sqlStr := fmt.Sprintf("UPDATE `%s`.`%s` SET %s WHERE %s;", escapeMysqlIdentifier(dbName), escapeMysqlIdentifier(ch.Table), strings.Join(setClauses, ", "), strings.Join(whereClauses, " AND "))
 			generatedSQL.WriteString(sqlStr + "\n")
 
 			res, err := tx.ExecContext(ctx, sqlStr, args...)
@@ -633,12 +645,12 @@ func (e *Engine) ApplyPendingChanges(ctx context.Context, changes types.PendingC
 			var args []interface{}
 
 			for col, val := range ch.NewValues {
-				cols = append(cols, fmt.Sprintf("`%s`", col))
+				cols = append(cols, fmt.Sprintf("`%s`", escapeMysqlIdentifier(col)))
 				placeholders = append(placeholders, "?")
 				args = append(args, val)
 			}
 
-			sqlStr := fmt.Sprintf("INSERT INTO `%s`.`%s` (%s) VALUES (%s);", dbName, ch.Table, strings.Join(cols, ", "), strings.Join(placeholders, ", "))
+			sqlStr := fmt.Sprintf("INSERT INTO `%s`.`%s` (%s) VALUES (%s);", escapeMysqlIdentifier(dbName), escapeMysqlIdentifier(ch.Table), strings.Join(cols, ", "), strings.Join(placeholders, ", "))
 			generatedSQL.WriteString(sqlStr + "\n")
 
 			res, err := tx.ExecContext(ctx, sqlStr, args...)
@@ -658,11 +670,11 @@ func (e *Engine) ApplyPendingChanges(ctx context.Context, changes types.PendingC
 			var args []interface{}
 
 			for pkCol, pkVal := range ch.PrimaryKey {
-				whereClauses = append(whereClauses, fmt.Sprintf("`%s` = ?", pkCol))
+				whereClauses = append(whereClauses, fmt.Sprintf("`%s` = ?", escapeMysqlIdentifier(pkCol)))
 				args = append(args, pkVal)
 			}
 
-			sqlStr := fmt.Sprintf("DELETE FROM `%s`.`%s` WHERE %s;", dbName, ch.Table, strings.Join(whereClauses, " AND "))
+			sqlStr := fmt.Sprintf("DELETE FROM `%s`.`%s` WHERE %s;", escapeMysqlIdentifier(dbName), escapeMysqlIdentifier(ch.Table), strings.Join(whereClauses, " AND "))
 			generatedSQL.WriteString(sqlStr + "\n")
 
 			res, err := tx.ExecContext(ctx, sqlStr, args...)
@@ -864,4 +876,8 @@ func escapeMySql(s string) string {
 	s = strings.ReplaceAll(s, "\\", "\\\\")
 	s = strings.ReplaceAll(s, "'", "\\'")
 	return s
+}
+
+func escapeMysqlIdentifier(id string) string {
+	return strings.ReplaceAll(id, "`", "``")
 }

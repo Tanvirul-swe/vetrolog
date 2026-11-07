@@ -157,7 +157,9 @@ export class VetroLogWebviewPanel {
   public async updateContent(subPath = '/') {
     const isRunning = await this.serverManager.checkHealth();
     const theme = this.getActiveTheme();
-    const serverUrl = `${this.serverManager.getBaseUrl()}${subPath}`;
+    const token = this.serverManager.getToken();
+    const separator = subPath.includes('?') ? '&' : '?';
+    const serverUrl = `${this.serverManager.getBaseUrl()}${subPath}${token ? `${separator}token=${token}` : ''}`;
 
     if (!isRunning) {
       this.panel.webview.html = this.getOfflineHtml();
@@ -203,7 +205,7 @@ export class VetroLogWebviewPanel {
       const msg = event.data;
       const iframe = document.querySelector('iframe');
       if (iframe && iframe.contentWindow) {
-        iframe.contentWindow.postMessage(msg, '*');
+        iframe.contentWindow.postMessage(msg, '${this.serverManager.getBaseUrl()}');
       }
     });
   </script>

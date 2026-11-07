@@ -39,6 +39,59 @@ export const getApiBaseUrl = (): string => {
   return '';
 };
 
+let cachedToken = '';
+
+/**
+ * Retrieves the ephemeral security token from URL parameters, window injection, or session storage.
+ */
+export const getApiToken = (): string => {
+  if (cachedToken) return cachedToken;
+  if (typeof window === 'undefined') return '';
+  const win = window as any;
+  if (win.__VETROLOG_TOKEN__) {
+    cachedToken = win.__VETROLOG_TOKEN__;
+    return cachedToken;
+  }
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const t = params.get('token');
+    if (t) {
+      cachedToken = t;
+      try {
+        sessionStorage.setItem('vetrolog_token', t);
+      } catch {
+        // Fallback
+      }
+      return cachedToken;
+    }
+    const stored = sessionStorage.getItem('vetrolog_token');
+    if (stored) {
+      cachedToken = stored;
+      return cachedToken;
+    }
+  } catch {
+    // Fallback if window or sessionStorage is inaccessible
+  }
+  return '';
+};
+
+/**
+ * Authenticated API Fetch wrapper that attaches X-Vetro-Token and credentials.
+ */
+export const apiFetch = async (endpoint: string, init?: RequestInit): Promise<Response> => {
+  const token = getApiToken();
+  const url = endpoint.startsWith('http') ? endpoint : `${getApiBaseUrl()}${endpoint}`;
+  const headers = new Headers(init?.headers || {});
+  if (token && !headers.has('X-Vetro-Token')) {
+    headers.set('X-Vetro-Token', token);
+  }
+  return fetch(url, {
+    ...init,
+    headers,
+    credentials: 'include',
+  });
+};
+
 export interface AdbDevice {
   id: string;
   model: string;
@@ -73,7 +126,7 @@ export const apiBridge = {
       }
     }
     try {
-      const res = await fetch(`${getApiBaseUrl()}/api/adb/devices`, { signal: AbortSignal.timeout(5000) });
+      const res = await apiFetch('/api/adb/devices', { signal: AbortSignal.timeout(5000) });
       if (!res.ok) return [];
       return (await res.json()) as AdbDevice[];
     } catch {
@@ -90,7 +143,7 @@ export const apiBridge = {
       }
     }
     try {
-      const res = await fetch(`${getApiBaseUrl()}/api/adb/apps?deviceId=${encodeURIComponent(deviceId)}`, {
+      const res = await apiFetch(`/api/adb/apps?deviceId=${encodeURIComponent(deviceId)}`, {
         signal: AbortSignal.timeout(5000),
       });
       if (!res.ok) return [];
@@ -109,8 +162,8 @@ export const apiBridge = {
       }
     }
     try {
-      const res = await fetch(
-        `${getApiBaseUrl()}/api/adb/is-running?deviceId=${encodeURIComponent(deviceId)}&packageName=${encodeURIComponent(packageName)}`,
+      const res = await apiFetch(
+        `/api/adb/is-running?deviceId=${encodeURIComponent(deviceId)}&packageName=${encodeURIComponent(packageName)}`,
         { signal: AbortSignal.timeout(5000) }
       );
       if (!res.ok) return false;
@@ -130,8 +183,8 @@ export const apiBridge = {
       }
     }
     try {
-      const res = await fetch(
-        `${getApiBaseUrl()}/api/adb/databases?deviceId=${encodeURIComponent(deviceId)}&packageName=${encodeURIComponent(packageName)}`,
+      const res = await apiFetch(
+        `/api/adb/databases?deviceId=${encodeURIComponent(deviceId)}&packageName=${encodeURIComponent(packageName)}`,
         { signal: AbortSignal.timeout(10000) }
       );
       if (!res.ok) return [];
@@ -172,7 +225,7 @@ export const apiBridge = {
         page: String(page),
         pageSize: String(pageSize),
       });
-      const res = await fetch(`${getApiBaseUrl()}/api/adb/table-data?${params.toString()}`, {
+      const res = await apiFetch(`/api/adb/table-data?${params.toString()}`, {
         signal: AbortSignal.timeout(15000),
       });
       if (!res.ok) return null;
@@ -191,7 +244,7 @@ export const apiBridge = {
     if (isWailsApp()) {
       return await AppBindings.AdbExecuteQuery(deviceId, packageName, remotePath, query);
     }
-    const res = await fetch(`${getApiBaseUrl()}/api/adb/query`, {
+    const res = await apiFetch('/api/adb/query', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ deviceId, packageName, remotePath, query }),
@@ -222,7 +275,7 @@ export const apiBridge = {
         JSON.stringify(newValues)
       );
     }
-    const res = await fetch(`${getApiBaseUrl()}/api/adb/update-row`, {
+    const res = await apiFetch('/api/adb/update-row', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -256,7 +309,7 @@ export const apiBridge = {
         JSON.stringify(primaryKey)
       );
     }
-    const res = await fetch(`${getApiBaseUrl()}/api/adb/delete-row`, {
+    const res = await apiFetch('/api/adb/delete-row', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -282,7 +335,7 @@ export const apiBridge = {
     if (isWailsApp()) {
       return await AppBindings.AdbExplainQuery(deviceId, packageName, remotePath, query);
     }
-    const res = await fetch(`${getApiBaseUrl()}/api/adb/explain`, {
+    const res = await apiFetch('/api/adb/explain', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ deviceId, packageName, remotePath, query }),
@@ -304,7 +357,7 @@ export const apiBridge = {
     if (isWailsApp()) {
       return await AppBindings.AdbSimulateQuery(deviceId, packageName, remotePath, query);
     }
-    const res = await fetch(`${getApiBaseUrl()}/api/adb/simulate`, {
+    const res = await apiFetch('/api/adb/simulate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ deviceId, packageName, remotePath, query }),
@@ -326,7 +379,7 @@ export const apiBridge = {
       return await AppBindings.AdbGetDatabaseSchemaExtended(deviceId, packageName, remotePath);
     }
     const params = new URLSearchParams({ deviceId, packageName, remotePath });
-    const res = await fetch(`${getApiBaseUrl()}/api/adb/schema-extended?${params.toString()}`, {
+    const res = await apiFetch(`/api/adb/schema-extended?${params.toString()}`, {
       signal: AbortSignal.timeout(30000),
     });
     if (!res.ok) {
@@ -346,7 +399,7 @@ export const apiBridge = {
       await AppBindings.AdbCreateIndex(deviceId, packageName, remotePath, indexSql);
       return true;
     }
-    const res = await fetch(`${getApiBaseUrl()}/api/adb/create-index`, {
+    const res = await apiFetch('/api/adb/create-index', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ deviceId, packageName, remotePath, indexSql }),
@@ -434,7 +487,7 @@ export const apiBridge = {
   remote: {
     listConnections: async (): Promise<any[]> => {
       try {
-        const res = await fetch(`${getApiBaseUrl()}/api/remote/connections`, { signal: AbortSignal.timeout(5000) });
+        const res = await apiFetch('/api/remote/connections', { signal: AbortSignal.timeout(5000) });
         return res.ok ? await res.json() : [];
       } catch {
         return [];
@@ -442,14 +495,14 @@ export const apiBridge = {
     },
     getConnection: async (id: string): Promise<any> => {
       try {
-        const res = await fetch(`${getApiBaseUrl()}/api/remote/connections/get?id=${encodeURIComponent(id)}`);
+        const res = await apiFetch(`/api/remote/connections/get?id=${encodeURIComponent(id)}`);
         return res.ok ? await res.json() : null;
       } catch {
         return null;
       }
     },
     saveConnection: async (cfg: any): Promise<any> => {
-      const res = await fetch(`${getApiBaseUrl()}/api/remote/connections/save`, {
+      const res = await apiFetch('/api/remote/connections/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(cfg),
@@ -457,7 +510,7 @@ export const apiBridge = {
       return res.ok ? await res.json() : null;
     },
     deleteConnection: async (id: string): Promise<boolean> => {
-      const res = await fetch(`${getApiBaseUrl()}/api/remote/connections/delete`, {
+      const res = await apiFetch('/api/remote/connections/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id }),
@@ -466,7 +519,7 @@ export const apiBridge = {
     },
     testConnection: async (cfg: any): Promise<any> => {
       try {
-        const res = await fetch(`${getApiBaseUrl()}/api/remote/connections/test`, {
+        const res = await apiFetch('/api/remote/connections/test', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(cfg),
@@ -477,7 +530,7 @@ export const apiBridge = {
       }
     },
     connect: async (id: string): Promise<any> => {
-      const res = await fetch(`${getApiBaseUrl()}/api/remote/connect`, {
+      const res = await apiFetch('/api/remote/connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id }),
@@ -489,7 +542,7 @@ export const apiBridge = {
       return await res.json();
     },
     openLocalFile: async (filePath: string): Promise<any> => {
-      const res = await fetch(`${getApiBaseUrl()}/api/remote/open-file`, {
+      const res = await apiFetch('/api/remote/open-file', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ filePath }),
@@ -501,7 +554,7 @@ export const apiBridge = {
       return await res.json();
     },
     disconnect: async (sessionId: string): Promise<boolean> => {
-      const res = await fetch(`${getApiBaseUrl()}/api/remote/disconnect`, {
+      const res = await apiFetch('/api/remote/disconnect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId }),
@@ -510,7 +563,7 @@ export const apiBridge = {
     },
     listDatabases: async (sessionId: string): Promise<string[]> => {
       try {
-        const res = await fetch(`${getApiBaseUrl()}/api/remote/databases?sessionId=${encodeURIComponent(sessionId)}`);
+        const res = await apiFetch(`/api/remote/databases?sessionId=${encodeURIComponent(sessionId)}`);
         return res.ok ? await res.json() : [];
       } catch {
         return [];
@@ -518,7 +571,7 @@ export const apiBridge = {
     },
     listSchemas: async (sessionId: string, dbName: string): Promise<string[]> => {
       try {
-        const res = await fetch(`${getApiBaseUrl()}/api/remote/schemas?sessionId=${encodeURIComponent(sessionId)}&db=${encodeURIComponent(dbName)}`);
+        const res = await apiFetch(`/api/remote/schemas?sessionId=${encodeURIComponent(sessionId)}&db=${encodeURIComponent(dbName)}`);
         return res.ok ? await res.json() : [];
       } catch {
         return [];
@@ -526,7 +579,7 @@ export const apiBridge = {
     },
     listTables: async (sessionId: string, dbName: string, schema: string): Promise<any[]> => {
       try {
-        const res = await fetch(`${getApiBaseUrl()}/api/remote/tables?sessionId=${encodeURIComponent(sessionId)}&db=${encodeURIComponent(dbName)}&schema=${encodeURIComponent(schema)}`);
+        const res = await apiFetch(`/api/remote/tables?sessionId=${encodeURIComponent(sessionId)}&db=${encodeURIComponent(dbName)}&schema=${encodeURIComponent(schema)}`);
         return res.ok ? await res.json() : [];
       } catch {
         return [];
@@ -534,7 +587,7 @@ export const apiBridge = {
     },
     getTableSchema: async (sessionId: string, dbName: string, schema: string, table: string): Promise<any> => {
       try {
-        const res = await fetch(`${getApiBaseUrl()}/api/remote/table-schema?sessionId=${encodeURIComponent(sessionId)}&db=${encodeURIComponent(dbName)}&schema=${encodeURIComponent(schema)}&table=${encodeURIComponent(table)}`);
+        const res = await apiFetch(`/api/remote/table-schema?sessionId=${encodeURIComponent(sessionId)}&db=${encodeURIComponent(dbName)}&schema=${encodeURIComponent(schema)}&table=${encodeURIComponent(table)}`);
         return res.ok ? await res.json() : null;
       } catch {
         return null;
@@ -542,7 +595,7 @@ export const apiBridge = {
     },
     getDatabaseSchemaExtended: async (sessionId: string, dbName: string, schema: string): Promise<any[]> => {
       try {
-        const res = await fetch(`${getApiBaseUrl()}/api/remote/schema-extended?sessionId=${encodeURIComponent(sessionId)}&db=${encodeURIComponent(dbName)}&schema=${encodeURIComponent(schema)}`);
+        const res = await apiFetch(`/api/remote/schema-extended?sessionId=${encodeURIComponent(sessionId)}&db=${encodeURIComponent(dbName)}&schema=${encodeURIComponent(schema)}`);
         return res.ok ? await res.json() : [];
       } catch {
         return [];
@@ -568,12 +621,12 @@ export const apiBridge = {
         sortDir,
         filter,
       });
-      const res = await fetch(`${getApiBaseUrl()}/api/remote/table-data?${params.toString()}`);
+      const res = await apiFetch(`/api/remote/table-data?${params.toString()}`);
       if (!res.ok) throw new Error('Failed to fetch table data');
       return await res.json();
     },
     executeQuery: async (sessionId: string, query: string, maxRows = 100): Promise<any> => {
-      const res = await fetch(`${getApiBaseUrl()}/api/remote/query`, {
+      const res = await apiFetch('/api/remote/query', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId, query, maxRows }),
@@ -585,7 +638,7 @@ export const apiBridge = {
       return await res.json();
     },
     applyPendingChanges: async (sessionId: string, payload: string): Promise<any> => {
-      const res = await fetch(`${getApiBaseUrl()}/api/remote/apply-changes`, {
+      const res = await apiFetch('/api/remote/apply-changes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId, payload }),
@@ -597,7 +650,7 @@ export const apiBridge = {
       return await res.json();
     },
     explainQuery: async (sessionId: string, query: string): Promise<any> => {
-      const res = await fetch(`${getApiBaseUrl()}/api/remote/explain`, {
+      const res = await apiFetch('/api/remote/explain', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId, query }),
@@ -606,7 +659,7 @@ export const apiBridge = {
       return await res.json();
     },
     simulateQuery: async (sessionId: string, query: string): Promise<any> => {
-      const res = await fetch(`${getApiBaseUrl()}/api/remote/simulate`, {
+      const res = await apiFetch('/api/remote/simulate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId, query }),
@@ -616,17 +669,17 @@ export const apiBridge = {
     },
     redisScan: async (sessionId: string, pattern = '*', cursor = 0, count = 100): Promise<any> => {
       const params = new URLSearchParams({ sessionId, pattern, cursor: String(cursor), count: String(count) });
-      const res = await fetch(`${getApiBaseUrl()}/api/remote/redis/scan?${params.toString()}`);
+      const res = await apiFetch(`/api/remote/redis/scan?${params.toString()}`);
       if (!res.ok) throw new Error('Redis scan failed');
       return await res.json();
     },
     redisGet: async (sessionId: string, key: string): Promise<any> => {
-      const res = await fetch(`${getApiBaseUrl()}/api/remote/redis/inspect?sessionId=${encodeURIComponent(sessionId)}&key=${encodeURIComponent(key)}`);
+      const res = await apiFetch(`/api/remote/redis/inspect?sessionId=${encodeURIComponent(sessionId)}&key=${encodeURIComponent(key)}`);
       if (!res.ok) throw new Error('Redis get failed');
       return await res.json();
     },
     redisSet: async (sessionId: string, key: string, valType: string, value: string, ttlSec = 0): Promise<boolean> => {
-      const res = await fetch(`${getApiBaseUrl()}/api/remote/redis/set`, {
+      const res = await apiFetch('/api/remote/redis/set', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId, key, valType, value, ttlSec }),
@@ -634,7 +687,7 @@ export const apiBridge = {
       return res.ok;
     },
     redisDel: async (sessionId: string, key: string): Promise<boolean> => {
-      const res = await fetch(`${getApiBaseUrl()}/api/remote/redis/delete`, {
+      const res = await apiFetch('/api/remote/redis/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId, key }),

@@ -63,7 +63,8 @@ export class VetroLogCustomEditorProvider implements vscode.CustomReadonlyEditor
         webviewPanel.webview.html = this.getOfflineHtml();
       } else {
         const encodedPath = encodeURIComponent(filePath);
-        const url = `${this.serverManager.getBaseUrl()}/?file=${encodedPath}`;
+        const token = this.serverManager.getToken();
+        const url = `${this.serverManager.getBaseUrl()}/?file=${encodedPath}${token ? `&token=${token}` : ''}`;
         webviewPanel.webview.html = this.getHtmlForWebview(url, theme, filePath);
       }
     };
@@ -166,7 +167,7 @@ export class VetroLogCustomEditorProvider implements vscode.CustomReadonlyEditor
       const msg = event.data;
       const iframe = document.querySelector('iframe');
       if (iframe && iframe.contentWindow) {
-        iframe.contentWindow.postMessage(msg, '*');
+        iframe.contentWindow.postMessage(msg, '${this.serverManager.getBaseUrl()}');
       }
     });
   </script>

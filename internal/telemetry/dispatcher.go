@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -20,9 +21,9 @@ const defaultGA4Endpoint = "https://www.google-analytics.com/mp/collect"
 // Default GA4 credentials (can be overridden via environment variables or build flags)
 var (
 	// DefaultMeasurementID is the fallback Google Analytics 4 Property Measurement ID (e.g. G-XXXXXXXXXX)
-	DefaultMeasurementID = "G-1RENXYMKEC"
+	DefaultMeasurementID = ""
 	// DefaultAPISecret is the Measurement Protocol API secret created in GA4 Data Stream settings
-	DefaultAPISecret = "QDD0WZyfT3GP-yyHcm7b4A"
+	DefaultAPISecret = ""
 )
 
 // Service manages anonymous telemetry collection and asynchronous dispatching
@@ -32,6 +33,7 @@ type Service struct {
 	apiSecret     string
 	endpoint      string
 	sessionID     string
+	userID        string
 	appMode       string // "desktop" or "web"
 	client        *http.Client
 	eventQueue    chan GA4Event
@@ -99,6 +101,13 @@ func (s *Service) SetEnabled(enabled bool) error {
 	}
 	s.cfg.Enabled = enabled
 	return SaveConfig(s.cfg)
+}
+
+// SetUserID associates an anonymous hashed user identifier with telemetry events
+func (s *Service) SetUserID(hashedUserID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.userID = hashedUserID
 }
 
 // GetStatus returns the current anonymous client ID and enablement status
@@ -174,17 +183,19 @@ func (s *Service) sendBatch(events []GA4Event) {
 
 	s.mu.RLock()
 	clientID := s.cfg.ClientID
+	userID := s.userID
 	mID := s.measurementID
 	secret := s.apiSecret
 	s.mu.RUnlock()
 
-	// Skip network dispatch if placeholder credentials are unchanged in local development
-	if mID == "" || secret == "" {
+	// Skip network dispatch if credentials are empty or placeholder in local development
+	if mID == "" || secret == "" || strings.HasPrefix(mID, "DEMO_") {
 		return
 	}
 
 	payload := GA4Payload{
 		ClientID: clientID,
+		UserID:   userID,
 		Events:   events,
 	}
 

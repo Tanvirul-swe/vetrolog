@@ -82,6 +82,10 @@ export function ExecuteQuery(arg1, arg2) {
   return window['go']['app']['App']['ExecuteQuery'](arg1, arg2);
 }
 
+export function GetAuthStatus() {
+  return window['go']['app']['App']['GetAuthStatus']();
+}
+
 export function GetConnectionState() {
   return window['go']['app']['App']['GetConnectionState']();
 }
@@ -100,6 +104,10 @@ export function GetTelemetryStatus() {
 
 export function ListSavedConnections() {
   return window['go']['app']['App']['ListSavedConnections']();
+}
+
+export function LoginWithDemo() {
+  return window['go']['app']['App']['LoginWithDemo']();
 }
 
 export function OpenConnection(arg1) {
@@ -186,8 +194,16 @@ export function SetTelemetryEnabled(arg1) {
   return window['go']['app']['App']['SetTelemetryEnabled'](arg1);
 }
 
+export function SignOut() {
+  return window['go']['app']['App']['SignOut']();
+}
+
 export function StartDownloadUpdate(arg1, arg2) {
   return window['go']['app']['App']['StartDownloadUpdate'](arg1, arg2);
+}
+
+export function StartGoogleLogin() {
+  return window['go']['app']['App']['StartGoogleLogin']();
 }
 
 export function TestConnection(arg1) {

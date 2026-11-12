@@ -12,6 +12,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/windows"
 
 	"vetrolog/internal/app"
+	"vetrolog/internal/config"
 	"vetrolog/internal/web"
 )
 
@@ -19,6 +20,9 @@ import (
 var assets embed.FS
 
 func main() {
+	// Load environment variables from .env if present
+	config.LoadEnv()
+
 	// Parse CLI flags
 	webMode := flag.Bool("web", false, "Start VetroLog in Local Web Server mode")
 	webHost := flag.String("host", "127.0.0.1", "Host address for Web Server mode (default: 127.0.0.1)")

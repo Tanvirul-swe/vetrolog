@@ -2,8 +2,11 @@ package app
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"sync"
 
+	"vetrolog/internal/auth"
 	"vetrolog/internal/broadcaster"
 	"vetrolog/internal/config"
 	"vetrolog/internal/db"
@@ -25,6 +28,7 @@ type App struct {
 	updater     *updater.Service
 	telemetry   *telemetry.Service
 	dbManager   *db.ConnectionManager
+	authService *auth.Service
 }
 
 // NewApp creates a new App struct with initialized subsystems
@@ -36,6 +40,12 @@ func NewApp() *App {
 	upd := updater.NewService()
 	tel := telemetry.NewService("desktop")
 	dbMgr, _ := db.NewConnectionManager()
+	authSvc := auth.NewService(8787)
+
+	if u := authSvc.GetCurrentUser(); u != nil {
+		h := sha256.Sum256([]byte(u.ID))
+		tel.SetUserID(hex.EncodeToString(h[:]))
+	}
 
 	return &App{
 		config:      cfg,
@@ -45,5 +55,6 @@ func NewApp() *App {
 		updater:     upd,
 		telemetry:   tel,
 		dbManager:   dbMgr,
+		authService: authSvc,
 	}
 }

@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -10,9 +12,11 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"vetrolog/internal/adb"
+	"vetrolog/internal/auth"
 	"vetrolog/internal/db/types"
 	"vetrolog/internal/discovery"
 	"vetrolog/internal/models"
+	"vetrolog/internal/telemetry"
 	"vetrolog/internal/updater"
 )
 
@@ -277,6 +281,62 @@ func (a *App) SetTelemetryEnabled(enabled bool) bool {
 	}
 	_ = a.telemetry.SetEnabled(enabled)
 	return a.telemetry.IsEnabled()
+}
+
+// =========================================================================
+// Authentication (Google OAuth 2.0 & Developer Profile)
+// =========================================================================
+
+// GetAuthStatus returns current user profile and demo mode state
+func (a *App) GetAuthStatus() auth.AuthStatus {
+	if a.authService == nil {
+		return auth.AuthStatus{IsAuthenticated: false, IsDemoMode: true}
+	}
+	return a.authService.GetStatus()
+}
+
+// StartGoogleLogin generates Google OAuth authorization URL and launches default browser
+func (a *App) StartGoogleLogin() (string, error) {
+	if a.authService == nil {
+		return "", fmt.Errorf("auth service not initialized")
+	}
+	if a.authService.IsDemoMode() {
+		return "", fmt.Errorf("google oauth is not configured or in demo mode")
+	}
+	authURL, _, err := a.authService.GenerateAuthURL()
+	if err != nil {
+		return "", err
+	}
+	if a.ctx != nil {
+		runtime.BrowserOpenURL(a.ctx, authURL)
+	}
+	return authURL, nil
+}
+
+// LoginWithDemo logs in with a local offline test profile
+func (a *App) LoginWithDemo() auth.AuthStatus {
+	if a.authService == nil {
+		return auth.AuthStatus{IsAuthenticated: false, IsDemoMode: true}
+	}
+	profile := a.authService.LoginWithDemo()
+	if a.telemetry != nil {
+		h := sha256.Sum256([]byte(profile.ID))
+		a.telemetry.SetUserID(hex.EncodeToString(h[:]))
+		a.telemetry.Track(telemetry.BuildUserSignedInEvent("demo", true))
+	}
+	return a.authService.GetStatus()
+}
+
+// SignOut clears active session
+func (a *App) SignOut() bool {
+	if a.authService != nil {
+		_ = a.authService.SignOut()
+	}
+	if a.telemetry != nil {
+		a.telemetry.SetUserID("")
+		a.telemetry.Track(telemetry.BuildUserSignedOutEvent())
+	}
+	return true
 }
 
 // =========================================================================

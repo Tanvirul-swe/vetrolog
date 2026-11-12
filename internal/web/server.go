@@ -2,6 +2,7 @@ package web
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"embed"
 	"encoding/hex"
 	"encoding/json"
@@ -17,19 +18,23 @@ import (
 	"time"
 
 	"vetrolog/internal/adb"
+	"vetrolog/internal/auth"
 	"vetrolog/internal/db"
 	"vetrolog/internal/db/types"
+	"vetrolog/internal/telemetry"
 	"vetrolog/internal/version"
 )
 
 // Server handles the HTTP REST API and serves the embedded React frontend
 type Server struct {
-	host      string
-	port      int
-	token     string
-	assets    embed.FS
-	adbServer *adb.Service
-	dbManager *db.ConnectionManager
+	host        string
+	port        int
+	token       string
+	assets      embed.FS
+	adbServer   *adb.Service
+	dbManager   *db.ConnectionManager
+	authService *auth.Service
+	telemetry   *telemetry.Service
 }
 
 // NewServer initializes a web server instance
@@ -41,14 +46,30 @@ func NewServer(assets embed.FS, host string, port int, token string) *Server {
 		token = generateSecureToken()
 	}
 	dbMgr, _ := db.NewConnectionManager()
-	return &Server{
-		host:      host,
-		port:      port,
-		token:     token,
-		assets:    assets,
-		adbServer: adb.GetService(),
-		dbManager: dbMgr,
+	authSvc := auth.NewService(port)
+	telSvc := telemetry.NewService("web")
+	if u := authSvc.GetCurrentUser(); u != nil {
+		telSvc.SetUserID(hashSubjectID(u.ID))
 	}
+
+	return &Server{
+		host:        host,
+		port:        port,
+		token:       token,
+		assets:      assets,
+		adbServer:   adb.GetService(),
+		dbManager:   dbMgr,
+		authService: authSvc,
+		telemetry:   telSvc,
+	}
+}
+
+func hashSubjectID(sub string) string {
+	if sub == "" {
+		return ""
+	}
+	h := sha256.Sum256([]byte(sub))
+	return hex.EncodeToString(h[:])
 }
 
 func generateSecureToken() string {
@@ -62,11 +83,19 @@ func generateSecureToken() string {
 // NewAPIHandler creates an http.Handler with all VetroLog API routes and CORS support
 func NewAPIHandler() http.Handler {
 	dbMgr, _ := db.NewConnectionManager()
+	authSvc := auth.NewService(8787)
+	telSvc := telemetry.NewService("desktop")
+	if u := authSvc.GetCurrentUser(); u != nil {
+		telSvc.SetUserID(hashSubjectID(u.ID))
+	}
+
 	srv := &Server{
-		host:      "127.0.0.1",
-		token:     "", // In-process desktop mode: no token check needed for native Wails window
-		adbServer: adb.GetService(),
-		dbManager: dbMgr,
+		host:        "127.0.0.1",
+		token:       "", // In-process desktop mode: no token check needed for native Wails window
+		adbServer:   adb.GetService(),
+		dbManager:   dbMgr,
+		authService: authSvc,
+		telemetry:   telSvc,
 	}
 	mux := http.NewServeMux()
 	srv.registerAPIRoutes(mux)
@@ -115,6 +144,169 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 			"status":  "ok",
 			"version": version.CurrentVersion,
 			"time":    time.Now().Unix(),
+		})
+	})
+
+	// -------------------------------------------------------------------------
+	// Authentication (Google OAuth 2.0 & Demo Mode)
+	// -------------------------------------------------------------------------
+
+	// Status: returns whether user is authenticated and if running in demo mode
+	mux.HandleFunc("/api/auth/status", func(w http.ResponseWriter, r *http.Request) {
+		if s.authService == nil {
+			writeJSON(w, http.StatusOK, auth.AuthStatus{IsAuthenticated: false, IsDemoMode: true})
+			return
+		}
+		writeJSON(w, http.StatusOK, s.authService.GetStatus())
+	})
+
+	// Login: returns Google authorization URL
+	mux.HandleFunc("/api/auth/google/login", func(w http.ResponseWriter, r *http.Request) {
+		if s.authService == nil || s.authService.IsDemoMode() {
+			writeJSON(w, http.StatusBadRequest, map[string]string{
+				"error": "Google OAuth is not configured or in demo mode. Use /api/auth/demo-login.",
+			})
+			return
+		}
+		authURL, state, err := s.authService.GenerateAuthURL()
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{
+			"url":   authURL,
+			"state": state,
+		})
+	})
+
+	// Callback: Google OAuth redirect landing page
+	mux.HandleFunc("/api/auth/google/callback", func(w http.ResponseWriter, r *http.Request) {
+		code := r.URL.Query().Get("code")
+		state := r.URL.Query().Get("state")
+		if code == "" || state == "" {
+			http.Error(w, "Missing authorization code or state parameter", http.StatusBadRequest)
+			return
+		}
+		profile, err := s.authService.HandleCallback(code, state)
+		if err != nil {
+			http.Error(w, "Authentication failed: "+err.Error(), http.StatusUnauthorized)
+			return
+		}
+
+		if s.telemetry != nil {
+			s.telemetry.SetUserID(hashSubjectID(profile.ID))
+			s.telemetry.Track(telemetry.BuildUserSignedInEvent("google", false))
+		}
+
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>VetroLog — Authentication Successful</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0B0F19; color: #F1F5F9; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+    .card { background: #131B2E; border: 1px solid #1E293B; border-radius: 16px; padding: 36px; text-align: center; max-width: 400px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); }
+    .icon { font-size: 48px; margin-bottom: 16px; }
+    h1 { font-size: 20px; font-weight: 600; margin: 0 0 8px 0; color: #38BDF8; }
+    p { font-size: 13px; color: #94A3B8; margin: 0 0 20px 0; line-height: 1.5; }
+    .btn { display: inline-block; background: #0284C7; color: white; padding: 10px 24px; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 500; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">✨</div>
+    <h1>Signed In Successfully</h1>
+    <p>Your Google account has been connected to VetroLog. You can now close this tab and return to the application.</p>
+    <a href="javascript:window.close()" class="btn">Close Window</a>
+  </div>
+  <script>
+    if (window.opener) {
+      window.opener.postMessage({ type: 'vetrolog:auth_success' }, '*');
+    }
+    setTimeout(() => { try { window.close(); } catch(e){} }, 2000);
+  </script>
+</body>
+</html>`))
+	})
+
+	// Demo Login: local offline mock profile
+	mux.HandleFunc("/api/auth/demo-login", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if s.authService == nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "auth service not initialized"})
+			return
+		}
+		profile := s.authService.LoginWithDemo()
+		if s.telemetry != nil {
+			s.telemetry.SetUserID(hashSubjectID(profile.ID))
+			s.telemetry.Track(telemetry.BuildUserSignedInEvent("demo", true))
+		}
+		writeJSON(w, http.StatusOK, s.authService.GetStatus())
+	})
+
+	// Logout: clears session
+	mux.HandleFunc("/api/auth/logout", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if s.authService != nil {
+			_ = s.authService.SignOut()
+		}
+		if s.telemetry != nil {
+			s.telemetry.SetUserID("")
+			s.telemetry.Track(telemetry.BuildUserSignedOutEvent())
+		}
+		status := auth.AuthStatus{IsAuthenticated: false, IsDemoMode: s.authService != nil && s.authService.IsDemoMode()}
+		writeJSON(w, http.StatusOK, status)
+	})
+
+	// -------------------------------------------------------------------------
+	// Telemetry Ingestion (Web Mode & VS Code Extension)
+	// -------------------------------------------------------------------------
+
+	mux.HandleFunc("/api/telemetry/event", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if s.telemetry == nil || !s.telemetry.IsEnabled() {
+			writeJSON(w, http.StatusOK, map[string]bool{"success": false})
+			return
+		}
+		var payload struct {
+			Name       string                 `json:"name"`
+			Properties map[string]interface{} `json:"properties"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json"})
+			return
+		}
+		s.telemetry.TrackFeature(payload.Name, payload.Properties)
+		writeJSON(w, http.StatusOK, map[string]bool{"success": true})
+	})
+
+	mux.HandleFunc("/api/telemetry/status", func(w http.ResponseWriter, r *http.Request) {
+		if s.telemetry == nil {
+			writeJSON(w, http.StatusOK, map[string]interface{}{"enabled": false, "clientId": ""})
+			return
+		}
+		if r.Method == http.MethodPost {
+			var req struct {
+				Enabled bool `json:"enabled"`
+			}
+			_ = json.NewDecoder(r.Body).Decode(&req)
+			_ = s.telemetry.SetEnabled(req.Enabled)
+		}
+		enabled, clientID := s.telemetry.GetStatus()
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"enabled":  enabled,
+			"clientId": clientID,
 		})
 	})
 
@@ -982,8 +1174,11 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// Public health check and static assets do not require token
-		if r.URL.Path == "/api/status" || !strings.HasPrefix(r.URL.Path, "/api/") {
+		// Public health check, OAuth callback/status, and static assets do not require token
+		if r.URL.Path == "/api/status" ||
+			r.URL.Path == "/api/auth/google/callback" ||
+			r.URL.Path == "/api/auth/status" ||
+			!strings.HasPrefix(r.URL.Path, "/api/") {
 			next.ServeHTTP(w, r)
 			return
 		}

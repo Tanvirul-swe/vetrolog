@@ -4,6 +4,7 @@ import (
 	"embed"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -105,6 +106,60 @@ func TestCORSOriginValidation(t *testing.T) {
 
 	if wVSCode.Header().Get("Access-Control-Allow-Origin") != "vscode-webview://12345" {
 		t.Fatalf("Expected reflected vscode-webview origin, got: %s", wVSCode.Header().Get("Access-Control-Allow-Origin"))
+	}
+}
+
+func TestAuthAndTelemetryEndpoints(t *testing.T) {
+	var emptyAssets embed.FS
+	srv := NewServer(emptyAssets, "127.0.0.1", 8787, "auth-token-xyz")
+	tmpSessionFile := t.TempDir() + "/session.json"
+	srv.authService.SetCustomSessionFileForTest(tmpSessionFile)
+
+	mux := http.NewServeMux()
+	srv.registerAPIRoutes(mux)
+	handler := enableCORS(srv.authMiddleware(mux))
+
+	// 1. /api/auth/status should be accessible publicly without token
+	reqAuthStatus := httptest.NewRequest("GET", "/api/auth/status", nil)
+	wAuthStatus := httptest.NewRecorder()
+	handler.ServeHTTP(wAuthStatus, reqAuthStatus)
+	if wAuthStatus.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK from /api/auth/status, got %d", wAuthStatus.Code)
+	}
+
+	// 2. /api/auth/demo-login with valid token
+	reqDemoLogin := httptest.NewRequest("POST", "/api/auth/demo-login", nil)
+	reqDemoLogin.Header.Set("X-Vetro-Token", "auth-token-xyz")
+	wDemoLogin := httptest.NewRecorder()
+	handler.ServeHTTP(wDemoLogin, reqDemoLogin)
+	if wDemoLogin.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK from demo login, got %d: %s", wDemoLogin.Code, wDemoLogin.Body.String())
+	}
+
+	// Verify status is now authenticated
+	reqStatusAfter := httptest.NewRequest("GET", "/api/auth/status", nil)
+	wStatusAfter := httptest.NewRecorder()
+	handler.ServeHTTP(wStatusAfter, reqStatusAfter)
+	if !strings.Contains(wStatusAfter.Body.String(), "demo.developer@gmail.com") {
+		t.Fatalf("Expected demo user profile in status: %s", wStatusAfter.Body.String())
+	}
+
+	// 3. /api/auth/logout with valid token
+	reqLogout := httptest.NewRequest("POST", "/api/auth/logout", nil)
+	reqLogout.Header.Set("X-Vetro-Token", "auth-token-xyz")
+	wLogout := httptest.NewRecorder()
+	handler.ServeHTTP(wLogout, reqLogout)
+	if wLogout.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK from logout, got %d", wLogout.Code)
+	}
+
+	// 4. /api/telemetry/status
+	reqTelStatus := httptest.NewRequest("GET", "/api/telemetry/status", nil)
+	reqTelStatus.Header.Set("X-Vetro-Token", "auth-token-xyz")
+	wTelStatus := httptest.NewRecorder()
+	handler.ServeHTTP(wTelStatus, reqTelStatus)
+	if wTelStatus.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK from /api/telemetry/status, got %d", wTelStatus.Code)
 	}
 }
 

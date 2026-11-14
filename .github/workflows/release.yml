@@ -139,7 +139,7 @@ jobs:
 
       # Upload Artifacts for Release
       - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.platform.artifact_name }}
           path: |
@@ -169,7 +169,7 @@ jobs:
           npx @vscode/vsce package --no-dependencies
 
       - name: Upload VS Code Extension Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: VetroLog-VSCode-Extension
           path: vscode-extension/*.vsix

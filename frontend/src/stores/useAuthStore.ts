@@ -16,7 +16,6 @@ export interface UserProfile {
 
 export interface AuthState {
   isAuthenticated: boolean;
-  isDemoMode: boolean;
   user: UserProfile | null;
   isLoading: boolean;
   isAuthenticating: boolean;
@@ -24,14 +23,12 @@ export interface AuthState {
 
   checkAuthStatus: () => Promise<void>;
   loginWithGoogle: () => Promise<void>;
-  loginWithDemo: () => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   isAuthenticated: false,
-  isDemoMode: true,
   user: null,
   isLoading: false,
   isAuthenticating: false,
@@ -45,7 +42,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         const status = await AppBindings.GetAuthStatus();
         set({
           isAuthenticated: Boolean(status.isAuthenticated),
-          isDemoMode: Boolean(status.isDemoMode),
           user: (status.user as UserProfile) || null,
         });
         return;
@@ -56,7 +52,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         const data = await res.json();
         set({
           isAuthenticated: Boolean(data.isAuthenticated),
-          isDemoMode: Boolean(data.isDemoMode),
           user: (data.user as UserProfile) || null,
         });
       }
@@ -105,64 +100,23 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
 
       const data = await res.json();
-      if (data.isDemoMode && !data.authUrl) {
-        // Fallback to demo login if Google credentials not configured
-        await get().loginWithDemo();
-        stopPolling();
-        return;
+      const authUrl = data.authUrl || data.url;
+      if (!authUrl) {
+        throw new Error(data.error || 'Failed to retrieve Google authorization URL');
       }
 
-      if (data.authUrl) {
-        window.open(data.authUrl, '_blank', 'noopener,noreferrer');
-        let attempts = 0;
-        pollTimer = setInterval(async () => {
-          attempts++;
-          await get().checkAuthStatus();
-          if (get().isAuthenticated || attempts > 60) {
-            stopPolling();
-          }
-        }, 1500);
-      }
+      window.open(authUrl, '_blank', 'noopener,noreferrer');
+      let attempts = 0;
+      pollTimer = setInterval(async () => {
+        attempts++;
+        await get().checkAuthStatus();
+        if (get().isAuthenticated || attempts > 60) {
+          stopPolling();
+        }
+      }, 1500);
     } catch (err: any) {
       stopPolling();
       set({ error: err.message || 'Failed to sign in with Google' });
-    }
-  },
-
-  loginWithDemo: async () => {
-    set({ isLoading: true, error: null });
-    try {
-      if (isWailsApp() && typeof AppBindings.LoginWithDemo === 'function') {
-        const status = await AppBindings.LoginWithDemo();
-        set({
-          isAuthenticated: Boolean(status.isAuthenticated),
-          isDemoMode: Boolean(status.isDemoMode),
-          user: (status.user as UserProfile) || null,
-          isLoading: false,
-        });
-        telemetry.trackFeature('demo_login');
-        return;
-      }
-
-      const res = await apiFetch('/api/auth/demo-login', {
-        method: 'POST',
-      });
-      if (!res.ok) {
-        throw new Error('Demo login failed');
-      }
-      const data = await res.json();
-      set({
-        isAuthenticated: Boolean(data.isAuthenticated),
-        isDemoMode: Boolean(data.isDemoMode),
-        user: (data.user as UserProfile) || null,
-        isLoading: false,
-      });
-      telemetry.trackFeature('demo_login');
-    } catch (err: any) {
-      set({
-        isLoading: false,
-        error: err.message || 'Demo login failed',
-      });
     }
   },
 

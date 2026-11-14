@@ -59,7 +59,7 @@ func TestBuildEvents(t *testing.T) {
 		t.Errorf("Expected feature sql_playground_run, got %v", featEv.Params["feature_name"])
 	}
 
-	signInEv := BuildUserSignedInEvent("google", false)
+	signInEv := BuildUserSignedInEvent("google")
 	if signInEv.Name != "user_signed_in" || signInEv.Params["provider"] != "google" {
 		t.Errorf("Unexpected signInEv: %+v", signInEv)
 	}

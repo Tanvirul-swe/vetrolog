@@ -58,8 +58,6 @@ export function GetTelemetryStatus():Promise<Record<string, any>>;
 
 export function ListSavedConnections():Promise<Array<types.ConnectionSummary>>;
 
-export function LoginWithDemo():Promise<auth.AuthStatus>;
-
 export function OpenConnection(arg1:string):Promise<types.ConnectionSession>;
 
 export function OpenLocalSQLiteFile(arg1:string):Promise<types.ConnectionSession>;

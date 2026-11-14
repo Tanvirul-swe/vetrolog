@@ -1,17 +1,19 @@
 package auth
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 )
@@ -24,6 +26,7 @@ const (
 
 // Service coordinates Google OAuth 2.0 flow and local user session persistence
 type Service struct {
+	port              int
 	clientID          string
 	clientSecret      string
 	redirectURI       string
@@ -31,6 +34,8 @@ type Service struct {
 	states            map[string]time.Time
 	customSessionFile string
 	httpClient        *http.Client
+	callbackServer    *http.Server
+	onLoginSuccess    func(profile *UserProfile)
 	mu                sync.RWMutex
 }
 
@@ -41,6 +46,7 @@ func NewService(port int) *Service {
 	redirectURI := fmt.Sprintf("http://localhost:%d/api/auth/google/callback", port)
 
 	s := &Service{
+		port:         port,
 		clientID:     clientID,
 		clientSecret: clientSecret,
 		redirectURI:  redirectURI,
@@ -55,6 +61,118 @@ func NewService(port int) *Service {
 	return s
 }
 
+// SetOnLoginSuccess sets a hook called after successful OAuth login
+func (s *Service) SetOnLoginSuccess(fn func(profile *UserProfile)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.onLoginSuccess = fn
+}
+
+// StartCallbackServer starts a background HTTP listener on 127.0.0.1:port to receive the Google OAuth callback
+func (s *Service) StartCallbackServer() error {
+	s.mu.Lock()
+	if s.callbackServer != nil {
+		s.mu.Unlock()
+		return nil
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/auth/google/callback", func(w http.ResponseWriter, r *http.Request) {
+		code := r.URL.Query().Get("code")
+		state := r.URL.Query().Get("state")
+		if code == "" || state == "" {
+			http.Error(w, "Missing authorization code or state parameter", http.StatusBadRequest)
+			return
+		}
+
+		profile, err := s.HandleCallback(code, state)
+		if err != nil {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.WriteHeader(http.StatusUnauthorized)
+			fmt.Fprintf(w, `<!DOCTYPE html><html><body style="font-family:sans-serif;background:#0B0F19;color:#F87171;text-align:center;padding:50px;"><h2>Authentication Failed</h2><p>%s</p></body></html>`, html.EscapeString(err.Error()))
+			return
+		}
+
+		s.mu.RLock()
+		onSuccess := s.onLoginSuccess
+		s.mu.RUnlock()
+		if onSuccess != nil {
+			onSuccess(profile)
+		}
+
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>VetroLog — Authentication Successful</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0B0F19; color: #F1F5F9; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+    .card { background: #131B2E; border: 1px solid #1E293B; border-radius: 16px; padding: 36px; text-align: center; max-width: 400px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); }
+    .icon { font-size: 48px; margin-bottom: 16px; }
+    h1 { font-size: 20px; font-weight: 600; margin: 0 0 8px 0; color: #38BDF8; }
+    p { font-size: 13px; color: #94A3B8; margin: 0 0 20px 0; line-height: 1.5; }
+    .btn { display: inline-block; background: #0284C7; color: white; padding: 10px 24px; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 500; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">✨</div>
+    <h1>Signed In Successfully</h1>
+    <p>Your Google account has been connected to VetroLog. You can now close this tab and return to the application.</p>
+    <a href="javascript:window.close()" class="btn">Close Window</a>
+  </div>
+  <script>
+    if (window.opener) {
+      window.opener.postMessage({ type: 'vetrolog:auth_success' }, '*');
+    }
+    setTimeout(() => { try { window.close(); } catch(e){} }, 2000);
+  </script>
+</body>
+</html>`))
+	})
+
+	srv := &http.Server{
+		Addr:    fmt.Sprintf("127.0.0.1:%d", s.port),
+		Handler: mux,
+	}
+	s.callbackServer = srv
+	s.mu.Unlock()
+
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Printf("[Auth] Callback server error: %v", err)
+		}
+	}()
+
+	return nil
+}
+
+// StopCallbackServer gracefully shuts down the callback HTTP listener
+func (s *Service) StopCallbackServer() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.callbackServer != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_ = s.callbackServer.Shutdown(ctx)
+		s.callbackServer = nil
+	}
+}
+
+// SaveSessionForTest forces saving a user profile for isolated testing
+func (s *Service) SaveSessionForTest(user *UserProfile) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.currentUser = user
+	return s.saveSession(&SessionData{
+		User:        user,
+		AccessToken: "mock-test-token",
+		SavedAt:     time.Now().Format(time.RFC3339),
+	})
+}
+
 // SetCustomSessionFileForTest overrides session file path for isolated tests
 func (s *Service) SetCustomSessionFileForTest(path string) {
 	s.mu.Lock()
@@ -62,14 +180,11 @@ func (s *Service) SetCustomSessionFileForTest(path string) {
 	s.customSessionFile = path
 }
 
-// IsDemoMode returns true if Google OAuth credentials are not configured or are placeholders
-func (s *Service) IsDemoMode() bool {
+// IsConfigured returns true if Google OAuth credentials are set
+func (s *Service) IsConfigured() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.clientID == "" ||
-		s.clientSecret == "" ||
-		strings.HasPrefix(s.clientID, "DEMO_") ||
-		strings.HasPrefix(s.clientID, "demo_")
+	return s.clientID != "" && s.clientSecret != ""
 }
 
 // GetStatus returns the active authentication state
@@ -79,16 +194,8 @@ func (s *Service) GetStatus() AuthStatus {
 
 	return AuthStatus{
 		IsAuthenticated: s.currentUser != nil,
-		IsDemoMode:      s.isDemoModeLocked(),
 		User:            s.currentUser,
 	}
-}
-
-func (s *Service) isDemoModeLocked() bool {
-	return s.clientID == "" ||
-		s.clientSecret == "" ||
-		strings.HasPrefix(s.clientID, "DEMO_") ||
-		strings.HasPrefix(s.clientID, "demo_")
 }
 
 // GetCurrentUser returns the active user profile or nil
@@ -103,8 +210,8 @@ func (s *Service) GenerateAuthURL() (string, string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.isDemoModeLocked() {
-		return "", "", errors.New("google oauth credentials not configured (running in demo mode)")
+	if s.clientID == "" || s.clientSecret == "" {
+		return "", "", errors.New("google oauth credentials not configured")
 	}
 
 	stateBytes := make([]byte, 16)
@@ -215,7 +322,7 @@ func (s *Service) HandleCallback(code string, state string) (*UserProfile, error
 		GivenName:  rawUser.GivenName,
 		FamilyName: rawUser.FamilyName,
 		Provider:   "google",
-		LoggedInAt: time.Now(),
+		LoggedInAt: time.Now().Format(time.RFC3339),
 	}
 
 	s.mu.Lock()
@@ -225,35 +332,10 @@ func (s *Service) HandleCallback(code string, state string) (*UserProfile, error
 	_ = s.saveSession(&SessionData{
 		User:        profile,
 		AccessToken: tokenRes.AccessToken,
-		SavedAt:     time.Now(),
+		SavedAt:     time.Now().Format(time.RFC3339),
 	})
 
 	return profile, nil
-}
-
-// LoginWithDemo logs in with a mock developer profile for local development without Google Cloud setup
-func (s *Service) LoginWithDemo() *UserProfile {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	profile := &UserProfile{
-		ID:         "demo_dev_user_001",
-		Email:      "demo.developer@gmail.com",
-		Name:       "Demo Developer",
-		Picture:    "https://api.dicebear.com/7.x/identicon/svg?seed=vetrolog-demo",
-		GivenName:  "Demo",
-		FamilyName: "Developer",
-		Provider:   "demo",
-		LoggedInAt: time.Now(),
-	}
-
-	s.currentUser = profile
-	_ = s.saveSession(&SessionData{
-		User:    profile,
-		SavedAt: time.Now(),
-	})
-
-	return profile
 }
 
 // SignOut clears the active session both in memory and on disk

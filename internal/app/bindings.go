@@ -2,8 +2,6 @@ package app
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -287,10 +285,10 @@ func (a *App) SetTelemetryEnabled(enabled bool) bool {
 // Authentication (Google OAuth 2.0 & Developer Profile)
 // =========================================================================
 
-// GetAuthStatus returns current user profile and demo mode state
+// GetAuthStatus returns current user profile authentication state
 func (a *App) GetAuthStatus() auth.AuthStatus {
 	if a.authService == nil {
-		return auth.AuthStatus{IsAuthenticated: false, IsDemoMode: true}
+		return auth.AuthStatus{IsAuthenticated: false}
 	}
 	return a.authService.GetStatus()
 }
@@ -300,9 +298,15 @@ func (a *App) StartGoogleLogin() (string, error) {
 	if a.authService == nil {
 		return "", fmt.Errorf("auth service not initialized")
 	}
-	if a.authService.IsDemoMode() {
-		return "", fmt.Errorf("google oauth is not configured or in demo mode")
+	if !a.authService.IsConfigured() {
+		return "", fmt.Errorf("google oauth credentials not configured in .env")
 	}
+
+	// Ensure the local callback server is listening on port 8787 to receive Google's redirect
+	if err := a.authService.StartCallbackServer(); err != nil {
+		return "", fmt.Errorf("failed to start auth callback server: %w", err)
+	}
+
 	authURL, _, err := a.authService.GenerateAuthURL()
 	if err != nil {
 		return "", err
@@ -311,20 +315,6 @@ func (a *App) StartGoogleLogin() (string, error) {
 		runtime.BrowserOpenURL(a.ctx, authURL)
 	}
 	return authURL, nil
-}
-
-// LoginWithDemo logs in with a local offline test profile
-func (a *App) LoginWithDemo() auth.AuthStatus {
-	if a.authService == nil {
-		return auth.AuthStatus{IsAuthenticated: false, IsDemoMode: true}
-	}
-	profile := a.authService.LoginWithDemo()
-	if a.telemetry != nil {
-		h := sha256.Sum256([]byte(profile.ID))
-		a.telemetry.SetUserID(hex.EncodeToString(h[:]))
-		a.telemetry.Track(telemetry.BuildUserSignedInEvent("demo", true))
-	}
-	return a.authService.GetStatus()
 }
 
 // SignOut clears active session

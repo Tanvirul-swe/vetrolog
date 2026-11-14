@@ -103,12 +103,11 @@ func BuildFeatureUsedEvent(featureName string, metadata map[string]interface{}) 
 }
 
 // BuildUserSignedInEvent records an authentication event without leaking personal identifiers
-func BuildUserSignedInEvent(provider string, isDemo bool) GA4Event {
+func BuildUserSignedInEvent(provider string) GA4Event {
 	return GA4Event{
 		Name: "user_signed_in",
 		Params: map[string]interface{}{
-			"provider": provider, // e.g. "google", "demo"
-			"is_demo":  isDemo,
+			"provider": provider, // e.g. "google"
 			"os":       runtime.GOOS,
 		},
 	}

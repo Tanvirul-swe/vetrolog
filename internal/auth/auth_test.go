@@ -6,32 +6,40 @@ import (
 	"testing"
 )
 
-func TestAuthService_DemoModeAndLogin(t *testing.T) {
+func TestAuthService_SessionAndSignOut(t *testing.T) {
 	svc := NewService(8787)
 	tmpFile := filepath.Join(t.TempDir(), "session.json")
 	svc.SetCustomSessionFileForTest(tmpFile)
 
-	// 1. Initial State should be unauthenticated and demo mode
+	// 1. Initial State should be unauthenticated
 	status := svc.GetStatus()
 	if status.IsAuthenticated {
 		t.Fatal("Expected initially unauthenticated")
 	}
-	if !status.IsDemoMode {
-		t.Fatal("Expected demo mode when no Google credentials are set")
-	}
 
-	// 2. Login with Demo
-	user := svc.LoginWithDemo()
-	if user == nil || user.Email != "demo.developer@gmail.com" {
-		t.Fatalf("Unexpected demo user: %+v", user)
+	// 2. Simulate saving authenticated session
+	testProfile := &UserProfile{
+		ID:         "test_user_123",
+		Email:      "test.developer@gmail.com",
+		Name:       "Test Developer",
+		Provider:   "google",
+		LoggedInAt: "2026-11-13T12:00:00Z",
 	}
+	svc.mu.Lock()
+	svc.currentUser = testProfile
+	_ = svc.saveSession(&SessionData{
+		User:        testProfile,
+		AccessToken: "mock-token",
+		SavedAt:     "2026-11-13T12:00:00Z",
+	})
+	svc.mu.Unlock()
 
 	status = svc.GetStatus()
 	if !status.IsAuthenticated {
-		t.Fatal("Expected authenticated after LoginWithDemo")
+		t.Fatal("Expected authenticated after saving session")
 	}
-	if status.User == nil || status.User.Name != "Demo Developer" {
-		t.Fatalf("Expected Demo Developer user, got: %+v", status.User)
+	if status.User == nil || status.User.Name != "Test Developer" {
+		t.Fatalf("Expected Test Developer user, got: %+v", status.User)
 	}
 
 	// 3. New service instance should reload saved session from disk
@@ -39,7 +47,7 @@ func TestAuthService_DemoModeAndLogin(t *testing.T) {
 	svc2.SetCustomSessionFileForTest(tmpFile)
 	svc2.loadStoredSession()
 	status2 := svc2.GetStatus()
-	if !status2.IsAuthenticated || status2.User == nil || status2.User.Email != "demo.developer@gmail.com" {
+	if !status2.IsAuthenticated || status2.User == nil || status2.User.Email != "test.developer@gmail.com" {
 		t.Fatalf("Expected reloaded session, got: %+v", status2)
 	}
 
@@ -57,10 +65,10 @@ func TestAuthService_DemoModeAndLogin(t *testing.T) {
 func TestAuthService_GenerateAuthURL(t *testing.T) {
 	svc := NewService(8787)
 
-	// Without credentials, should fail gracefully with demo mode warning
+	// Without credentials, should fail gracefully
 	_, _, err := svc.GenerateAuthURL()
-	if err == nil || !strings.Contains(err.Error(), "demo mode") {
-		t.Fatalf("Expected demo mode error, got: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "credentials not configured") {
+		t.Fatalf("Expected credentials error, got: %v", err)
 	}
 
 	// Simulate configured credentials
@@ -84,6 +92,21 @@ func TestAuthService_GenerateAuthURL(t *testing.T) {
 	}
 	if !strings.Contains(authURL, state) {
 		t.Errorf("Expected state in authURL: %s", authURL)
+	}
+}
+
+func TestAuthService_CallbackServerLifecycle(t *testing.T) {
+	// Pick an ephemeral port for testing
+	testPort := 18787
+	svc := NewService(testPort)
+	if err := svc.StartCallbackServer(); err != nil {
+		t.Fatalf("StartCallbackServer failed: %v", err)
+	}
+	defer svc.StopCallbackServer()
+
+	// Calling Start again should be idempotent
+	if err := svc.StartCallbackServer(); err != nil {
+		t.Fatalf("Subsequent StartCallbackServer failed: %v", err)
 	}
 }
 

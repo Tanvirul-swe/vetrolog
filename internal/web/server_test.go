@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"vetrolog/internal/auth"
 )
 
 func TestSecurityAndAuthMiddleware(t *testing.T) {
@@ -127,21 +129,20 @@ func TestAuthAndTelemetryEndpoints(t *testing.T) {
 		t.Fatalf("Expected 200 OK from /api/auth/status, got %d", wAuthStatus.Code)
 	}
 
-	// 2. /api/auth/demo-login with valid token
-	reqDemoLogin := httptest.NewRequest("POST", "/api/auth/demo-login", nil)
-	reqDemoLogin.Header.Set("X-Vetro-Token", "auth-token-xyz")
-	wDemoLogin := httptest.NewRecorder()
-	handler.ServeHTTP(wDemoLogin, reqDemoLogin)
-	if wDemoLogin.Code != http.StatusOK {
-		t.Fatalf("Expected 200 OK from demo login, got %d: %s", wDemoLogin.Code, wDemoLogin.Body.String())
+	// 2. Simulate authenticated state
+	srv.authService.SetCustomSessionFileForTest(tmpSessionFile)
+	testUser := &auth.UserProfile{
+		ID:    "test_sub_1",
+		Email: "test.dev@gmail.com",
+		Name:  "Test Dev",
 	}
+	_ = srv.authService.SaveSessionForTest(testUser)
 
-	// Verify status is now authenticated
 	reqStatusAfter := httptest.NewRequest("GET", "/api/auth/status", nil)
 	wStatusAfter := httptest.NewRecorder()
 	handler.ServeHTTP(wStatusAfter, reqStatusAfter)
-	if !strings.Contains(wStatusAfter.Body.String(), "demo.developer@gmail.com") {
-		t.Fatalf("Expected demo user profile in status: %s", wStatusAfter.Body.String())
+	if !strings.Contains(wStatusAfter.Body.String(), "test.dev@gmail.com") {
+		t.Fatalf("Expected test user profile in status: %s", wStatusAfter.Body.String())
 	}
 
 	// 3. /api/auth/logout with valid token

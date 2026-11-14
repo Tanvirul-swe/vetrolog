@@ -41,6 +41,13 @@ func NewApp() *App {
 	tel := telemetry.NewService("desktop")
 	dbMgr, _ := db.NewConnectionManager()
 	authSvc := auth.NewService(8787)
+	authSvc.SetOnLoginSuccess(func(profile *auth.UserProfile) {
+		if tel != nil {
+			h := sha256.Sum256([]byte(profile.ID))
+			tel.SetUserID(hex.EncodeToString(h[:]))
+			tel.Track(telemetry.BuildUserSignedInEvent("google"))
+		}
+	})
 
 	if u := authSvc.GetCurrentUser(); u != nil {
 		h := sha256.Sum256([]byte(u.ID))

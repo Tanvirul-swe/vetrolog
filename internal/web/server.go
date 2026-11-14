@@ -148,13 +148,13 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	})
 
 	// -------------------------------------------------------------------------
-	// Authentication (Google OAuth 2.0 & Demo Mode)
+	// Authentication (Google OAuth 2.0)
 	// -------------------------------------------------------------------------
 
-	// Status: returns whether user is authenticated and if running in demo mode
+	// Status: returns whether user is authenticated
 	mux.HandleFunc("/api/auth/status", func(w http.ResponseWriter, r *http.Request) {
 		if s.authService == nil {
-			writeJSON(w, http.StatusOK, auth.AuthStatus{IsAuthenticated: false, IsDemoMode: true})
+			writeJSON(w, http.StatusOK, auth.AuthStatus{IsAuthenticated: false})
 			return
 		}
 		writeJSON(w, http.StatusOK, s.authService.GetStatus())
@@ -162,9 +162,9 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 
 	// Login: returns Google authorization URL
 	mux.HandleFunc("/api/auth/google/login", func(w http.ResponseWriter, r *http.Request) {
-		if s.authService == nil || s.authService.IsDemoMode() {
+		if s.authService == nil || !s.authService.IsConfigured() {
 			writeJSON(w, http.StatusBadRequest, map[string]string{
-				"error": "Google OAuth is not configured or in demo mode. Use /api/auth/demo-login.",
+				"error": "Google OAuth is not configured. Please supply VETROLOG_GOOGLE_CLIENT_ID and VETROLOG_GOOGLE_CLIENT_SECRET in .env.",
 			})
 			return
 		}
@@ -174,8 +174,9 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]string{
-			"url":   authURL,
-			"state": state,
+			"url":     authURL,
+			"authUrl": authURL,
+			"state":   state,
 		})
 	})
 
@@ -195,7 +196,7 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 
 		if s.telemetry != nil {
 			s.telemetry.SetUserID(hashSubjectID(profile.ID))
-			s.telemetry.Track(telemetry.BuildUserSignedInEvent("google", false))
+			s.telemetry.Track(telemetry.BuildUserSignedInEvent("google"))
 		}
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -231,24 +232,6 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 </html>`))
 	})
 
-	// Demo Login: local offline mock profile
-	mux.HandleFunc("/api/auth/demo-login", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-		if s.authService == nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "auth service not initialized"})
-			return
-		}
-		profile := s.authService.LoginWithDemo()
-		if s.telemetry != nil {
-			s.telemetry.SetUserID(hashSubjectID(profile.ID))
-			s.telemetry.Track(telemetry.BuildUserSignedInEvent("demo", true))
-		}
-		writeJSON(w, http.StatusOK, s.authService.GetStatus())
-	})
-
 	// Logout: clears session
 	mux.HandleFunc("/api/auth/logout", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -262,7 +245,7 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 			s.telemetry.SetUserID("")
 			s.telemetry.Track(telemetry.BuildUserSignedOutEvent())
 		}
-		status := auth.AuthStatus{IsAuthenticated: false, IsDemoMode: s.authService != nil && s.authService.IsDemoMode()}
+		status := auth.AuthStatus{IsAuthenticated: false}
 		writeJSON(w, http.StatusOK, status)
 	})
 

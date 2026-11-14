@@ -106,10 +106,6 @@ export function ListSavedConnections() {
   return window['go']['app']['App']['ListSavedConnections']();
 }
 
-export function LoginWithDemo() {
-  return window['go']['app']['App']['LoginWithDemo']();
-}
-
 export function OpenConnection(arg1) {
   return window['go']['app']['App']['OpenConnection'](arg1);
 }

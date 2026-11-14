@@ -35,13 +35,11 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
   const setTheme = useThemeStore((s) => s.setTheme);
 
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  const isDemoMode = useAuthStore((s) => s.isDemoMode);
   const user = useAuthStore((s) => s.user);
   const isAuthenticating = useAuthStore((s) => s.isAuthenticating);
   const isLoading = useAuthStore((s) => s.isLoading);
   const authError = useAuthStore((s) => s.error);
   const loginWithGoogle = useAuthStore((s) => s.loginWithGoogle);
-  const loginWithDemo = useAuthStore((s) => s.loginWithDemo);
   const logout = useAuthStore((s) => s.logout);
   const clearError = useAuthStore((s) => s.clearError);
 
@@ -101,7 +99,7 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
                         : 'bg-primary/10 text-primary border-primary/30'
                     }`}
                   >
-                    {isAuthenticated ? (user?.provider === 'google' ? 'Google Account' : 'Demo Account') : 'Local'}
+                    {isAuthenticated ? 'Google Account' : 'Local'}
                   </Badge>
                 </div>
                 <p className="text-xs text-muted-foreground font-mono mt-0.5 truncate">
@@ -178,18 +176,12 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
                       </p>
                     </div>
 
-                    {isDemoMode && (
-                      <div className="p-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-300 text-[11px] flex items-center justify-between">
-                        <span>Demo Mode active (Google OAuth credentials placeholder detected in .env).</span>
-                      </div>
-                    )}
-
-                    <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                    <div className="pt-1">
                       <Button
                         type="button"
                         onClick={loginWithGoogle}
                         disabled={isAuthenticating || isLoading}
-                        className="flex-1 h-9 text-xs gap-2 bg-foreground text-background hover:bg-foreground/90 font-medium"
+                        className="w-full h-9 text-xs gap-2 bg-foreground text-background hover:bg-foreground/90 font-medium"
                       >
                         {isAuthenticating ? (
                           <Loader2 className="size-3.5 animate-spin" />
@@ -215,16 +207,6 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
                         )}
                         <span>{isAuthenticating ? 'Waiting for browser...' : 'Sign in with Google'}</span>
                       </Button>
-
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={loginWithDemo}
-                        disabled={isAuthenticating || isLoading}
-                        className="h-9 text-xs border-border/80 hover:bg-muted text-muted-foreground hover:text-foreground"
-                      >
-                        {isLoading ? <Loader2 className="size-3.5 animate-spin" /> : 'Continue as Demo'}
-                      </Button>
                     </div>
                   </div>
                 ) : (
@@ -234,7 +216,7 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
                       <div className="flex items-center gap-2">
                         <CheckCircle2 className="size-4 text-emerald-400" />
                         <span className="text-xs font-semibold text-foreground">
-                          {user?.provider === 'google' ? 'Google Account Connected' : 'Demo Account Active'}
+                          Google Account Connected
                         </span>
                       </div>
                       <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-400 border-emerald-500/30">

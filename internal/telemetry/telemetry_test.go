@@ -58,6 +58,16 @@ func TestBuildEvents(t *testing.T) {
 	if featEv.Params["feature_name"] != "sql_playground_run" {
 		t.Errorf("Expected feature sql_playground_run, got %v", featEv.Params["feature_name"])
 	}
+
+	signInEv := BuildUserSignedInEvent("google")
+	if signInEv.Name != "user_signed_in" || signInEv.Params["provider"] != "google" {
+		t.Errorf("Unexpected signInEv: %+v", signInEv)
+	}
+
+	signOutEv := BuildUserSignedOutEvent()
+	if signOutEv.Name != "user_signed_out" {
+		t.Errorf("Unexpected signOutEv: %+v", signOutEv)
+	}
 }
 
 func TestServiceOptOut(t *testing.T) {

@@ -29,6 +29,8 @@ jobs:
             os: ubuntu-22.04
             wails_platform: linux/amd64
             artifact_name: VetroLog-Linux-x64
+    env:
+      BUILD_LDFLAGS: "-X vetrolog/internal/auth.DefaultClientID=${{ secrets.VETROLOG_GOOGLE_CLIENT_ID }} -X vetrolog/internal/auth.DefaultClientSecret=${{ secrets.VETROLOG_GOOGLE_CLIENT_SECRET }} -X vetrolog/internal/telemetry.DefaultMeasurementID=${{ secrets.VETROLOG_GA_MEASUREMENT_ID }} -X vetrolog/internal/telemetry.DefaultAPISecret=${{ secrets.VETROLOG_GA_API_SECRET }}"
 
     steps:
       - name: Checkout Code
@@ -67,7 +69,7 @@ jobs:
       - name: Build macOS Universal App
         if: runner.os == 'macOS'
         run: |
-          wails build -platform ${{ matrix.platform.wails_platform }} -clean
+          wails build -platform ${{ matrix.platform.wails_platform }} -clean -ldflags "$BUILD_LDFLAGS"
           # Create zip archive of the .app
           cd build/bin
           ditto -c -k --sequesterRsrc --keepParent VetroLog.app VetroLog-macOS-Universal.zip
@@ -91,7 +93,7 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           choco install nsis -y
-          wails build -platform ${{ matrix.platform.wails_platform }} -clean -nsis
+          wails build -platform ${{ matrix.platform.wails_platform }} -clean -nsis -ldflags "$env:BUILD_LDFLAGS"
           cd build/bin
           Compress-Archive -Path vetrolog.exe -DestinationPath VetroLog-Windows-x64-Portable.zip
 
@@ -99,7 +101,7 @@ jobs:
       - name: Build Linux Binary & Debian Package
         if: runner.os == 'Linux'
         run: |
-          wails build -platform ${{ matrix.platform.wails_platform }} -clean
+          wails build -platform ${{ matrix.platform.wails_platform }} -clean -ldflags "$BUILD_LDFLAGS"
           cd build/bin
           tar -czvf VetroLog-Linux-x64.tar.gz vetrolog
           

@@ -22,6 +22,11 @@ func (a *App) Startup(ctx context.Context) {
 
 	// Start mDNS ZeroConf discovery advertisement for local Wi-Fi mobile clients
 	a.mdns = discovery.NewMDNSService(a.config.WSPort)
+
+	// Start local OAuth callback server on port 8787 for Google Sign-In
+	if a.authService != nil && a.authService.IsConfigured() {
+		_ = a.authService.StartCallbackServer()
+	}
 }
 
 // DomReady is called after the frontend DOM has been loaded
@@ -50,6 +55,9 @@ func (a *App) Shutdown(ctx context.Context) {
 	}
 	if a.dbManager != nil {
 		a.dbManager.CloseAll()
+	}
+	if a.authService != nil {
+		a.authService.StopCallbackServer()
 	}
 	a.batcher.Stop()
 	a.server.Stop()

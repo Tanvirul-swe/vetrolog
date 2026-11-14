@@ -1,5 +1,5 @@
 import * as AppBindings from '@/../wailsjs/go/app/App';
-import { isWailsApp } from '@/services/apiBridge';
+import { isWailsApp, apiFetch } from '@/services/apiBridge';
 
 export interface TelemetryStatus {
   enabled: boolean;
@@ -36,9 +36,21 @@ export const telemetry = {
 
       // Browser fallback (checks local opt-out)
       const optOut = localStorage.getItem(LOCAL_STORAGE_OPT_OUT) === 'true';
-      if (!optOut && import.meta.env.DEV) {
-        // In local development, log to console for visibility
-        console.debug(`[Telemetry Preview] ${name}`, params);
+      if (!optOut) {
+        if (import.meta.env.DEV) {
+          // In local development, log to console for visibility
+          console.debug(`[Telemetry Preview] ${name}`, params);
+        }
+        // Send to web backend if server is accessible
+        try {
+          await apiFetch('/api/telemetry/event', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, params }),
+          });
+        } catch {
+          // Fail silently
+        }
       }
     } catch {
       // Fail silently; analytics must never interrupt user workflows
@@ -90,6 +102,14 @@ export const telemetry = {
         return {
           enabled: Boolean(res?.enabled),
           clientId: String(res?.clientId || ''),
+        };
+      }
+      const res = await apiFetch('/api/telemetry/status');
+      if (res.ok) {
+        const data = await res.json();
+        return {
+          enabled: Boolean(data?.enabled),
+          clientId: String(data?.clientId || ''),
         };
       }
     } catch {

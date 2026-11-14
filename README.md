@@ -44,6 +44,7 @@ Visit our complete documentation site: **[https://vetro.hifzio.com/](https://vet
 | **[💻 Multi-Platform Installation](https://vetro.hifzio.com/getting-started/installation/)** | Direct download & setup guides for macOS (Universal DMG), Windows, and Linux. |
 | **[📱 Framework Guides](https://vetro.hifzio.com/framework-guides/flutter/)** | Integration guides for Flutter (Drift/sqflite), Android (Room), and React Native. |
 | **[🤝 Contributing Guidelines](CONTRIBUTING.md)** | Codebase directory map, local dev setup, quality checks, and PR standards. |
+| **[🔒 Telemetry & Privacy Policy](docs/TELEMETRY.md)** | Zero-PII contract, Google Analytics 4 taxonomy, OAuth 2.0 specs, and opt-out methods. |
 | **[🚀 Deployment & CI/CD](https://vetro.hifzio.com/deployment-and-modes/ci-cd-releases/)** | Release tagging workflow, GitHub Actions matrix packaging, and in-app updater mechanics. |
 
 ---
@@ -149,9 +150,17 @@ If you prefer to inspect your databases in **Chrome, Safari, Firefox**, or run V
 git clone https://github.com/Tanvirul-swe/vetrolog.git
 cd vetrolog
 
+# (Optional) Copy environment template for telemetry or OAuth testing
+cp .env.example .env
+
+# Install frontend dependencies
+cd frontend && npm install && cd ..
+
 # Start development server with live reload
 wails dev
 ```
+
+> **Note**: VetroLog runs in **Demo Mode** out of the box with zero external configuration required. All database tools and ADB inspection are 100% functional offline without any API keys or credentials.
 
 ### Production Build
 ```bash

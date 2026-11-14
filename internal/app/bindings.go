@@ -10,9 +10,11 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"vetrolog/internal/adb"
+	"vetrolog/internal/auth"
 	"vetrolog/internal/db/types"
 	"vetrolog/internal/discovery"
 	"vetrolog/internal/models"
+	"vetrolog/internal/telemetry"
 	"vetrolog/internal/updater"
 )
 
@@ -277,6 +279,54 @@ func (a *App) SetTelemetryEnabled(enabled bool) bool {
 	}
 	_ = a.telemetry.SetEnabled(enabled)
 	return a.telemetry.IsEnabled()
+}
+
+// =========================================================================
+// Authentication (Google OAuth 2.0 & Developer Profile)
+// =========================================================================
+
+// GetAuthStatus returns current user profile authentication state
+func (a *App) GetAuthStatus() auth.AuthStatus {
+	if a.authService == nil {
+		return auth.AuthStatus{IsAuthenticated: false}
+	}
+	return a.authService.GetStatus()
+}
+
+// StartGoogleLogin generates Google OAuth authorization URL and launches default browser
+func (a *App) StartGoogleLogin() (string, error) {
+	if a.authService == nil {
+		return "", fmt.Errorf("auth service not initialized")
+	}
+	if !a.authService.IsConfigured() {
+		return "", fmt.Errorf("google oauth credentials not configured in .env")
+	}
+
+	// Ensure the local callback server is listening on port 8787 to receive Google's redirect
+	if err := a.authService.StartCallbackServer(); err != nil {
+		return "", fmt.Errorf("failed to start auth callback server: %w", err)
+	}
+
+	authURL, _, err := a.authService.GenerateAuthURL()
+	if err != nil {
+		return "", err
+	}
+	if a.ctx != nil {
+		runtime.BrowserOpenURL(a.ctx, authURL)
+	}
+	return authURL, nil
+}
+
+// SignOut clears active session
+func (a *App) SignOut() bool {
+	if a.authService != nil {
+		_ = a.authService.SignOut()
+	}
+	if a.telemetry != nil {
+		a.telemetry.SetUserID("")
+		a.telemetry.Track(telemetry.BuildUserSignedOutEvent())
+	}
+	return true
 }
 
 // =========================================================================

@@ -18,6 +18,7 @@ import { useDatabaseStore } from '@/stores/useDatabaseStore';
 import { usePlaygroundStore } from '@/stores/usePlaygroundStore';
 import { useConnectionManagerStore } from '@/stores/useConnectionManagerStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
+import { useAuthStore } from '@/stores/useAuthStore';
 import { QRPairingModal } from '@/features/connection/components/QRPairingModal';
 import { AdbDeviceSelector } from '@/features/adb/components/AdbDeviceSelector';
 import { ConnectionManagerModal } from '@/features/connections/components/ConnectionManagerModal';
@@ -61,6 +62,9 @@ export function AppHeader({
 
   const isSidebarOpen = useSettingsStore((s) => s.isSidebarOpen);
   const toggleSidebar = useSettingsStore((s) => s.toggleSidebar);
+
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const user = useAuthStore((s) => s.user);
 
   const handleModeSwitch = async (mode: 'mobile' | 'remote') => {
     setWorkspaceMode(mode);
@@ -255,10 +259,26 @@ export function AppHeader({
               variant="ghost"
               size="icon-sm"
               onClick={() => setIsProfileOpen(true)}
-              title="User Profile & Preferences"
-              className="size-6 text-muted-foreground hover:text-foreground hover:bg-background/80"
+              title={isAuthenticated && user ? `${user.name} (${user.email})` : 'Developer Profile & Settings'}
+              className="size-6 text-muted-foreground hover:text-foreground hover:bg-background/80 relative"
             >
-              <User className="size-3.5 text-primary" />
+              {isAuthenticated && user?.picture ? (
+                <img
+                  src={user.picture}
+                  alt={user.name || 'User'}
+                  className="size-5 rounded-full object-cover ring-1 ring-emerald-500/70"
+                  referrerPolicy="no-referrer"
+                />
+              ) : isAuthenticated && user?.name ? (
+                <div className="size-5 rounded-full bg-primary/20 text-primary font-semibold text-[10px] flex items-center justify-center ring-1 ring-emerald-500/70">
+                  {user.name.charAt(0).toUpperCase()}
+                </div>
+              ) : (
+                <User className="size-3.5 text-primary" />
+              )}
+              {isAuthenticated && (
+                <span className="absolute -top-0.5 -right-0.5 size-1.5 rounded-full bg-emerald-500 ring-1 ring-background" />
+              )}
             </Button>
           </div>
         </div>

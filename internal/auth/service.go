@@ -39,10 +39,23 @@ type Service struct {
 	mu                sync.RWMutex
 }
 
+var (
+	// DefaultClientID is the fallback Google OAuth Client ID baked into production release builds via ldflags
+	DefaultClientID = ""
+	// DefaultClientSecret is the fallback Google OAuth Client Secret baked into production release builds via ldflags
+	DefaultClientSecret = ""
+)
+
 // NewService initializes the authentication service
 func NewService(port int) *Service {
 	clientID := os.Getenv("VETROLOG_GOOGLE_CLIENT_ID")
+	if clientID == "" {
+		clientID = DefaultClientID
+	}
 	clientSecret := os.Getenv("VETROLOG_GOOGLE_CLIENT_SECRET")
+	if clientSecret == "" {
+		clientSecret = DefaultClientSecret
+	}
 	redirectURI := fmt.Sprintf("http://localhost:%d/api/auth/google/callback", port)
 
 	s := &Service{

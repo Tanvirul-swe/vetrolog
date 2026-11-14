@@ -110,3 +110,32 @@ func TestAuthService_CallbackServerLifecycle(t *testing.T) {
 	}
 }
 
+func TestAuthService_DefaultCredentialsFallback(t *testing.T) {
+	oldClientID := DefaultClientID
+	oldClientSecret := DefaultClientSecret
+	DefaultClientID = "fallback-client-id"
+	DefaultClientSecret = "fallback-client-secret"
+	defer func() {
+		DefaultClientID = oldClientID
+		DefaultClientSecret = oldClientSecret
+	}()
+
+	t.Setenv("VETROLOG_GOOGLE_CLIENT_ID", "")
+	t.Setenv("VETROLOG_GOOGLE_CLIENT_SECRET", "")
+
+	svc := NewService(8787)
+	if svc.clientID != "fallback-client-id" {
+		t.Fatalf("expected fallback-client-id, got %s", svc.clientID)
+	}
+	if svc.clientSecret != "fallback-client-secret" {
+		t.Fatalf("expected fallback-client-secret, got %s", svc.clientSecret)
+	}
+
+	// Environment variable should take precedence over default
+	t.Setenv("VETROLOG_GOOGLE_CLIENT_ID", "env-client-id")
+	svcEnv := NewService(8787)
+	if svcEnv.clientID != "env-client-id" {
+		t.Fatalf("expected env-client-id, got %s", svcEnv.clientID)
+	}
+}
+

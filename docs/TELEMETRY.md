@@ -36,7 +36,7 @@ Here is the exhaustive list of events that VetroLog may send to Google Analytics
 
 | Event Name | Purpose | Example Parameters |
 | :--- | :--- | :--- |
-| `app_started` | Track application launches & platform distribution | `platform: "darwin"`, `arch: "arm64"`, `version: "v1.5.1"`, `app_mode: "desktop"` |
+| `app_started` | Track application launches & platform distribution | `platform: "darwin"`, `arch: "arm64"`, `version: "v1.6.0"`, `app_mode: "desktop"` |
 | `session_heartbeat` | Measure active developer engagement time | `duration_minutes: 5` |
 | `device_connected` | Count ADB device connection types | `connection_type: "adb_usb"`, `platform: "android"` |
 | `database_inspected` | Understand popular database engines & scale | `framework: "sqlite"`, `live_sync: true`, `table_bucket: "6-20"` *(never table names)* |

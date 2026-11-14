@@ -41,7 +41,7 @@ interface UpdaterStoreState {
   initEventListeners: () => () => void;
 }
 
-export const CURRENT_APP_VERSION = 'v1.5.1';
+export const CURRENT_APP_VERSION = 'v1.6.0';
 
 export const useUpdaterStore = create<UpdaterStoreState>((set, get) => ({
   status: 'idle',
@@ -151,9 +151,9 @@ export const useUpdaterStore = create<UpdaterStoreState>((set, get) => ({
   simulateUpdateFlow: () => {
     const mockInfo: UpdateInfoBridge = {
       currentVersion: CURRENT_APP_VERSION,
-      latestVersion: 'v1.5.1',
-      releaseName: 'v1.5.1 — Multi-Platform Desktop & VS Code Extension Studio',
-      releaseNotes: '### What is New in v1.5.1:\n• Official VS Code Extension: Inspect mobile apps over ADB and local/remote databases inside VS Code\n• Full Remote Database Studio: PostgreSQL, MySQL, MariaDB, SQLite, MSSQL, Redis REST daemon\n• Interactive Real-Time ER Diagram: Auto-generated visual maps, pan/zoom & multi-format exports\n• Modern Light & Dark Theme: High-contrast theme system with zero-flicker boot',
+      latestVersion: 'v1.6.0',
+      releaseName: 'v1.6.0 — Google Sign-In, Privacy-Preserving Telemetry & Cloud Ecosystem',
+      releaseNotes: '### What is New in v1.6.0:\n• Google OAuth 2.0 Sign-In: Secure one-click Google authentication with encrypted local session storage\n• Privacy-Preserving Telemetry: Anonymous usage insights powered by GA4 Measurement Protocol with full opt-out\n• Multi-Platform CI/CD Secrets Injection: Out-of-the-box binaries with compile-time ldflags\n• Enhanced UI Profile Modal: Live user avatar, name, and email with 1-click Sign Out',
       releaseUrl: 'https://github.com/Tanvirul-swe/vetrolog/releases',
       assetUrl: 'https://github.com/Tanvirul-swe/vetrolog/releases/download/v1.2.0/VetroLog-macOS-Universal.zip',
       assetName: 'VetroLog-macOS-Universal.zip',

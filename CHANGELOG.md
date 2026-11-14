@@ -5,6 +5,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [v1.6.0] - 2026-11-14
+
+### 🚀 Overview
+**VetroLog v1.6.0** introduces native **Google OAuth 2.0 Sign-In** with secure local desktop authorization callbacks, an enhanced **User Profile Hub**, a transparent and privacy-preserving **Anonymous Telemetry Engine** powered by Google Analytics 4 (GA4) Measurement Protocol with 1-click opt-out, and seamless **Production Multi-Platform CI/CD Secrets Injection** via Go build linker flags (`ldflags`).
+
+---
+
+### 🌟 New Features & Highlights
+
+#### 1. Native Google OAuth 2.0 Authentication (`internal/auth`)
+* **Standard Authorization Code Flow with PKCE**: Direct browser-to-app authentication leveraging Google Identity Services. State-validated authorization flow guarantees anti-CSRF security.
+* **Local Callback Server**: Dedicated desktop callback server listening on `127.0.0.1:8787` (`/api/auth/google/callback`) automatically receives the OAuth token exchange, communicates state to the desktop runtime, and renders a clean HTML completion page that closes the browser tab automatically.
+* **Encrypted Local Session Persistence**: User profile tokens and identity metadata are stored securely in `~/.vetrolog/auth_session.json` with multi-session reload and secure sign-out.
+* **Modern Profile Dialog (`features/profile`)**: Revamped user profile modal displaying verified avatar image, full name, email address, connected provider badge, and 1-click Sign Out action.
+* **Clean Codebase**: Completely removed legacy demo/mock authentication for a streamlined production authentication experience.
+
+#### 2. Privacy-Preserving Telemetry Engine (`internal/telemetry`)
+* **Anonymous Usage Insights**: Asynchronous, non-blocking telemetry powered by Google Analytics 4 Measurement Protocol (`/mp/collect`) to measure platform health and device distribution.
+* **No PII Collected**: Strictly tracks zero personal identity information, zero SQL queries, zero database schema names, and zero table contents.
+* **1-Click User Opt-Out**: Transparent opt-out configuration persisted to `~/.vetrolog/telemetry.json` with an immediate toggle in the User Profile modal.
+* **Full Transparency**: Published comprehensive telemetry policies and data dictionary in [`docs/TELEMETRY.md`](docs/TELEMETRY.md).
+
+#### 3. Production Multi-Platform Secrets Injection via Go `ldflags` (`.github/workflows/release.yml`)
+* **Automated CI/CD Compilation**: Release workflows for macOS Universal (`.dmg`, `.app`), Windows x64 (`.exe`, NSIS installer), and Linux x64 (`.deb`, `.tar.gz`) now inject production OAuth and telemetry credentials at build time using `-ldflags -X`.
+* **Zero Configuration for End-Users**: Downloaded binaries work immediately out of the box with zero setup.
+* **Local Developer Priority**: Environment variables loaded from `.env` or `~/.vetrolog/.env` take immediate precedence over compile-time defaults for smooth local developer testing.
+
+---
+
 ## [v1.5.1] - 2026-11-04
 
 ### 🚀 Overview
